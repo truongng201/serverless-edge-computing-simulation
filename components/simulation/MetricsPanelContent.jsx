@@ -56,23 +56,27 @@ export default function MetricsPanelContent({
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2">
                 <Server className="w-4 h-4" />
-                Edge Nodes
+                Edge Nodes (Warm)
               </span>
-              <Badge variant="outline">{edgeNodes.length}</Badge>
+              <Badge variant="outline">
+                {edgeNodes.length} ({edgeNodes.filter(e => e.isWarm).length})
+              </Badge>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2">
                 <Database className="w-4 h-4" />
-                Central Nodes
+                Central Nodes (Warm)
               </span>
-              <Badge variant="outline">{centralNodes.length}</Badge>
+              <Badge variant="outline">
+                {centralNodes.length} ({centralNodes.filter(c => c.isWarm).length})
+              </Badge>
             </div>
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2">
                 <Timer className="w-4 h-4" />
                 Avg Latency
               </span>
-              <Badge variant={totalLatency > 50 ? "destructive" : totalLatency > 25 ? "secondary" : "default"}>
+              <Badge variant={totalLatency > 500 ? "destructive" : totalLatency > 200 ? "secondary" : "default"}>
                 {totalLatency}ms
               </Badge>
             </div>
@@ -140,6 +144,7 @@ export default function MetricsPanelContent({
                   <span className="flex items-center gap-1">
                     <Database className="w-3 h-3" />
                     {central.id}
+                    {central.isWarm && <span className="text-green-500">●</span>}
                   </span>
                   <Badge
                     variant={
@@ -175,7 +180,10 @@ export default function MetricsPanelContent({
                 onClick={() => setSelectedEdge(selectedEdge && selectedEdge.id === edge.id ? null : edge)}
               >
                 <div className="flex justify-between text-xs mb-1">
-                  <span>{edge.id}</span>
+                  <span className="flex items-center gap-1">
+                    {edge.id}
+                    {edge.isWarm && <span className="text-green-500">●</span>}
+                  </span>
                   <Badge
                     variant={
                       edge.currentLoad > 80
@@ -194,6 +202,82 @@ export default function MetricsPanelContent({
             ))}
           </CardContent>
         </Card>
+
+        {/* Latency Breakdown - Show detailed metrics for selected node */}
+        {((selectedEdge && selectedEdge.lastMetrics) || (selectedCentral && selectedCentral.lastMetrics)) && (
+          <Card className="mb-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Timer className="w-4 h-4" />
+                Latency Breakdown
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {(() => {
+                const node = selectedEdge || selectedCentral;
+                const metrics = node.lastMetrics;
+                const nodeType = selectedEdge ? "Cloudlet" : "Cloud";
+                
+                return (
+                  <div className="space-y-2">
+                    <div className="text-xs font-medium text-gray-700">{node.id} ({nodeType})</div>
+                    
+                    {/* Service Status */}
+                    <div className="flex justify-between text-xs">
+                      <span>Service Status:</span>
+                      <Badge variant={metrics.isWarmStart ? "default" : "secondary"} className="text-xs">
+                        {metrics.isWarmStart ? "Warm Start" : "Cold Start"}
+                      </Badge>
+                    </div>
+                    
+                    {/* Data Size */}
+                    <div className="flex justify-between text-xs">
+                      <span>Data Size s(u,t):</span>
+                      <span className="font-mono">{metrics.dataSize} MB</span>
+                    </div>
+                    
+                    {/* Communication Delay */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>Communication d_com:</span>
+                        <span className="font-mono">{metrics.communicationDelay} ms</span>
+                      </div>
+                      <div className="ml-2 text-xs text-gray-500">
+                        τ = {metrics.unitTransmissionDelay} ms/MB
+                      </div>
+                    </div>
+                    
+                    {/* Processing Delay */}
+                    <div className="space-y-1">
+                      <div className="flex justify-between text-xs">
+                        <span>Processing d_proc:</span>
+                        <span className="font-mono">{metrics.processingDelay} ms</span>
+                      </div>
+                      <div className="ml-2 text-xs text-gray-500">
+                        ρ = {metrics.unitProcessingTime} ms/MB
+                      </div>
+                    </div>
+                    
+                    {/* Total Latency */}
+                    <div className="border-t pt-2">
+                      <div className="flex justify-between text-xs font-medium">
+                        <span>Total D(u,v,t):</span>
+                        <span className="font-mono">{metrics.communicationDelay + metrics.processingDelay} ms</span>
+                      </div>
+                    </div>
+                    
+                    {/* Formula Display */}
+                    <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded">
+                      <div>D(u,v,t) = d_com + d_proc</div>
+                      <div>d_com = {metrics.dataSize} × {metrics.unitTransmissionDelay}</div>
+                      <div>d_proc = {metrics.isWarmStart ? '0' : 'cold_delay'} + {metrics.dataSize} × {metrics.unitProcessingTime}</div>
+                    </div>
+                  </div>
+                );
+              })()}
+            </CardContent>
+          </Card>
+        )}
 
         {/* Algorithm Info */}
         <Card>
