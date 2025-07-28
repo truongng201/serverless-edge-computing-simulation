@@ -1,0 +1,238 @@
+Attention-based Models - Comprehensive Comparison
+============================================================
+
+Model: LSTM with Basic Attention
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [128, 64]
+  attention_units: 64
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: LSTM
+  attention_type: basic
+
+Training Results:
+  final_loss: 0.009991432540118694
+  final_val_loss: 0.010721653699874878
+  final_accuracy: 0.10448334366083145
+  final_pixel_accuracy: 0.18227095901966095
+  epochs_trained: 22
+  total_params: 144035
+  rnn_type: LSTM
+  attention_type: basic
+
+Evaluation Results:
+  loss: 0.012914634309709072
+  compile_metrics: 0.12451858818531036
+  rnn_type: LSTM
+  attention_type: basic
+  mean_error_meters: 5097.820015745393
+  median_error_meters: 3992.41160186439
+  std_error_meters: 3344.6048560277104
+  mean_error_pixels: 113.59355926513672
+  median_error_pixels: 81.06600952148438
+  std_error_pixels: 80.05949401855469
+
+Training Time: 0:05:14.956227
+
+============================================================
+
+Model: LSTM with Self-Attention (8 heads)
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [128, 64]
+  attention_units: 64
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: LSTM
+  attention_type: self
+  num_heads: 8
+
+Training Results:
+  final_loss: 0.008102662861347198
+  final_val_loss: 0.012896609492599964
+  final_accuracy: 0.09381000697612762
+  final_pixel_accuracy: 0.22681108117103577
+  epochs_trained: 45
+  total_params: 156450
+  rnn_type: LSTM
+  attention_type: self
+
+Evaluation Results:
+  loss: 0.014043262228369713
+  compile_metrics: 0.13966479897499084
+  rnn_type: LSTM
+  attention_type: self
+  mean_error_meters: 5733.9748077848635
+  median_error_meters: 4948.003103939534
+  std_error_meters: 3368.3332734551723
+  mean_error_pixels: 128.12713623046875
+  median_error_pixels: 105.18463897705078
+  std_error_pixels: 85.68663024902344
+
+Training Time: 0:11:38.094750
+
+============================================================
+
+Model: LSTM with Self-Attention (4 heads)
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [128, 64]
+  attention_units: 64
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: LSTM
+  attention_type: self
+  num_heads: 4
+
+Training Results:
+  final_loss: 0.0091196084395051
+  final_val_loss: 0.015175290405750275
+  final_accuracy: 0.09965168684720993
+  final_pixel_accuracy: 0.2034890055656433
+  epochs_trained: 30
+  total_params: 156450
+  rnn_type: LSTM
+  attention_type: self
+
+Evaluation Results:
+  loss: 0.012033632025122643
+  compile_metrics: 0.11879879981279373
+  rnn_type: LSTM
+  attention_type: self
+  mean_error_meters: 4920.477740548673
+  median_error_meters: 4160.663184238174
+  std_error_meters: 3262.9102743315607
+  mean_error_pixels: 111.8662338256836
+  median_error_pixels: 81.89595794677734
+  std_error_pixels: 81.55396270751953
+
+Training Time: 0:06:23.330610
+
+============================================================
+
+Model: GRU with Basic Attention
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [128, 64]
+  attention_units: 64
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: GRU
+  attention_type: basic
+
+Training Results:
+  final_loss: 0.008884652517735958
+  final_val_loss: 0.0145028717815876
+  final_accuracy: 0.10056042671203613
+  final_pixel_accuracy: 0.1923561692237854
+  epochs_trained: 49
+  total_params: 111523
+  rnn_type: GRU
+  attention_type: basic
+
+Evaluation Results:
+  loss: 0.01584336720407009
+  compile_metrics: 0.13779883086681366
+  rnn_type: GRU
+  attention_type: basic
+  mean_error_meters: 5716.145880188154
+  median_error_meters: 3761.0872543857367
+  std_error_meters: 4365.501506846359
+  mean_error_pixels: 130.34616088867188
+  median_error_pixels: 74.68656158447266
+  std_error_pixels: 108.38994598388672
+
+Training Time: 0:08:25.785455
+
+============================================================
+
+Model: GRU with Self-Attention (8 heads)
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [128, 64]
+  attention_units: 64
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: GRU
+  attention_type: self
+  num_heads: 8
+
+Training Results:
+  final_loss: 0.007157732266932726
+  final_val_loss: 0.010892070829868317
+  final_accuracy: 0.08899248391389847
+  final_pixel_accuracy: 0.24143289029598236
+  epochs_trained: 78
+  total_params: 123938
+  rnn_type: GRU
+  attention_type: self
+
+Evaluation Results:
+  loss: 0.015186167322099209
+  compile_metrics: 0.1415776163339615
+  rnn_type: GRU
+  attention_type: self
+  mean_error_meters: 5895.601959542114
+  median_error_meters: 4014.777930969263
+  std_error_meters: 4160.767014553686
+  mean_error_pixels: 135.2429962158203
+  median_error_pixels: 84.9478988647461
+  std_error_pixels: 103.30262756347656
+
+Training Time: 0:27:24.748322
+
+============================================================
+
+Best Model: LSTM with Self-Attention (4 heads)
+Best Mean Error: 4920.5 meters

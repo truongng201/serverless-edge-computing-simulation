@@ -1,0 +1,37 @@
+GRU Trajectory Model - Experiment Results
+==================================================
+
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  gru_units: [64, 32]
+  dense_units: [32]
+  dropout_rate: 0.2
+  recurrent_dropout: 0.1
+  l2_regularization: 0.0005
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 80
+  validation_split: 0.2
+  patience: 10
+
+Training Results:
+  final_loss: 0.006154498551040888
+  final_val_loss: 0.004485870245844126
+  final_accuracy: 0.08079101145267487
+  final_pixel_accuracy: 0.28167614340782166
+  epochs_trained: 25
+  total_params: 29922
+
+Evaluation Results:
+  loss: 0.0029256772249937057
+  compile_metrics: 0.05403425544500351
+  mean_error_meters: 2176.3020060867125
+  median_error_meters: 1840.0411909331365
+  std_error_meters: 1475.516141959053
+  mean_error_pixels: 47.234806060791016
+  median_error_pixels: 38.13117980957031
+  std_error_pixels: 33.76655960083008
+
+Training Time: 0:05:45.650917

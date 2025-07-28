@@ -1,0 +1,230 @@
+Bidirectional RNN Models - Comprehensive Comparison
+============================================================
+
+Model: Bidirectional LSTM (Concat)
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [64, 32]
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: LSTM
+  merge_mode: concat
+
+Training Results:
+  final_loss: 0.0067659527994692326
+  final_val_loss: 0.014807692728936672
+  final_accuracy: 0.08575913310050964
+  final_pixel_accuracy: 0.21711649000644684
+  epochs_trained: 23
+  total_params: 98594
+  rnn_type: LSTM
+  merge_mode: concat
+
+Evaluation Results:
+  loss: 0.009113281033933163
+  compile_metrics: 0.10042381286621094
+  rnn_type: LSTM
+  merge_mode: concat
+  mean_error_meters: 4159.174005674559
+  median_error_meters: 3845.043751052436
+  std_error_meters: 2638.1216233464534
+  mean_error_pixels: 94.57585906982422
+  median_error_pixels: 83.21949768066406
+  std_error_pixels: 65.38014221191406
+
+Training Time: 0:02:57.661053
+
+============================================================
+
+Model: Bidirectional LSTM (Sum)
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [64, 32]
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: LSTM
+  merge_mode: sum
+
+Training Results:
+  final_loss: 0.006423470564186573
+  final_val_loss: 0.011174318380653858
+  final_accuracy: 0.08184444904327393
+  final_pixel_accuracy: 0.24600496888160706
+  epochs_trained: 25
+  total_params: 79906
+  rnn_type: LSTM
+  merge_mode: sum
+
+Evaluation Results:
+  loss: 0.012063813395798206
+  compile_metrics: 0.11439532041549683
+  rnn_type: LSTM
+  merge_mode: sum
+  mean_error_meters: 4791.484405170681
+  median_error_meters: 3121.941183646203
+  std_error_meters: 3579.597318938033
+  mean_error_pixels: 110.77105712890625
+  median_error_pixels: 65.40846252441406
+  std_error_pixels: 91.11798858642578
+
+Training Time: 0:02:54.638270
+
+============================================================
+
+Model: Bidirectional LSTM (Average)
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [64, 32]
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: LSTM
+  merge_mode: ave
+
+Training Results:
+  final_loss: 0.006716891657561064
+  final_val_loss: 0.01345805637538433
+  final_accuracy: 0.0837358608841896
+  final_pixel_accuracy: 0.2350674718618393
+  epochs_trained: 21
+  total_params: 79906
+  rnn_type: LSTM
+  merge_mode: ave
+
+Evaluation Results:
+  loss: 0.01542515680193901
+  compile_metrics: 0.12222414463758469
+  rnn_type: LSTM
+  merge_mode: ave
+  mean_error_meters: 5140.574496607187
+  median_error_meters: 3469.9753915664633
+  std_error_meters: 4239.455317185943
+  mean_error_pixels: 120.05135345458984
+  median_error_pixels: 73.23701477050781
+  std_error_pixels: 103.24199676513672
+
+Training Time: 0:03:56.671501
+
+============================================================
+
+Model: Bidirectional GRU (Concat)
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [64, 32]
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: GRU
+  merge_mode: concat
+
+Training Results:
+  final_loss: 0.006329876370728016
+  final_val_loss: 0.012139774858951569
+  final_accuracy: 0.08395743370056152
+  final_pixel_accuracy: 0.22008167207241058
+  epochs_trained: 37
+  total_params: 76322
+  rnn_type: GRU
+  merge_mode: concat
+
+Evaluation Results:
+  loss: 0.01898414082825184
+  compile_metrics: 0.1480991095304489
+  rnn_type: GRU
+  merge_mode: concat
+  mean_error_meters: 6154.891363859762
+  median_error_meters: 4599.157768637818
+  std_error_meters: 4938.441649513755
+  mean_error_pixels: 140.8128662109375
+  median_error_pixels: 90.06509399414062
+  std_error_pixels: 120.68716430664062
+
+Training Time: 0:05:43.424605
+
+============================================================
+
+Model: Bidirectional GRU (Sum)
+----------------------------------------
+Configuration:
+  sequence_length: 10
+  input_features: 33
+  output_features: 2
+  rnn_units: [64, 32]
+  dense_units: [64, 32]
+  dropout_rate: 0.3
+  recurrent_dropout: 0.2
+  l2_regularization: 0.001
+  learning_rate: 0.001
+  batch_size: 32
+  epochs: 100
+  validation_split: 0.2
+  patience: 15
+  rnn_type: GRU
+  merge_mode: sum
+
+Training Results:
+  final_loss: 0.0066592334769666195
+  final_val_loss: 0.017685968428850174
+  final_accuracy: 0.08467476069927216
+  final_pixel_accuracy: 0.2190074473619461
+  epochs_trained: 32
+  total_params: 61730
+  rnn_type: GRU
+  merge_mode: sum
+
+Evaluation Results:
+  loss: 0.015845660120248795
+  compile_metrics: 0.13108161091804504
+  rnn_type: GRU
+  merge_mode: sum
+  mean_error_meters: 5450.132837215679
+  median_error_meters: 4077.1165228366835
+  std_error_meters: 4414.939554559671
+  mean_error_pixels: 124.60457611083984
+  median_error_pixels: 84.51459503173828
+  std_error_pixels: 108.80708312988281
+
+Training Time: 0:05:07.079133
+
+============================================================
+
+Best Model: Bidirectional LSTM (Concat)
+Best Mean Error: 4159.2 meters
