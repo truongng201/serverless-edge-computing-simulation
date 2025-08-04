@@ -716,16 +716,19 @@ export default function Component() {
       ctx.fillText(edge.id, edge.x, edge.y - 35);
       ctx.fillText(`${Math.round(edge.currentLoad)}%`, edge.x, edge.y + 45);
     });
-
+    console.log(users);
     // Draw users and their predicted paths
+    // Add logging to debug user visibility
+    console.log('Users state:', users);
     users.forEach((user) => {
-      console.log(user)
+      console.log(`Rendering user: ${user.id}, Position: (${user.x}, ${user.y}), Size: ${user.size}`);
       if (
         user.x < visibleLeft - 50 ||
         user.x > visibleRight + 50 ||
         user.y < visibleTop - 50 ||
         user.y > visibleBottom + 50
       ) {
+        console.log(`User ${user.id} is outside visible bounds.`);
         return;
       }
 
