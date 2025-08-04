@@ -11,6 +11,7 @@ import ControlPanelContent from "@/components/simulation/ControlPanelContent";
 import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 import { calculateDistance, findNearestNode, getAllNodes } from "@/lib/helper";
 import { CentralNode, EdgeNode, UserNode } from "./lib/components";
+import { useSocket } from "@/hooks/use-socket";
 
 export default function Component() {
   const canvasRef = useRef(null);
@@ -65,6 +66,9 @@ export default function Component() {
   // Manual connection state
   const [manualConnectionMode, setManualConnectionMode] = useState(false);
   const [autoAssignment, setAutoAssignment] = useState(true);
+
+  // Socket.IO for real-time data communication
+  const socketData = useSocket('http://localhost:5001');
 
   // Algorithms for user expectancy calculation
   const algorithms = {
@@ -1376,6 +1380,7 @@ export default function Component() {
           clearEverything={clearEverything}
           getEditModeDescription={getEditModeDescription}
           getCursorStyle={getCursorStyle}
+          socketData={socketData}
         />
       </ControlPanel>
 

@@ -1,11 +1,8 @@
-from resource.container import ServerlessContainer
+from control.ui_handler import app
 
-import time
+def main():
+    # Start the Flask application
+    app.run(host="0.0.0.0", port=5001, debug=True)
 
-
-
-
-ServerlessContainer = ServerlessContainer(app_id="example_app")
-# ServerlessContainer.build()
-ServerlessContainer.run_function()
-S
+if __name__ == "__main__":
+    main()

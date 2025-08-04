@@ -7,18 +7,21 @@
 ## Installation
 
 - Clone the repository:
+
 ```bash
 git clone <repository-url>
 ```
 
 - Navigate to the project directory:
+
 ```bash
 cd serverless-sim
 ```
 
 - Activate the virtual environment:
+
 ```bash
-conda create -n serverless-sim python=3.11
+conda create -n serverless-sim python=3.11 pip
 conda activate serverless-sim
 ```
 
