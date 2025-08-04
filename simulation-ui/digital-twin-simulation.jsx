@@ -10,6 +10,7 @@ import EditModeDescription from "@/components/simulation/EditModeDescription";
 import ControlPanelContent from "@/components/simulation/ControlPanelContent";
 import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 import { useSocket } from "@/hooks/use-socket";
+import axios from 'axios';
 
 export default function Component() {
   const canvasRef = useRef(null);
@@ -718,6 +719,7 @@ export default function Component() {
 
     // Draw users and their predicted paths
     users.forEach((user) => {
+      console.log(user)
       if (
         user.x < visibleLeft - 50 ||
         user.x > visibleRight + 50 ||
@@ -727,59 +729,45 @@ export default function Component() {
         return;
       }
 
-      // Predicted path
-      if (predictionEnabled && user.predictedPath.length > 0) {
-        ctx.strokeStyle = "rgba(168, 85, 247, 0.6)";
-        ctx.lineWidth = 2 / zoomLevel;
-        ctx.setLineDash([5 / zoomLevel, 5 / zoomLevel]);
-        ctx.beginPath();
-        ctx.moveTo(user.x, user.y);
-        user.predictedPath.forEach((point) => {
-          ctx.lineTo(point.x, point.y);
-        });
-        ctx.stroke();
-        ctx.setLineDash([]);
-      }
-
       // Connection to assigned edge (different style for manual connections)
-      if (user.assignedEdge) {
-        const assignedEdge = edgeNodes.find(
-          (edge) => edge.id === user.assignedEdge
-        );
-        if (assignedEdge) {
-          ctx.strokeStyle = user.manualConnection
-            ? "rgba(34, 197, 94, 0.8)"
-            : "rgba(34, 197, 94, 0.4)";
-          ctx.lineWidth = user.manualConnection ? 2 / zoomLevel : 1 / zoomLevel;
-          if (user.manualConnection) {
-            ctx.setLineDash([]);
-          }
-          ctx.beginPath();
-          ctx.moveTo(user.x, user.y);
-          ctx.lineTo(assignedEdge.x, assignedEdge.y);
-          ctx.stroke();
-        }
-      }
+      // if (user.assignedEdge) {
+      //   const assignedEdge = edgeNodes.find(
+      //     (edge) => edge.id === user.assignedEdge
+      //   );
+      //   if (assignedEdge) {
+      //     ctx.strokeStyle = user.manualConnection
+      //       ? "rgba(34, 197, 94, 0.8)"
+      //       : "rgba(34, 197, 94, 0.4)";
+      //     ctx.lineWidth = user.manualConnection ? 2 / zoomLevel : 1 / zoomLevel;
+      //     if (user.manualConnection) {
+      //       ctx.setLineDash([]);
+      //     }
+      //     ctx.beginPath();
+      //     ctx.moveTo(user.x, user.y);
+      //     ctx.lineTo(assignedEdge.x, assignedEdge.y);
+      //     ctx.stroke();
+      //   }
+      // }
 
       // Connection to assigned central node (different style for manual connections)
-      if (user.assignedCentral) {
-        const assignedCentral = centralNodes.find(
-          (central) => central.id === user.assignedCentral
-        );
-        if (assignedCentral) {
-          ctx.strokeStyle = user.manualConnection
-            ? "rgba(99, 102,241, 0.8)"
-            : "rgba(99, 102,241, 0.4)";
-          ctx.lineWidth = user.manualConnection ? 2 / zoomLevel : 1 / zoomLevel;
-          if (user.manualConnection) {
-            ctx.setLineDash([]);
-          }
-          ctx.beginPath();
-          ctx.moveTo(user.x, user.y);
-          ctx.lineTo(assignedCentral.x, assignedCentral.y);
-          ctx.stroke();
-        }
-      }
+      // if (user.assignedCentral) {
+      //   const assignedCentral = centralNodes.find(
+      //     (central) => central.id === user.assignedCentral
+      //   );
+      //   if (assignedCentral) {
+      //     ctx.strokeStyle = user.manualConnection
+      //       ? "rgba(99, 102,241, 0.8)"
+      //       : "rgba(99, 102,241, 0.4)";
+      //     ctx.lineWidth = user.manualConnection ? 2 / zoomLevel : 1 / zoomLevel;
+      //     if (user.manualConnection) {
+      //       ctx.setLineDash([]);
+      //     }
+      //     ctx.beginPath();
+      //     ctx.moveTo(user.x, user.y);
+      //     ctx.lineTo(assignedCentral.x, assignedCentral.y);
+      //     ctx.stroke();
+      //   }
+      // }
 
       // User
       const isSelected = selectedUser && selectedUser.id === user.id;
@@ -797,15 +785,7 @@ export default function Component() {
         2 * Math.PI
       );
       ctx.fill();
-
-      // Manual connection indicator
-      if (user.manualConnection) {
-        ctx.strokeStyle = "#f59e0b";
-        ctx.lineWidth = 2 / zoomLevel;
-        ctx.beginPath();
-        ctx.arc(user.x, user.y, user.size + 4, 0, 2 * Math.PI);
-        ctx.stroke();
-      }
+     
 
       // Edit mode indicator for users
       if ((editMode === "users" || editMode === "both") && !isSelected) {
@@ -910,6 +890,15 @@ export default function Component() {
 
     return () => clearInterval(interval);
   }, []);
+
+  // Cleanup socket connection on component unmount
+  useEffect(() => {
+    return () => {
+      if (socketData && socketData.disconnect) {
+        socketData.disconnect();
+      }
+    };
+  }, [socketData]);
 
   const resetSimulation = () => {
     clearEverything();
@@ -1031,6 +1020,23 @@ export default function Component() {
     if (editMode !== "none") return "move";
     return "crosshair";
   };
+
+  // Fetch the first step of all users from the API
+  useEffect(() => {
+    const fetchFirstSample = async () => {
+      try {
+        const response = await axios.get('http://localhost:5001/get_first_sample');
+        const firstSample = response.data;
+        console.log('First Sample:', firstSample);
+        // Update the users state with the fetched data
+        setUsers(firstSample?.data?.items || []);
+      } catch (error) {
+        console.error('Error fetching first sample:', error);
+      }
+    };
+
+    fetchFirstSample();
+  }, []);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gray-50">

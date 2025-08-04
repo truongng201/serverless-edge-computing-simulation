@@ -77,8 +77,9 @@ class DactDataLoader:
             for step in item['steps']:
                 if step['timestep'] == step_id:
                     items.append({
-                        "item_id": item['item_id'],
-                        "location": step['location'],
+                        "id": item['item_id'],
+                        "x": step['location']['lat'],
+                        "y": step['location']['lon'],
                         "speed": step['speed'],
                         "acceleration": step['acceleration'],
                         "heading": step['heading'],

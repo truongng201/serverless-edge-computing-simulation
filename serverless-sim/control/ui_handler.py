@@ -7,8 +7,9 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+
+
 # Global variables to manage simulation state
-current_step = 659
 data_loader = DactDataLoader()
 simulation_running = False
 step_lock = threading.Lock()
@@ -31,31 +32,28 @@ def receive_data():
 @socketio.on('connect')
 def handle_connect():
     print('Client connected')
-    emit('connection_response', {'status': 'Start simulation', 'message': 'Connected to the server'})
+    emit('connection_response', {'status': 'Connected', 'message': 'Connected to the server'})
 
 @socketio.on('disconnect')
 def handle_disconnect():
     print('Client disconnected')
-
 @socketio.on('request_next_step')
-def handle_next_step_request(payload=None):
-    global current_step
-    
+def handle_next_step_request(current_step):
+    print(f'Received request_next_step for step {current_step}')
+    current_step = int(current_step)
     with step_lock:
         # Get data for current step
         step_data = data_loader.get_data_by_step(step_id=current_step)
-        
-        if step_data:
-            # Increment step for next request
-            current_step += 1
-            
+        print(step_data)
+        if step_data.get("items"):
             # Send the data back to client
             emit('step_data', {
                 'status': 'success',
                 'data': step_data,
-                'current_step': current_step - 1
+                'current_step': current_step
             })
         else:
+            print(f'No data available for step {current_step}')
             # No more data available, reset or handle end of simulation
             emit('step_data', {
                 'status': 'error',
@@ -63,6 +61,3 @@ def handle_next_step_request(payload=None):
                 'current_step': current_step
             })
 
-
-if __name__ == '__main__':
-    socketio.run(app, debug=True, host='0.0.0.0', port=5000)
