@@ -1,8 +1,7 @@
-from flask import Flask, request, jsonify
+from flask import Flask, jsonify
 from flask_socketio import SocketIO, emit
 from control.data_loader import DactDataLoader  # Assuming DataLoader is defined in data_loader.py
 import threading
-import time
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'your-secret-key'
@@ -31,18 +30,15 @@ def receive_data():
 
 @socketio.on('connect')
 def handle_connect():
-    """Handle client connection"""
     print('Client connected')
-    emit('connection_response', {'status': 'Connected to simulation server'})
+    emit('connection_response', {'status': 'Start simulation', 'message': 'Connected to the server'})
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    """Handle client disconnection"""
     print('Client disconnected')
 
 @socketio.on('request_next_step')
-def handle_next_step_request():
-    """Handle request for next simulation step"""
+def handle_next_step_request(payload=None):
     global current_step
     
     with step_lock:
@@ -67,37 +63,6 @@ def handle_next_step_request():
                 'current_step': current_step
             })
 
-@socketio.on('start_simulation')
-def handle_start_simulation():
-    """Start automatic simulation with 10-second intervals"""
-    global simulation_running
-    simulation_running = True
-    emit('simulation_status', {'status': 'started', 'message': 'Simulation started'})
-
-@socketio.on('stop_simulation')
-def handle_stop_simulation():
-    """Stop automatic simulation"""
-    global simulation_running
-    simulation_running = False
-    emit('simulation_status', {'status': 'stopped', 'message': 'Simulation stopped'})
-
-@socketio.on('reset_simulation')
-def handle_reset_simulation():
-    """Reset simulation to beginning"""
-    global current_step, simulation_running
-    with step_lock:
-        current_step = 659
-        simulation_running = False
-    emit('simulation_status', {'status': 'reset', 'message': 'Simulation reset to beginning'})
-
-@socketio.on('get_current_status')
-def handle_get_status():
-    """Get current simulation status"""
-    emit('simulation_status', {
-        'status': 'running' if simulation_running else 'stopped',
-        'current_step': current_step,
-        'message': f'Current step: {current_step}'
-    })
 
 if __name__ == '__main__':
     socketio.run(app, debug=True, host='0.0.0.0', port=5000)

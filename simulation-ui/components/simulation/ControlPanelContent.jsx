@@ -6,7 +6,6 @@ import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
-import { Input } from "@/components/ui/input"
 import {
   Play, Pause, RotateCcw, Users, Server, Plus, Minus, Database, Trash2, Link, Unlink, Edit3, Move, ChevronLeft
 } from "lucide-react"
@@ -42,13 +41,8 @@ export default function ControlPanelContent({
   zoomLevel,
   editMode,
   setEditMode,
-  autoAssignment,
-  setAutoAssignment,
-  algorithms,
-  connectUserToNode,
-  disconnectUser,
-  resetAllConnections,
-  updateSelectedUser,
+  models,
+  setSelectedModel,
   deleteSelectedUser,
   resetSimulation,
   addEdgeNode,
@@ -127,7 +121,7 @@ export default function ControlPanelContent({
         </Card>
 
         {/* Manual Connection Controls */}
-        <Card className="mb-4">
+        {/* <Card className="mb-4">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Link className="w-4 h-4" />
@@ -191,10 +185,10 @@ export default function ControlPanelContent({
               Reset All Connections
             </Button>
           </CardContent>
-        </Card>
+        </Card> */}
 
         {/* User Editor */}
-        {selectedUser && (
+        {/* {selectedUser && (
           <Card className="mb-4">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -237,7 +231,7 @@ export default function ControlPanelContent({
               </div>
             </CardContent>
           </Card>
-        )}
+        )} */}
 
         {/* Clear All Controls */}
         <Card className="mb-4">
@@ -273,7 +267,17 @@ export default function ControlPanelContent({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Simulation</CardTitle>
           </CardHeader>
+          
           <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${socketData?.isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+              <span className="text-xs">{socketData?.isConnected ? 'Connected' : 'Disconnected'}</span>
+            </div>
+            {socketData?.currentStep && (
+              <div className="text-xs text-gray-600">
+                Current Step: {socketData.currentStep}
+              </div>
+            )}
             <div className="flex gap-2">
               <Button onClick={() => setIsSimulating(!isSimulating)} variant={isSimulating ? "destructive" : "default"} size="sm" className="flex-1">
                 {isSimulating ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -293,98 +297,7 @@ export default function ControlPanelContent({
             </div>
           </CardContent>
         </Card>
-
-        {/* Socket.IO Simulation Controls */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Real-time Data Stream</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {/* Connection Status */}
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${socketData?.isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs">{socketData?.isConnected ? 'Connected' : 'Disconnected'}</span>
-            </div>
-            
-            {/* Current Step Display */}
-            {socketData?.currentStep && (
-              <div className="text-xs text-gray-600">
-                Current Step: {socketData.currentStep}
-              </div>
-            )}
-            
-            {/* Auto Simulation Controls */}
-            <div className="flex gap-2">
-              <Button 
-                onClick={socketData?.startAutoSimulation} 
-                variant={socketData?.simulationStatus === 'running' ? "destructive" : "default"} 
-                size="sm" 
-                className="flex-1"
-                disabled={!socketData?.isConnected}
-              >
-                {socketData?.simulationStatus === 'running' ? (
-                  <>
-                    <Pause className="w-4 h-4" />
-                    Stop Auto
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4" />
-                    Start Auto
-                  </>
-                )}
-              </Button>
-              <Button 
-                onClick={socketData?.resetSimulation} 
-                variant="outline" 
-                size="sm"
-                disabled={!socketData?.isConnected}
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-            </div>
-            
-            {/* Manual Step Control */}
-            <Button 
-              onClick={socketData?.requestNextStep} 
-              variant="outline" 
-              size="sm" 
-              className="w-full"
-              disabled={!socketData?.isConnected || socketData?.simulationStatus === 'running'}
-            >
-              Next Step
-            </Button>
-            
-            {/* Status Display */}
-            <div className="text-xs text-gray-600">
-              Status: {socketData?.simulationStatus || 'Stopped'}
-              {socketData?.simulationStatus === 'running' && (
-                <div className="mt-1">Requesting new data every 10 seconds</div>
-              )}
-            </div>
-            
-            {/* Data Display */}
-            {socketData?.simulationData?.data && (
-              <div className="p-2 bg-gray-50 rounded text-xs max-h-32 overflow-y-auto">
-                <div className="font-medium mb-1">Latest Data:</div>
-                <div>Step: {socketData.simulationData.data.step_id}</div>
-                <div>Items: {socketData.simulationData.data.items?.length || 0}</div>
-                {socketData.simulationData.data.items?.slice(0, 3).map((item, idx) => (
-                  <div key={idx} className="mt-1 pl-2 border-l border-gray-300">
-                    <div>ID: {item.item_id}</div>
-                    <div>Lat: {item.location.lat.toFixed(4)}</div>
-                    <div>Lon: {item.location.lon.toFixed(4)}</div>
-                    <div>Speed: {item.speed.toFixed(1)}</div>
-                  </div>
-                ))}
-                {socketData.simulationData.data.items?.length > 3 && (
-                  <div className="text-gray-500">... and {socketData.simulationData.data.items.length - 3} more</div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
+      
         {/* Zoom Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -418,17 +331,17 @@ export default function ControlPanelContent({
         {/* Algorithm Selection */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Algorithm</CardTitle>
+            <CardTitle className="text-sm">Model</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label className="text-xs">Prediction Algorithm</Label>
+              <Label className="text-xs">Prediction Model</Label>
               <Select value={selectedAlgorithm} onValueChange={setSelectedAlgorithm}>
                 <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(algorithms).map(([key, name]) => (
+                  {Object.entries(models).map(([key, name]) => (
                     <SelectItem key={key} value={key}>
                       {name}
                     </SelectItem>

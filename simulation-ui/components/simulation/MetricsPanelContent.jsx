@@ -14,8 +14,9 @@ export default function MetricsPanelContent({
   setSelectedEdge,
   selectedCentral,
   setSelectedCentral,
-  algorithms,
-  selectedAlgorithm,
+  models,
+  selectedModel,
+  setSelectedModel,
   rightPanelOpen,
   setRightPanelOpen,
 }) {
@@ -286,13 +287,9 @@ export default function MetricsPanelContent({
           </CardHeader>
           <CardContent>
             <div className="text-sm">
-              <div className="font-medium mb-2">{algorithms[selectedAlgorithm]}</div>
+              <div className="font-medium mb-2">{models[selectedModel]}</div>
               <div className="text-xs text-gray-600">
-                {selectedAlgorithm === "linear" && "Simple linear extrapolation based on current velocity"}
-                {selectedAlgorithm === "kalman" && "Kalman filter with noise estimation for smooth prediction"}
-                {selectedAlgorithm === "markov" && "Markov chain with state transition probabilities"}
-                {selectedAlgorithm === "neural" && "Neural network-based prediction with weighted inputs"}
-                {selectedAlgorithm === "gravity" && "Gravity model with attraction to edge and central nodes"}
+                {selectedModel === "lstm" && "Long Short-Term Memory (LSTM) network is a type of recurrent neural network (RNN) that is well-suited for sequence prediction problems. It can learn long-term dependencies and is effective for time series forecasting."}
               </div>
             </div>
           </CardContent>

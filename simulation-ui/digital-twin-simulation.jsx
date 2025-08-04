@@ -9,8 +9,6 @@ import SimulationCanvas from "@/components/simulation/SimulationCanvas";
 import EditModeDescription from "@/components/simulation/EditModeDescription";
 import ControlPanelContent from "@/components/simulation/ControlPanelContent";
 import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
-import { calculateDistance, findNearestNode, getAllNodes } from "@/lib/helper";
-import { CentralNode, EdgeNode, UserNode } from "./lib/components";
 import { useSocket } from "@/hooks/use-socket";
 
 export default function Component() {
@@ -20,7 +18,6 @@ export default function Component() {
 
   // Central nodes - main servers/coordinators
   const [centralNodes, setCentralNodes] = useState([]);
-  const [graph, setGraph] = useState(new Map()); // adjacency list for graph representation
 
   const [isSimulating, setIsSimulating] = useState(false);
   const [simulationSpeed, setSimulationSpeed] = useState([1]);
@@ -29,9 +26,9 @@ export default function Component() {
   const [isDragging, setIsDragging] = useState(false);
 
   // UI State
-  const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
-  const [selectedAlgorithm, setSelectedAlgorithm] = useState("linear");
+  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState("lstm");
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [selectedCentral, setSelectedCentral] = useState(null);
@@ -68,60 +65,18 @@ export default function Component() {
   const [autoAssignment, setAutoAssignment] = useState(true);
 
   // Socket.IO for real-time data communication
-  const socketData = useSocket('http://localhost:5001');
+  const socketData = useSocket('http://localhost:5001', isSimulating);
 
-  // Algorithms for user expectancy calculation
-  const algorithms = {
-    linear: "Linear Prediction",
-    // kalman: "Kalman Filter",
-    // markov: "Markov Chain",
-    // neural: "Neural Network",
-    // gravity: "Gravity Model",
+  // Models for user expectancy calculation
+  const models = {
+    lstm: "LSTM",
   };
 
-  // Calculate distance between two points
+
   const calculateDistance = (x1, y1, x2, y2) => {
-    return Math.sqrt((x2 - x1) ** 2 + (y2 - y1) ** 2);
-  };
-
-  // Find nearest edge node to a user
-  const findNearestEdge = (user) => {
-    if (edgeNodes.length === 0) return null;
-    return edgeNodes.reduce((nearest, edge) => {
-      const distanceToEdge = calculateDistance(user.x, user.y, edge.x, edge.y);
-      const distanceToNearest = calculateDistance(
-        user.x,
-        user.y,
-        nearest.x,
-        nearest.y
-      );
-      return distanceToEdge < distanceToNearest ? edge : nearest;
-    });
-  };
-
-  // Find nearest central node to a user
-  const findNearestCentral = (user) => {
-    if (centralNodes.length === 0) return null;
-    return centralNodes.reduce((nearest, central) => {
-      const distanceToCentral = calculateDistance(
-        user.x,
-        user.y,
-        central.x,
-        central.y
-      );
-      const distanceToNearest = nearest
-        ? calculateDistance(user.x, user.y, nearest.x, nearest.y)
-        : Number.POSITIVE_INFINITY;
-      return distanceToCentral < distanceToNearest ? central : nearest;
-    });
-  };
-
-  // Get all available nodes for connection
-  const getAllNodes = () => {
-    return [
-      ...edgeNodes.map((node) => ({ ...node, type: "edge" })),
-      ...centralNodes.map((node) => ({ ...node, type: "central" })),
-    ];
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    return Math.sqrt(dx * dx + dy * dy);
   };
 
   // Calculate latency based on connection using experimental formula
@@ -280,196 +235,7 @@ export default function Component() {
     setSelectedUser(null);
   };
 
-  // Different prediction algorithms
-  const predictUserMobility = (user) => {
-    const predictions = [];
-    let currentX = user.x;
-    let currentY = user.y;
 
-    switch (selectedAlgorithm) {
-      case "linear":
-        for (let i = 1; i <= predictionSteps[0]; i++) {
-          currentX += user.vx * i * 2;
-          currentY += user.vy * i * 2;
-          currentX = Math.max(10, Math.min(window.innerWidth - 10, currentX));
-          currentY = Math.max(10, Math.min(window.innerHeight - 10, currentY));
-          predictions.push({ x: currentX, y: currentY });
-        }
-        break;
-
-      case "kalman":
-        const noise = 0.1;
-        for (let i = 1; i <= predictionSteps[0]; i++) {
-          currentX += user.vx * i * 2 + (Math.random() - 0.5) * noise * i;
-          currentY += user.vy * i * 2 + (Math.random() - 0.5) * noise * i;
-          currentX = Math.max(10, Math.min(window.innerWidth - 10, currentX));
-          currentY = Math.max(10, Math.min(window.innerHeight - 10, currentY));
-          predictions.push({ x: currentX, y: currentY });
-        }
-        break;
-
-      case "markov":
-        for (let i = 1; i <= predictionSteps[0]; i++) {
-          const stateChange = Math.random();
-          if (stateChange < 0.7) {
-            currentX += user.vx * 2;
-            currentY += user.vy * 2;
-          } else {
-            currentX += (Math.random() - 0.5) * 8;
-            currentY += (Math.random() - 0.5) * 8;
-          }
-          currentX = Math.max(10, Math.min(window.innerWidth - 10, currentX));
-          currentY = Math.max(10, Math.min(window.innerHeight - 10, currentY));
-          predictions.push({ x: currentX, y: currentY });
-        }
-        break;
-
-      case "neural":
-        for (let i = 1; i <= predictionSteps[0]; i++) {
-          const weight1 = 0.8,
-            weight2 = 0.6,
-            bias = 0.1;
-          currentX += (user.vx * weight1 + user.vy * weight2 + bias) * 2;
-          currentY += (user.vy * weight1 + user.vx * weight2 + bias) * 2;
-          currentX = Math.max(10, Math.min(window.innerWidth - 10, currentX));
-          currentY = Math.max(10, Math.min(window.innerHeight - 10, currentY));
-          predictions.push({ x: currentX, y: currentY });
-        }
-        break;
-
-      case "gravity":
-        for (let i = 1; i <= predictionSteps[0]; i++) {
-          let forceX = 0,
-            forceY = 0;
-          // Attraction to edge nodes
-          edgeNodes.forEach((edge) => {
-            const distance = calculateDistance(
-              currentX,
-              currentY,
-              edge.x,
-              edge.y
-            );
-            const force = 100 / (distance + 1);
-            forceX += (edge.x - currentX) * force * 0.001;
-            forceY += (edge.y - currentY) * force * 0.001;
-          });
-          // Stronger attraction to central nodes
-          centralNodes.forEach((central) => {
-            const distance = calculateDistance(
-              currentX,
-              currentY,
-              central.x,
-              central.y
-            );
-            const force = 200 / (distance + 1);
-            forceX += (central.x - currentX) * force * 0.001;
-            forceY += (central.y - currentY) * force * 0.001;
-          });
-          currentX += user.vx * 2 + forceX;
-          currentY += user.vy * 2 + forceY;
-          currentX = Math.max(10, Math.min(window.innerWidth - 10, currentX));
-          currentY = Math.max(10, Math.min(window.innerHeight - 10, currentY));
-          predictions.push({ x: currentX, y: currentY });
-        }
-        break;
-
-      default:
-        return predictions;
-    }
-
-    return predictions;
-  };
-
-  // Optimize replica placement based on predictions
-  const optimizeReplicaPlacement = useCallback(() => {
-    if (!predictionEnabled) return;
-
-    const updatedUsers = users.map((user) => {
-      const predictedPath = predictUserMobility(user);
-
-      // Skip automatic assignment if user has manual connection
-      if (user.manualConnection || !autoAssignment) {
-        return {
-          ...user,
-          predictedPath,
-        };
-      }
-
-      const nearestEdge = findNearestNode(edgeNodes, user);
-      const nearestCentral = findNearestNode(centralNodes, user);
-
-      // Calculate latency using experimental formula for both edge and central nodes
-      let bestLatency = Number.POSITIVE_INFINITY;
-      let assignedEdge = null;
-      let assignedCentral = null;
-
-      if (nearestEdge) {
-        const edgeLatency = calculateLatency(user, nearestEdge.id, "edge");
-        if (edgeLatency < bestLatency) {
-          bestLatency = edgeLatency;
-          assignedEdge = nearestEdge.id;
-          assignedCentral = null;
-        }
-      }
-
-      if (nearestCentral) {
-        const centralLatency = calculateLatency(user, nearestCentral.id, "central");
-        if (centralLatency < bestLatency) {
-          bestLatency = centralLatency;
-          assignedEdge = null;
-          assignedCentral = nearestCentral.id;
-        }
-      }
-
-      // If no nodes available, set high latency
-      const latency = bestLatency === Number.POSITIVE_INFINITY
-        ? 100 + Math.random() * 50
-        : bestLatency;
-
-      return {
-        ...user,
-        predictedPath,
-        assignedEdge,
-        assignedCentral,
-        latency,
-      };
-    });
-
-    setUsers(updatedUsers);
-
-    const avgLatency =
-      updatedUsers.reduce((sum, user) => sum + user.latency, 0) /
-        updatedUsers.length || 0;
-    setTotalLatency(Math.round(avgLatency));
-
-    // Update edge node loads
-    const updatedEdges = edgeNodes.map((edge) => {
-      const assignedUsers = updatedUsers.filter(
-        (user) => user.assignedEdge === edge.id
-      );
-      const load = (assignedUsers.length / (edge.capacity / 10)) * 100;
-      return { ...edge, currentLoad: Math.min(100, load) };
-    });
-    setEdgeNodes(updatedEdges);
-
-    // Update central node loads
-    const updatedCentrals = centralNodes.map((central) => {
-      const assignedUsers = updatedUsers.filter(
-        (user) => user.assignedCentral === central.id
-      );
-      const load = (assignedUsers.length / (central.capacity / 10)) * 100;
-      return { ...central, currentLoad: Math.min(100, load) };
-    });
-    setCentralNodes(updatedCentrals);
-  }, [
-    users,
-    edgeNodes,
-    centralNodes,
-    predictionEnabled,
-    selectedAlgorithm,
-    predictionSteps,
-    autoAssignment,
-  ]);
 
   // Simulation step
   const simulationStep = useCallback(() => {
@@ -1101,12 +867,11 @@ export default function Component() {
   useEffect(() => {
     const interval = setInterval(() => {
       simulationStep();
-      optimizeReplicaPlacement();
       draw();
     }, 100);
 
     return () => clearInterval(interval);
-  }, [simulationStep, optimizeReplicaPlacement, draw]);
+  }, [simulationStep, draw]);
 
   useEffect(() => {
     const handleResize = () => draw();
@@ -1303,8 +1068,8 @@ export default function Component() {
           setLeftPanelOpen={setLeftPanelOpen}
           rightPanelOpen={rightPanelOpen}
           setRightPanelOpen={setRightPanelOpen}
-          selectedAlgorithm={selectedAlgorithm}
-          setSelectedAlgorithm={setSelectedAlgorithm}
+          selectedModel={selectedModel}
+          setSelectedModel={setSelectedModel}
           selectedUser={selectedUser}
           setSelectedUser={setSelectedUser}
           selectedEdge={selectedEdge}
@@ -1352,15 +1117,13 @@ export default function Component() {
           setManualConnectionMode={setManualConnectionMode}
           autoAssignment={autoAssignment}
           setAutoAssignment={setAutoAssignment}
-          algorithms={algorithms}
+          models={models}
           calculateDistance={calculateDistance}
           connectUserToNode={connectUserToNode}
           disconnectUser={disconnectUser}
           resetAllConnections={resetAllConnections}
           updateSelectedUser={updateSelectedUser}
           deleteSelectedUser={deleteSelectedUser}
-          predictUserMobility={predictUserMobility}
-          optimizeReplicaPlacement={optimizeReplicaPlacement}
           simulationStep={simulationStep}
           handleCanvasClick={handleCanvasClick}
           handleMouseDown={handleMouseDown}
@@ -1397,8 +1160,8 @@ export default function Component() {
           setSelectedEdge={setSelectedEdge}
           selectedCentral={selectedCentral}
           setSelectedCentral={setSelectedCentral}
-          algorithms={algorithms}
-          selectedAlgorithm={selectedAlgorithm}
+          models={models}
+          selectedModel={selectedModel}
           rightPanelOpen={rightPanelOpen}
           setRightPanelOpen={setRightPanelOpen}
         />
