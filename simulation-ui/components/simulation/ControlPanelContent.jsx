@@ -4,13 +4,15 @@ import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import {
-  Play, Pause, RotateCcw, Users, Server, Plus, Minus, Database, Trash2, Link, Unlink, Edit3, Move, ChevronLeft
+  Play, Pause, RotateCcw, Users, Server, Plus, Minus, Database, Trash2, Link, Unlink, Edit3, Move, ChevronLeft, MapPin, Target, Navigation, Eye, EyeOff
 } from "lucide-react"
 
 export default function ControlPanelContent({
+  users,
   edgeNodes,
   centralNodes,
   isSimulating,
@@ -59,7 +61,17 @@ export default function ControlPanelContent({
   resetZoom,
   leftPanelOpen,
   setLeftPanelOpen,
-  socketData
+  socketData,
+  placementAlgorithm,
+  setPlacementAlgorithm,
+  maxCoverageDistance,
+  setMaxCoverageDistance,
+  runPlacementAlgorithm,
+  roadMode,
+  setRoadMode,
+  showRoads,
+  setShowRoads,
+  roads
 }) {
   return (
     <>
@@ -259,6 +271,99 @@ export default function ControlPanelContent({
                 All
               </Button>
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Road Network Controls */}
+        <Card className="mb-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Navigation className="w-4 h-4" />
+              Road Network
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Road Mode</Label>
+              <Switch checked={roadMode} onCheckedChange={setRoadMode} />
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <Label className="text-xs">Show Roads</Label>
+              <Switch checked={showRoads} onCheckedChange={setShowRoads} />
+            </div>
+            
+            <div className="text-xs text-gray-600 space-y-1">
+              <div>Available Roads: {roads?.length || 0}</div>
+              <div>Road Types: Highway, Main, Local</div>
+              {roadMode && (
+                <div className="text-blue-600 font-medium">
+                  Click near roads to place users
+                </div>
+              )}
+            </div>
+            
+            <div className="bg-blue-50 p-2 rounded text-xs">
+              <div className="font-medium mb-1">Road Mode Features:</div>
+              <div>• Users snap to nearest road</div>
+              <div>• Constrained movement along roads</div>
+              <div>• Bidirectional traffic</div>
+              <div>• Auto direction reversal</div>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Auto Placement Controls */}
+        <Card className="mb-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Target className="w-4 h-4" />
+              Auto Placement
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-xs">Algorithm</Label>
+              <Select value={placementAlgorithm} onValueChange={setPlacementAlgorithm}>
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="topk-demand">Top-K Demand</SelectItem>
+                  <SelectItem value="kmeans">K-Means Clustering</SelectItem>
+                  <SelectItem value="random-random">Random-Random</SelectItem>
+                  <SelectItem value="random-nearest">Random-Nearest</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label className="text-xs">Max Coverage Distance: {maxCoverageDistance[0]}px</Label>
+              <Slider 
+                value={maxCoverageDistance} 
+                onValueChange={setMaxCoverageDistance} 
+                max={200} 
+                min={50} 
+                step={10} 
+                className="h-4" 
+              />
+            </div>
+            
+            <div className="text-xs text-gray-600 mb-2">
+              <div>Edge Servers: {edgeNodes.length}</div>
+              <div>Users: {users?.length || 0}</div>
+            </div>
+            
+            <Button 
+              onClick={runPlacementAlgorithm} 
+              size="sm" 
+              variant="default" 
+              className="w-full"
+              disabled={!users?.length || !edgeNodes.length}
+            >
+              <MapPin className="w-4 h-4 mr-1" />
+              Run Placement
+            </Button>
           </CardContent>
         </Card>
 

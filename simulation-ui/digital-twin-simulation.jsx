@@ -41,11 +41,26 @@ export default function Component() {
 
   // Edge settings
   const [edgeCapacity, setEdgeCapacity] = useState([100]);
-  const [edgeCoverage, setEdgeCoverage] = useState([0]);
+  const [edgeCoverage, setEdgeCoverage] = useState([80]);
 
   // Central node settings
   const [centralCapacity, setCentralCapacity] = useState([500]);
-  const [centralCoverage, setCentralCoverage] = useState([0]);
+  const [centralCoverage, setCentralCoverage] = useState([150]);
+
+  // Update coverage for existing nodes when slider changes
+  useEffect(() => {
+    setEdgeNodes(prev => prev.map(edge => ({
+      ...edge,
+      coverage: edgeCoverage[0]
+    })));
+  }, [edgeCoverage]);
+
+  useEffect(() => {
+    setCentralNodes(prev => prev.map(central => ({
+      ...central,
+      coverage: centralCoverage[0]
+    })));
+  }, [centralCoverage]);
 
   // Zoom and Pan state
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -65,6 +80,15 @@ export default function Component() {
   const [manualConnectionMode, setManualConnectionMode] = useState(false);
   const [autoAssignment, setAutoAssignment] = useState(true);
 
+  // Auto Placement state
+  const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
+  const [maxCoverageDistance, setMaxCoverageDistance] = useState([100]);
+
+  // Road Network state
+  const [roadMode, setRoadMode] = useState(false);
+  const [roads, setRoads] = useState([]);
+  const [showRoads, setShowRoads] = useState(true);
+
   // Socket.IO for real-time data communication
   const socketData = useSocket('http://localhost:5001', isSimulating);
 
@@ -78,6 +102,350 @@ export default function Component() {
     const dx = x2 - x1;
     const dy = y2 - y1;
     return Math.sqrt(dx * dx + dy * dy);
+  };
+
+  // Road Network Functions
+  const createPredefinedRoads = () => {
+    const canvasWidth = window.innerWidth;
+    const canvasHeight = window.innerHeight;
+    
+    const predefinedRoads = [
+      // Horizontal roads
+      {
+        id: "road-1",
+        startX: 100,
+        startY: 200,
+        endX: canvasWidth - 100,
+        endY: 200,
+        width: 40,
+        color: "#6B7280",
+        type: "highway",
+        direction: "bidirectional"
+      },
+      {
+        id: "road-2", 
+        startX: 150,
+        startY: 400,
+        endX: canvasWidth - 150,
+        endY: 400,
+        width: 30,
+        color: "#9CA3AF",
+        type: "main",
+        direction: "bidirectional"
+      },
+      {
+        id: "road-3",
+        startX: 100,
+        startY: 600,
+        endX: canvasWidth - 200,
+        endY: 600,
+        width: 25,
+        color: "#D1D5DB",
+        type: "local",
+        direction: "bidirectional"
+      },
+      // Vertical roads
+      {
+        id: "road-4",
+        startX: 300,
+        startY: 100,
+        endX: 300,
+        endY: canvasHeight - 100,
+        width: 35,
+        color: "#6B7280",
+        type: "highway",
+        direction: "bidirectional"
+      },
+      {
+        id: "road-5",
+        startX: 600,
+        startY: 150,
+        endX: 600,
+        endY: canvasHeight - 150,
+        width: 30,
+        color: "#9CA3AF",
+        type: "main",
+        direction: "bidirectional"
+      },
+      {
+        id: "road-6",
+        startX: 900,
+        startY: 100,
+        endX: 900,
+        endY: canvasHeight - 200,
+        width: 25,
+        color: "#D1D5DB",
+        type: "local",
+        direction: "bidirectional"
+      }
+    ];
+    
+    setRoads(predefinedRoads);
+  };
+
+  // Initialize roads on component mount
+  useEffect(() => {
+    createPredefinedRoads();
+  }, []);
+
+  // Get nearest point on a road to given coordinates
+  const getNearestPointOnRoad = (x, y, road) => {
+    const dx = road.endX - road.startX;
+    const dy = road.endY - road.startY;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    
+    if (length === 0) return { x: road.startX, y: road.startY, t: 0 };
+    
+    const t = Math.max(0, Math.min(1, ((x - road.startX) * dx + (y - road.startY) * dy) / (length * length)));
+    
+    return {
+      x: road.startX + t * dx,
+      y: road.startY + t * dy,
+      t: t
+    };
+  };
+
+  // Find nearest road to given coordinates
+  const findNearestRoad = (x, y) => {
+    let nearestRoad = null;
+    let minDistance = Infinity;
+    let nearestPoint = null;
+    
+    roads.forEach(road => {
+      const point = getNearestPointOnRoad(x, y, road);
+      const distance = calculateDistance(x, y, point.x, point.y);
+      
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestRoad = road;
+        nearestPoint = point;
+      }
+    });
+    
+    return { road: nearestRoad, point: nearestPoint, distance: minDistance };
+  };
+
+  // Move user along road
+  const moveUserAlongRoad = (user, road) => {
+    const dx = road.endX - road.startX;
+    const dy = road.endY - road.startY;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    
+    if (length === 0) return { x: user.x, y: user.y };
+    
+    // Normalize direction
+    const unitX = dx / length;
+    const unitY = dy / length;
+    
+    // Move along road direction
+    const speed = userSpeed[0];
+    let newX = user.x + unitX * speed * (user.roadDirection || 1);
+    let newY = user.y + unitY * speed * (user.roadDirection || 1);
+    
+    // Check bounds and reverse direction if needed
+    const newPoint = getNearestPointOnRoad(newX, newY, road);
+    if (newPoint.t <= 0 || newPoint.t >= 1) {
+      // Reverse direction
+      const newDirection = -(user.roadDirection || 1);
+      newX = user.x + unitX * speed * newDirection;
+      newY = user.y + unitY * speed * newDirection;
+      return { 
+        x: newX, 
+        y: newY, 
+        roadDirection: newDirection,
+        constrainedToRoad: true 
+      };
+    }
+    
+    return { 
+      x: newX, 
+      y: newY, 
+      roadDirection: user.roadDirection || 1,
+      constrainedToRoad: true 
+    };
+  };
+
+  // Auto Placement Algorithms
+  const topKDemandPlacement = (users, candidates, k, lMax) => {
+    // Calculate demand score for each candidate
+    const candidateScores = candidates.map((candidate) => {
+      const score = users.reduce((total, user) => {
+        const distance = calculateDistance(user.x, user.y, candidate.x, candidate.y);
+        return distance <= lMax ? total + 1 : total; // weight = 1 for all users
+      }, 0);
+      return { ...candidate, score };
+    });
+
+    // Sort by score descending and take top K
+    candidateScores.sort((a, b) => b.score - a.score);
+    return candidateScores.slice(0, k);
+  };
+
+  const kMeansPlacement = (users, candidates, k) => {
+    if (users.length === 0) return [];
+    
+    // Simple K-means implementation
+    // Initialize centroids randomly from users
+    let centroids = [];
+    const shuffledUsers = [...users].sort(() => Math.random() - 0.5);
+    for (let i = 0; i < Math.min(k, shuffledUsers.length); i++) {
+      centroids.push({ x: shuffledUsers[i].x, y: shuffledUsers[i].y });
+    }
+
+    // K-means iterations
+    for (let iter = 0; iter < 10; iter++) {
+      // Assign users to nearest centroid
+      const clusters = Array(k).fill().map(() => []);
+      users.forEach(user => {
+        let minDist = Infinity;
+        let assignedCluster = 0;
+        centroids.forEach((centroid, idx) => {
+          const dist = calculateDistance(user.x, user.y, centroid.x, centroid.y);
+          if (dist < minDist) {
+            minDist = dist;
+            assignedCluster = idx;
+          }
+        });
+        clusters[assignedCluster].push(user);
+      });
+
+      // Update centroids
+      const newCentroids = clusters.map(cluster => {
+        if (cluster.length === 0) return centroids[0]; // Handle empty cluster
+        const avgX = cluster.reduce((sum, user) => sum + user.x, 0) / cluster.length;
+        const avgY = cluster.reduce((sum, user) => sum + user.y, 0) / cluster.length;
+        return { x: avgX, y: avgY };
+      });
+
+      centroids = newCentroids;
+    }
+
+    // Find nearest candidate for each centroid
+    return centroids.map(centroid => {
+      let nearestCandidate = candidates[0];
+      let minDist = calculateDistance(centroid.x, centroid.y, candidates[0].x, candidates[0].y);
+      
+      candidates.forEach(candidate => {
+        const dist = calculateDistance(centroid.x, centroid.y, candidate.x, candidate.y);
+        if (dist < minDist) {
+          minDist = dist;
+          nearestCandidate = candidate;
+        }
+      });
+      
+      return nearestCandidate;
+    });
+  };
+
+  const randomRandomPlacement = (users, candidates, k) => {
+    // Random K candidates
+    const shuffledCandidates = [...candidates].sort(() => Math.random() - 0.5);
+    return shuffledCandidates.slice(0, k);
+  };
+
+  const randomNearestPlacement = (users, candidates, k) => {
+    // Same as random-random for placement, difference is in assignment
+    return randomRandomPlacement(users, candidates, k);
+  };
+
+  // Main placement algorithm runner
+  const runPlacementAlgorithm = () => {
+    if (users.length === 0) {
+      alert("No users available for placement algorithm");
+      return;
+    }
+
+    const k = edgeNodes.length;
+    if (k === 0) {
+      alert("No edge nodes available for placement");
+      return;
+    }
+
+    // Use user positions as candidates
+    const candidates = users.map(user => ({ x: user.x, y: user.y }));
+    let selectedPositions = [];
+
+    switch (placementAlgorithm) {
+      case "topk-demand":
+        selectedPositions = topKDemandPlacement(users, candidates, k, maxCoverageDistance[0]);
+        break;
+      case "kmeans":
+        selectedPositions = kMeansPlacement(users, candidates, k);
+        break;
+      case "random-random":
+        selectedPositions = randomRandomPlacement(users, candidates, k);
+        break;
+      case "random-nearest":
+        selectedPositions = randomNearestPlacement(users, candidates, k);
+        break;
+      default:
+        alert("Unknown placement algorithm");
+        return;
+    }
+
+    // Update edge node positions
+    setEdgeNodes(prevNodes => {
+      return prevNodes.map((node, index) => {
+        if (index < selectedPositions.length) {
+          return {
+            ...node,
+            x: selectedPositions[index].x,
+            y: selectedPositions[index].y
+          };
+        }
+        return node;
+      });
+    });
+
+    // Reassign users to nearest edge nodes
+    const updatedNodes = edgeNodes.map((node, index) => {
+      if (index < selectedPositions.length) {
+        return {
+          ...node,
+          x: selectedPositions[index].x,
+          y: selectedPositions[index].y
+        };
+      }
+      return node;
+    });
+
+    setUsers(prevUsers => {
+      return prevUsers.map(user => {
+        if (placementAlgorithm === "random-random") {
+          // Random assignment for random-random
+          const randomNode = updatedNodes[Math.floor(Math.random() * updatedNodes.length)];
+          return {
+            ...user,
+            assignedEdge: randomNode.id,
+            assignedCentral: null,
+            manualConnection: false,
+            latency: calculateLatency(user, randomNode.id, "edge")
+          };
+        } else {
+          // Nearest assignment for other algorithms
+          let nearestNode = updatedNodes[0];
+          let minDist = calculateDistance(user.x, user.y, updatedNodes[0].x, updatedNodes[0].y);
+          
+          updatedNodes.forEach(node => {
+            const dist = calculateDistance(user.x, user.y, node.x, node.y);
+            if (dist < minDist) {
+              minDist = dist;
+              nearestNode = node;
+            }
+          });
+
+          return {
+            ...user,
+            assignedEdge: nearestNode.id,
+            assignedCentral: null,
+            manualConnection: false,
+            latency: calculateLatency(user, nearestNode.id, "edge")
+          };
+        }
+      });
+    });
+
+    console.log(`Placement algorithm ${placementAlgorithm} completed with ${selectedPositions.length} positions`);
   };
 
   // Calculate latency based on connection using experimental formula
@@ -244,6 +612,22 @@ export default function Component() {
 
     setUsers((prevUsers) =>
       prevUsers.map((user) => {
+        // Road-constrained movement
+        if (roadMode && user.assignedRoad) {
+          const road = roads.find(r => r.id === user.assignedRoad);
+          if (road) {
+            const movement = moveUserAlongRoad(user, road);
+            return {
+              ...user,
+              x: movement.x,
+              y: movement.y,
+              roadDirection: movement.roadDirection,
+              constrainedToRoad: movement.constrainedToRoad
+            };
+          }
+        }
+
+        // Free movement (original logic)
         let newX = user.x + user.vx * simulationSpeed[0];
         let newY = user.y + user.vy * simulationSpeed[0];
         let newVx = user.vx;
@@ -261,7 +645,7 @@ export default function Component() {
         return { ...user, x: newX, y: newY, vx: newVx, vy: newVy };
       })
     );
-  }, [isSimulating, simulationSpeed]);
+  }, [isSimulating, simulationSpeed, roadMode, roads, userSpeed]);
 
   // Handle canvas click to add users or select nodes
   const handleCanvasClick = (event) => {
@@ -315,18 +699,36 @@ export default function Component() {
     setSelectedCentral(null);
 
     if (editMode === "none") {
+      let userX = worldX;
+      let userY = worldY;
+      let assignedRoad = null;
+      let roadDirection = Math.random() > 0.5 ? 1 : -1;
+
+      // If road mode is enabled, snap user to nearest road
+      if (roadMode && roads.length > 0) {
+        const nearest = findNearestRoad(worldX, worldY);
+        if (nearest.road && nearest.distance < 50) { // Allow placing within 50px of road
+          userX = nearest.point.x;
+          userY = nearest.point.y;
+          assignedRoad = nearest.road.id;
+        }
+      }
+
       const newUser = {
         id: `user-${Date.now()}`,
-        x: worldX,
-        y: worldY,
-        vx: (Math.random() - 0.5) * userSpeed[0],
-        vy: (Math.random() - 0.5) * userSpeed[0],
+        x: userX,
+        y: userY,
+        vx: roadMode ? 0 : (Math.random() - 0.5) * userSpeed[0], // No random velocity in road mode
+        vy: roadMode ? 0 : (Math.random() - 0.5) * userSpeed[0],
         predictedPath: [],
         assignedEdge: null,
         assignedCentral: null,
         latency: 0,
         size: userSize[0],
         manualConnection: false,
+        assignedRoad: assignedRoad,
+        roadDirection: roadDirection,
+        constrainedToRoad: roadMode && assignedRoad !== null
       };
       setUsers((prev) => [...prev, newUser]);
     }
@@ -556,6 +958,67 @@ export default function Component() {
       ctx.stroke();
     }
 
+    // Draw roads
+    if (showRoads && roads.length > 0) {
+      roads.forEach((road) => {
+        // Check if road is visible
+        const roadLeft = Math.min(road.startX, road.endX) - road.width;
+        const roadRight = Math.max(road.startX, road.endX) + road.width;
+        const roadTop = Math.min(road.startY, road.endY) - road.width;
+        const roadBottom = Math.max(road.startY, road.endY) + road.width;
+        
+        if (roadRight < visibleLeft || roadLeft > visibleRight || 
+            roadBottom < visibleTop || roadTop > visibleBottom) {
+          return;
+        }
+
+        // Draw road background (wider)
+        ctx.strokeStyle = "#374151";
+        ctx.lineWidth = (road.width + 4) / zoomLevel;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(road.startX, road.startY);
+        ctx.lineTo(road.endX, road.endY);
+        ctx.stroke();
+
+        // Draw road surface
+        ctx.strokeStyle = road.color;
+        ctx.lineWidth = road.width / zoomLevel;
+        ctx.lineCap = "round";
+        ctx.beginPath();
+        ctx.moveTo(road.startX, road.startY);
+        ctx.lineTo(road.endX, road.endY);
+        ctx.stroke();
+
+        // Draw center line for highways and main roads
+        if (road.type === "highway" || road.type === "main") {
+          ctx.strokeStyle = "#FFFFFF";
+          ctx.lineWidth = 2 / zoomLevel;
+          ctx.setLineDash([20 / zoomLevel, 10 / zoomLevel]);
+          ctx.beginPath();
+          ctx.moveTo(road.startX, road.startY);
+          ctx.lineTo(road.endX, road.endY);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        }
+
+        // Draw road labels
+        if (zoomLevel > 0.5) {
+          const midX = (road.startX + road.endX) / 2;
+          const midY = (road.startY + road.endY) / 2;
+          const fontSize = Math.max(8, 12 / zoomLevel);
+          
+          ctx.fillStyle = "#FFFFFF";
+          ctx.font = `bold ${fontSize}px sans-serif`;
+          ctx.textAlign = "center";
+          ctx.strokeStyle = "#000000";
+          ctx.lineWidth = 3 / zoomLevel;
+          ctx.strokeText(road.id, midX, midY);
+          ctx.fillText(road.id, midX, midY);
+        }
+      });
+    }
+
     // Draw connections between central and edge nodes
     centralNodes.forEach((central) => {
       edgeNodes.forEach((edge) => {
@@ -598,12 +1061,17 @@ export default function Component() {
       }
 
       // Coverage area
-      ctx.fillStyle = `rgba(99, 102, 241, ${
-        0.03 + central.currentLoad * 0.002
-      })`;
-      ctx.beginPath();
-      ctx.arc(central.x, central.y, central.coverage, 0, 2 * Math.PI);
-      ctx.fill();
+      if (central.coverage > 0) {
+        ctx.fillStyle = `rgba(99, 102, 241, ${
+          0.15 + central.currentLoad * 0.005
+        })`;
+        ctx.strokeStyle = `rgba(99, 102, 241, 0.4)`;
+        ctx.lineWidth = 2 / zoomLevel;
+        ctx.beginPath();
+        ctx.arc(central.x, central.y, central.coverage, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      }
 
       // Central node
       const isSelected = selectedCentral && selectedCentral.id === central.id;
@@ -670,10 +1138,15 @@ export default function Component() {
       }
 
       // Coverage area
-      ctx.fillStyle = `rgba(59, 130, 246, ${0.05 + edge.currentLoad * 0.003})`;
-      ctx.beginPath();
-      ctx.arc(edge.x, edge.y, edge.coverage, 0, 2 * Math.PI);
-      ctx.fill();
+      if (edge.coverage > 0) {
+        ctx.fillStyle = `rgba(16, 185, 129, ${0.12 + edge.currentLoad * 0.004})`;
+        ctx.strokeStyle = `rgba(16, 185, 129, 0.5)`;
+        ctx.lineWidth = 1.5 / zoomLevel;
+        ctx.beginPath();
+        ctx.arc(edge.x, edge.y, edge.coverage, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.stroke();
+      }
 
       // Edge node
       const isSelected = selectedEdge && selectedEdge.id === edge.id;
@@ -844,6 +1317,9 @@ export default function Component() {
     zoomLevel,
     panOffset,
     editMode,
+    roadMode,
+    roads,
+    showRoads,
   ]);
 
   // Animation loop
@@ -1153,6 +1629,16 @@ export default function Component() {
           getEditModeDescription={getEditModeDescription}
           getCursorStyle={getCursorStyle}
           socketData={socketData}
+          placementAlgorithm={placementAlgorithm}
+          setPlacementAlgorithm={setPlacementAlgorithm}
+          maxCoverageDistance={maxCoverageDistance}
+          setMaxCoverageDistance={setMaxCoverageDistance}
+          runPlacementAlgorithm={runPlacementAlgorithm}
+          roadMode={roadMode}
+          setRoadMode={setRoadMode}
+          showRoads={showRoads}
+          setShowRoads={setShowRoads}
+          roads={roads}
         />
       </ControlPanel>
 
