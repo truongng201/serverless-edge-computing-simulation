@@ -1,0 +1,37 @@
+{
+  "name": "digital-twin-simulation",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
+  },
+  "dependencies": {
+    "@radix-ui/react-label": "2.0.2",
+    "@radix-ui/react-progress": "1.0.3",
+    "@radix-ui/react-select": "2.0.0",
+    "@radix-ui/react-slider": "1.1.2",
+    "@radix-ui/react-slot": "1.0.2",
+    "@radix-ui/react-switch": "1.0.3",
+    "axios": "^1.11.0",
+    "class-variance-authority": "0.7.0",
+    "clsx": "2.0.0",
+    "lucide-react": "0.263.1",
+    "next": "^14.2.31",
+    "next-themes": "0.2.1",
+    "react": "18.2.0",
+    "react-dom": "18.2.0",
+    "socket.io-client": "^4.7.5",
+    "tailwind-merge": "2.2.0",
+    "tailwindcss-animate": "1.0.7"
+  },
+  "devDependencies": {
+    "autoprefixer": "10.4.16",
+    "eslint": "8.56.0",
+    "eslint-config-next": "14.0.4",
+    "postcss": "8.4.32",
+    "tailwindcss": "3.4.0"
+  }
+}
