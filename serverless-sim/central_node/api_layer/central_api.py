@@ -1,0 +1,275 @@
+"""
+Central Node API Layer
+Handles requests from simulation UI and coordinates with control layer
+"""
+
+import logging
+from flask import Flask, request, jsonify, Blueprint
+from typing import Dict, Any, Optional
+import time
+
+from central_node.control_layer.scheduler import Scheduler, SchedulingStrategy
+from central_node.control_layer.prediction import WorkloadPredictor
+from central_node.control_layer.migration import MigrationManager
+from central_node.control_layer.global_metrics import GlobalMetricsCollector
+from central_node.control_layer.ui_handler import register_ui_handler
+from config import Config
+
+# Create blueprint for central node API
+central_api = Blueprint('central_api', __name__, url_prefix=Config.CENTRAL_API_PREFIX)
+
+class CentralNodeAPI:
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        
+        # Initialize control layer components
+        self.scheduler = Scheduler()
+        self.predictor = WorkloadPredictor()
+        self.migration_manager = MigrationManager()
+        self.metrics_collector = GlobalMetricsCollector()
+        
+        # Start metrics collection
+        self.metrics_collector.start_collection()
+        
+        self.logger.info("Central Node API initialized")
+        
+    def schedule_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Schedule a request to an edge node"""
+        try:
+            decision = self.scheduler.schedule_request(request_data)
+            
+            if not decision:
+                return {
+                    "success": False,
+                    "error": "No available edge nodes",
+                    "code": "NO_NODES_AVAILABLE"
+                }
+                
+            return {
+                "success": True,
+                "target_node": decision.target_node_id,
+                "estimated_time": decision.execution_time_estimate,
+                "confidence": decision.confidence,
+                "reasoning": decision.reasoning
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Request scheduling failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "code": "SCHEDULING_ERROR"
+            }
+            
+    def register_edge_node(self, node_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Register a new edge node"""
+        try:
+            from central_node.control_layer.scheduler import EdgeNodeInfo
+            
+            node_info = EdgeNodeInfo(
+                node_id=node_data["node_id"],
+                endpoint=node_data["endpoint"],
+                location=node_data.get("location", {"lat": 0.0, "lng": 0.0}),
+                current_load=0.0,
+                available_resources=node_data.get("resources", {}),
+                last_heartbeat=time.time()
+            )
+            
+            self.scheduler.register_edge_node(node_info)
+            
+            return {
+                "success": True,
+                "message": f"Edge node {node_data['node_id']} registered successfully"
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Node registration failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "code": "REGISTRATION_ERROR"
+            }
+            
+    def update_node_metrics(self, node_id: str, metrics_data: Dict[str, Any]) -> Dict[str, Any]:
+        """Update metrics from an edge node"""
+        try:
+            from central_node.control_layer.global_metrics import NodeMetrics
+            
+            # Update scheduler with basic metrics
+            self.scheduler.update_node_metrics(node_id, metrics_data)
+            
+            # Add to global metrics collection
+            node_metrics = NodeMetrics(
+                node_id=node_id,
+                timestamp=time.time(),
+                cpu_usage=metrics_data.get("cpu_usage", 0.0),
+                memory_usage=metrics_data.get("memory_usage", 0.0),
+                network_io=metrics_data.get("network_io", {}),
+                disk_io=metrics_data.get("disk_io", {}),
+                container_count=metrics_data.get("container_count", 0),
+                active_requests=metrics_data.get("active_requests", 0),
+                response_time_avg=metrics_data.get("response_time_avg", 0.0),
+                energy_consumption=metrics_data.get("energy_consumption", 0.0)
+            )
+            
+            self.metrics_collector.add_node_metrics(node_metrics)
+            
+            # Check if migration is needed
+            migration_reason = self.migration_manager.should_migrate_container(
+                {"node_id": node_id}, metrics_data
+            )
+            
+            migration_suggested = migration_reason is not None
+            
+            return {
+                "success": True,
+                "migration_suggested": migration_suggested,
+                "migration_reason": migration_reason.value if migration_reason else None
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Metrics update failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "code": "METRICS_ERROR"
+            }
+            
+    def get_cluster_status(self) -> Dict[str, Any]:
+        """Get overall cluster status"""
+        try:
+            scheduler_status = self.scheduler.get_cluster_status()
+            cluster_metrics = self.metrics_collector.get_cluster_metrics()
+            health_summary = self.metrics_collector.get_cluster_health_summary()
+            migration_stats = self.migration_manager.get_migration_stats()
+            
+            return {
+                "success": True,
+                "cluster_info": scheduler_status,
+                "metrics": cluster_metrics.__dict__ if cluster_metrics else None,
+                "health": health_summary,
+                "migrations": migration_stats,
+                "timestamp": time.time()
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Cluster status failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "code": "STATUS_ERROR"
+            }
+            
+    def predict_workload(self, node_id: str, horizon_minutes: int = 30) -> Dict[str, Any]:
+        """Get workload prediction for a node"""
+        try:
+            prediction = self.predictor.predict_workload(node_id, horizon_minutes)
+            
+            if not prediction:
+                return {
+                    "success": False,
+                    "error": "Prediction not available",
+                    "code": "PREDICTION_ERROR"
+                }
+                
+            return {
+                "success": True,
+                "prediction": {
+                    "predicted_load": prediction.predicted_load,
+                    "confidence_interval": prediction.confidence_interval,
+                    "horizon_minutes": prediction.prediction_horizon,
+                    "accuracy": prediction.model_accuracy
+                }
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Prediction failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "code": "PREDICTION_ERROR"
+            }
+
+# Global instance
+central_node_api = CentralNodeAPI()
+
+# API Routes
+@central_api.route('/schedule', methods=['POST'])
+def schedule_request():
+    """Schedule a request to an edge node"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "No data provided"}), 400
+        
+    result = central_node_api.schedule_request(data)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_api.route('/nodes/register', methods=['POST'])
+def register_node():
+    """Register a new edge node"""
+    data = request.get_json()
+    if not data or "node_id" not in data:
+        return jsonify({"success": False, "error": "Invalid node data"}), 400
+        
+    result = central_node_api.register_edge_node(data)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_api.route('/nodes/<node_id>/metrics', methods=['POST'])
+def update_metrics(node_id):
+    """Update metrics for an edge node"""
+    data = request.get_json()
+    if not data:
+        return jsonify({"success": False, "error": "No metrics data provided"}), 400
+        
+    result = central_node_api.update_node_metrics(node_id, data)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_api.route('/cluster/status', methods=['GET'])
+def get_cluster_status():
+    """Get cluster status"""
+    result = central_node_api.get_cluster_status()
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
+
+@central_api.route('/predict/<node_id>', methods=['GET'])
+def predict_workload(node_id):
+    """Get workload prediction for a node"""
+    horizon = request.args.get('horizon', default=30, type=int)
+    result = central_node_api.predict_workload(node_id, horizon)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_api.route('/metrics/export', methods=['GET'])
+def export_metrics():
+    """Export metrics data"""
+    duration = request.args.get('duration_hours', default=1, type=int)
+    format_type = request.args.get('format', default='json', type=str)
+    
+    try:
+        exported_data = central_node_api.metrics_collector.export_metrics(format_type, duration)
+        return exported_data, 200, {'Content-Type': 'application/json'}
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@central_api.route('/health', methods=['GET'])
+def health_check():
+    """Health check endpoint"""
+    return jsonify({
+        "status": "healthy",
+        "timestamp": time.time(),
+        "components": {
+            "scheduler": "running",
+            "predictor": "running",
+            "migration_manager": "running",
+            "metrics_collector": "running"
+        }
+    })
+
+def register_central_api(app: Flask):
+    """Register central node API with Flask app"""
+    app.register_blueprint(central_api)
+    register_ui_handler(app)  # Register UI handler for legacy compatibility
+    logging.getLogger(__name__).info("Central Node API and UI Handler registered")

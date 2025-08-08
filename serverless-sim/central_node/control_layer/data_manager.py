@@ -1,10 +1,45 @@
+"""
+Data Manager for Central Node Control Layer
+Handles data loading and simulation data management for the UI
+"""
+
 import os
 import csv
+import logging
 from collections import defaultdict
+from typing import Dict, Any, List, Optional
+
+class DataManager:
+    """
+    Manages simulation data for the central node UI.
+    Provides data loading capabilities for DACT and vehicle datasets.
+    """
+    
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        self.dact_loader = DactDataLoader()
+        self.vehicle_loader = VehicleDataLoader()
+        
+    def get_vehicle_data_by_timestep(self, timestep: float) -> Optional[Dict[str, Any]]:
+        """Get vehicle data for a specific timestep"""
+        return self.vehicle_loader.get_data_by_timestep(timestep)
+        
+    def get_dact_data_by_step(self, step_id: int) -> Optional[Dict[str, Any]]:
+        """Get DACT data for a specific step"""
+        return self.dact_loader.get_data_by_step(step_id)
+
 
 class DactDataLoader:
+    """Loads and manages DACT dataset for simulation"""
+    
     def __init__(self, data_path: str = None):
-        self._data_path = data_path or os.path.join(os.getcwd(), 'control/data/DACT-Easy-Dataset.csv')
+        self.logger = logging.getLogger(__name__)
+        # Look for data in the project data directory
+        if data_path is None:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            data_path = os.path.join(project_root, 'data', 'DACT-Easy-Dataset.csv')
+        
+        self._data_path = data_path
         self._data = None
         self._load_data()
 
@@ -13,7 +48,7 @@ class DactDataLoader:
         Load data from the specified CSV file and organize it by trip_id.
         """
         if not os.path.isfile(self._data_path):
-            print(f"[ERROR] File not found: {self._data_path}")
+            self.logger.warning(f"DACT data file not found: {self._data_path}")
             self._data = []
             return
 
@@ -37,7 +72,7 @@ class DactDataLoader:
                         }
                         trip_dict[trip_id].append(step)
                     except (KeyError, ValueError) as e:
-                        print(f"[WARNING] Skipping row due to invalid data: {e}")
+                        self.logger.warning(f"Skipping row due to invalid data: {e}")
 
             # Convert to list format with item_id
             self._data = [
@@ -48,23 +83,14 @@ class DactDataLoader:
                 }
                 for idx, (trip_id, steps) in enumerate(trip_dict.items(), start=1)
             ]
-
-            if not self._data:
-                print(f"[WARNING] Loaded file but found no valid trip data in: {self._data_path}")
+            
+            self.logger.info(f"Loaded {len(self._data)} trips from DACT dataset")
 
         except Exception as e:
-            print(f"[ERROR] Failed to read file {self._data_path}: {e}")
+            self.logger.error(f"Failed to load DACT data: {e}")
             self._data = []
 
-    def get_data_by_trip_id(self, trip_id: str):
-        """
-        Retrieve data by trip_id.
-        """
-        if not self._data:
-            return None
-        return next((item for item in self._data if item['trip_id'] == trip_id), None)
-
-    def _normalize_coordinates(self, items):
+    def _normalize_coordinates(self, items: List[Dict]) -> List[Dict]:
         """
         Normalize the x (latitude) and y (longitude) coordinates to a range of 0 to 1 and apply a new scaling factor.
         """
@@ -78,21 +104,20 @@ class DactDataLoader:
 
         for item in items:
             item['x'] = (item['x'] - min_lat) / (max_lat - min_lat) if max_lat > min_lat else 0.5
-            item['x'] *= 5000  # Adjusted scale for better visibility
+            item['x'] *= 1000  # Adjusted scale for better visibility
             item['y'] = (item['y'] - min_lon) / (max_lon - min_lon) if max_lon > min_lon else 0.5
-            item['y'] *= 5000
+            item['y'] *= 1000
 
         return items
 
-    def get_data_by_step(self, step_id: int):
+    def get_data_by_step(self, step_id: int) -> Optional[Dict[str, Any]]:
         """
-        Retrieve data by item_id (sequential ID) and normalize coordinates.
+        Retrieve data by step_id (timestep) from the DACT dataset.
         """
         if not self._data:
             return None
 
         items = []
-        
         for item in self._data:
             for step in item['steps']:
                 if step['timestep'] == step_id:
@@ -110,28 +135,31 @@ class DactDataLoader:
         
         items = self._normalize_coordinates(items)
 
-        data = {
+        return {
             "step_id": step_id,
             "items": items
         }
-        return data
 
-    def get_all_data(self):
-        """
-        Get the full dataset.
-        """
+    def get_all_data(self) -> List[Dict[str, Any]]:
+        """Get the full dataset."""
         return self._data or []
 
-    def __len__(self):
-        """
-        Get the number of trip items loaded.
-        """
+    def __len__(self) -> int:
+        """Get the number of trip items loaded."""
         return len(self._data or [])
 
 
 class VehicleDataLoader:
+    """Loads and manages vehicle dataset for simulation"""
+    
     def __init__(self, data_path: str = None):
-        self._data_path = data_path or os.path.join(os.getcwd(), 'control/data/vehicles_data_5min.csv')
+        self.logger = logging.getLogger(__name__)
+        # Look for data in the project data directory
+        if data_path is None:
+            project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
+            data_path = os.path.join(project_root, 'data', 'vehicles_data_5min.csv')
+        
+        self._data_path = data_path
         self._data = None
         self._load_data()
     
@@ -141,7 +169,7 @@ class VehicleDataLoader:
         Converts fields to appropriate types for later use.
         """
         if not os.path.isfile(self._data_path):
-            print(f"[ERROR] File not found: {self._data_path}")
+            self.logger.warning(f"Vehicle data file not found: {self._data_path}")
             self._data = []
             return
 
@@ -162,14 +190,18 @@ class VehicleDataLoader:
                             "angle": float(row["angle"])
                         })
                     except (ValueError, KeyError) as e:
-                        print(f"[WARN] Skipping malformed row: {row} - Error: {e}")
+                        self.logger.warning(f"Skipping malformed row: {row} - Error: {e}")
+                        
             if not self._data:
-                print(f"[WARNING] Loaded file but found no valid vehicle data in: {self._data_path}")
+                self.logger.warning(f"Loaded file but found no valid vehicle data in: {self._data_path}")
+            else:
+                self.logger.info(f"Loaded {len(self._data)} vehicle records")
+                
         except Exception as e:
-            print(f"[ERROR] Failed to read file {self._data_path}: {e}")
+            self.logger.error(f"Failed to read vehicle data file {self._data_path}: {e}")
             self._data = []
             
-    def _normalize_coordinates(self, items):
+    def _normalize_coordinates(self, items: List[Dict]) -> List[Dict]:
         """
         Normalize the x (latitude) and y (longitude) coordinates to a range of 0 to 1 and apply a new scaling factor.
         """
@@ -189,7 +221,7 @@ class VehicleDataLoader:
 
         return items
             
-    def get_data_by_timestep(self, timestep: float):
+    def get_data_by_timestep(self, timestep: float) -> Optional[Dict[str, Any]]:
         """
         Retrieve vehicle data by timestep and normalize coordinates.
         Expected output format:
@@ -212,6 +244,7 @@ class VehicleDataLoader:
         """
         if not self._data:
             return None
+            
         items = []
         for row in self._data:
             if float(row["time"]) == float(timestep):
@@ -232,6 +265,3 @@ class VehicleDataLoader:
             "step_id": timestep,
             "items": items
         }
-
-            
-            
