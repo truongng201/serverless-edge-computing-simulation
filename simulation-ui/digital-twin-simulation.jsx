@@ -19,7 +19,6 @@ import { useCanvasDrawing } from "@/lib/canvas-drawing";
 import { runPlacementAlgorithm } from "@/lib/user-management";
 import * as NodeManagement from "@/lib/node-management";
 import * as UserManagement from "@/lib/user-management";
-import axios from 'axios';
 
 export default function Component() {
   // Get all state from the custom hook
@@ -89,7 +88,13 @@ export default function Component() {
       state.setIsSimulating,
       state.setTotalLatency
     ),
-    resetSimulation: () => NodeManagement.resetSimulation(() => nodeActions.clearEverything())
+    resetSimulation: () => {
+      NodeManagement.resetSimulation(() => nodeActions.clearEverything());
+      // Also reset the simulation data if available
+      if (state.simulationData?.resetSimulation) {
+        state.simulationData.resetSimulation();
+      }
+    }
   };
 
   const userActions = {
@@ -144,21 +149,31 @@ export default function Component() {
     draw();
   }, [draw]);
 
-  // Fetch the first step of all users from the API
+  // Initial data fetch when component mounts (only if not simulating)
   useEffect(() => {
-    const fetchFirstSample = async () => {
-      try {
-        const response = await axios.get('http://localhost:5001/get_sample?timestep=28800.00');
-        const firstSample = response.data;
-        console.log('First Sample:', firstSample);
-        state.setUsers(firstSample?.data?.items || []);
-      } catch (error) {
-        console.error('Error fetching first sample:', error);
+    const fetchInitialData = async () => {
+      if (!state.isSimulating && state.simulationData?.jumpToTimestep) {
+        try {
+          console.log('Fetching initial simulation data...');
+          await state.simulationData.jumpToTimestep(28800.00);
+        } catch (error) {
+          console.error('Error fetching initial sample:', error);
+        }
       }
     };
 
-    fetchFirstSample();
-  }, [state.setUsers]);
+    fetchInitialData();
+  }, []); // Only run once on mount
+
+  // Debug simulation state changes
+  useEffect(() => {
+    console.log('Simulation state changed:', {
+      isSimulating: state.isSimulating,
+      currentStep: state.simulationData?.currentStep,
+      status: state.simulationData?.simulationStatus,
+      usersCount: state.users.length
+    });
+  }, [state.isSimulating, state.simulationData?.currentStep, state.simulationData?.simulationStatus, state.users.length]);
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gray-50">
@@ -245,6 +260,7 @@ export default function Component() {
           setManualConnectionMode={state.setManualConnectionMode}
           autoAssignment={state.autoAssignment}
           setAutoAssignment={state.setAutoAssignment}
+          simulationData={state.simulationData}
           models={models}
           connectUserToNode={userActions.connectUserToNode}
           disconnectUser={userActions.disconnectUser}

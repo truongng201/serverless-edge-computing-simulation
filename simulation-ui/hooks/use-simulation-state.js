@@ -62,7 +62,7 @@ export function useSimulationState() {
   const [showRoads, setShowRoads] = useState(false);
 
   // Simulation data management using REST API
-  useSimulation('http://localhost:5001', isSimulating, simulationSpeed[0], setUsers);
+  const simulationData = useSimulation('http://localhost:5001', isSimulating, simulationSpeed[0], setUsers);
 
   // Update coverage for existing nodes when slider changes
   useEffect(() => {
@@ -185,5 +185,6 @@ export function useSimulationState() {
     setRoads,
     showRoads,
     setShowRoads,
+    simulationData,
   };
 }

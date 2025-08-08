@@ -262,8 +262,19 @@ export default function ControlPanelContent({
           <CardContent className="space-y-3">
            
             {simulationData?.currentStep && (
-              <div className="text-xs text-gray-600">
-                Current Timestep: {simulationData.currentStep.toFixed(2)}
+              <div className="space-y-1">
+                <div className="text-xs text-gray-600">
+                  Current Timestep: {simulationData.currentStep.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-500">
+                  Status: {simulationData.simulationStatus || 'stopped'}
+                  {simulationData.isLoading && ' (loading...)'}
+                </div>
+                {simulationData.error && (
+                  <div className="text-xs text-red-500">
+                    Error: {simulationData.error}
+                  </div>
+                )}
               </div>
             )}
             <div className="flex gap-2">

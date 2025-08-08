@@ -334,16 +334,17 @@ const drawEdgeNodes = (ctx, edgeNodes, selectedEdge, editMode, visibleLeft, visi
 };
 
 const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visibleTop, visibleRight, visibleBottom, zoomLevel) => {
-  console.log('Users state:', users);
+  // Reduced logging to avoid console spam
+  if (users.length > 0 && Math.random() < 0.1) { // Log only occasionally
+    console.log(`Rendering ${users.length} users`);
+  }
   users.forEach((user) => {
-    console.log(`Rendering user: ${user.id}, Position: (${user.x}, ${user.y}), Size: ${user.size}`);
     if (
       user.x < visibleLeft - 50 ||
       user.x > visibleRight + 50 ||
       user.y < visibleTop - 50 ||
       user.y > visibleBottom + 50
     ) {
-      console.log(`User ${user.id} is outside visible bounds.`);
       return;
     }
 

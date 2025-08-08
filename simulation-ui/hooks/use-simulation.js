@@ -12,7 +12,7 @@ export const useSimulation = (
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
   const intervalRef = useRef(null);
-  const stepInterval = 300; // 5 minutes in seconds (300 seconds)
+  const stepInterval = 1
 
   // Function to fetch simulation data for a specific timestep
   const fetchSimulationData = async (timestep) => {
@@ -28,7 +28,59 @@ export const useSimulation = (
       
       if (response.data.status === "success") {
         console.log(`Successfully fetched data for timestep ${timestep}:`, response.data.data);
-        setUsers(response.data.data?.items);
+        // Update users with the fetched data - handle both array and object with items property
+        const userData = response.data.data?.items || response.data.data || [];
+        
+        // Instead of replacing all users, update existing ones and add new ones
+        setUsers(prevUsers => {
+          const userMap = new Map();
+          
+          // First, add all existing users to the map
+          prevUsers.forEach(user => {
+            userMap.set(user.id, user);
+          });
+          
+          // Then update with new data or add new users
+          userData.forEach(newUserData => {
+            const existingUser = userMap.get(newUserData.id);
+            if (existingUser) {
+              // Update existing user with new position and data, preserving other properties
+              userMap.set(newUserData.id, {
+                ...existingUser,
+                ...newUserData,
+                // Preserve UI-specific properties that might not come from API
+                manualConnection: existingUser.manualConnection,
+                latency: existingUser.latency || 0,
+                vx: existingUser.vx || 0,
+                vy: existingUser.vy || 0,
+                assignedRoad: existingUser.assignedRoad,
+                roadDirection: existingUser.roadDirection,
+                constrainedToRoad: existingUser.constrainedToRoad
+              });
+            } else {
+              // Add new user with default properties
+              userMap.set(newUserData.id, {
+                ...newUserData,
+                manualConnection: false,
+                latency: 0,
+                vx: (Math.random() - 0.5) * 2,
+                vy: (Math.random() - 0.5) * 2,
+                assignedRoad: null,
+                roadDirection: 1,
+                constrainedToRoad: false
+              });
+            }
+          });
+          
+          // Remove users that are no longer in the data
+          const currentUserIds = new Set(userData.map(u => u.id));
+          const updatedUsers = Array.from(userMap.values()).filter(user => 
+            currentUserIds.has(user.id)
+          );
+          
+          return updatedUsers;
+        });
+        
         setCurrentStep(timestep);
         return response.data.data;
       } else {
@@ -47,6 +99,7 @@ export const useSimulation = (
   useEffect(() => {
     if (isSimulating) {
       console.log(`Starting simulation with speed ${simulationSpeed}x`);
+      setSimulationStatus("running");
       
       // Start continuous data fetching
       if (intervalRef.current) {
@@ -56,8 +109,11 @@ export const useSimulation = (
       // Fetch initial data immediately
       fetchSimulationData(currentStep);
       
-      // Set up interval to fetch data - speed affects interval duration
-      const intervalDuration = Math.max(100, 1000 / simulationSpeed); // Minimum 100ms
+      // Set up interval to fetch data every 5 seconds, adjusted by simulation speed
+      const baseIntervalDuration = 5000; // 5 seconds
+      const intervalDuration = Math.max(1000, baseIntervalDuration / simulationSpeed); // Minimum 1 second
+      
+      console.log(`Setting up interval every ${intervalDuration}ms (${intervalDuration/1000}s)`);
       
       intervalRef.current = setInterval(() => {
         setCurrentStep(prevStep => {
@@ -68,7 +124,6 @@ export const useSimulation = (
         });
       }, intervalDuration);
 
-      setSimulationStatus("running");
     } else {
       console.log("Pausing simulation");
       // Pause simulation - stop the interval
@@ -85,7 +140,7 @@ export const useSimulation = (
         clearInterval(intervalRef.current);
       }
     };
-  }, [isSimulating, simulationSpeed, serverUrl]);
+  }, [isSimulating, simulationSpeed, serverUrl, currentStep]);
 
   // Function to request next step manually
   const requestNextStep = async () => {
