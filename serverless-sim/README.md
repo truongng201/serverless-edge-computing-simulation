@@ -57,7 +57,7 @@ System metrics are collected every 10 seconds:
 
 ## Directory Structure
 
-```
+``` plaintext
 serverless-sim/
 ├── main.py                 # Entry point supporting both node types
 ├── config.py              # Configuration and enums
@@ -92,7 +92,7 @@ serverless-sim/
 
 - **Purpose**: Decides which edge node should handle each request
 - **Strategies**: Round Robin, Least Loaded, Geographic, Predictive
-- **Features**: 
+- **Features**:
   - Edge node registration and health monitoring
   - Load balancing across cluster
   - Request routing decisions
@@ -173,6 +173,7 @@ serverless-sim/
   - Graph visualization endpoints
 
 #### Edge Node API (`edge_api.py`)
+
 - **Purpose**: Process requests from control layer of central node
 - **Features**:
   - Identify cold start and warm start replicas
@@ -189,6 +190,7 @@ serverless-sim/
 ### Resource Layer (Shared)
 
 #### Docker Manager (`docker_manager.py`)
+
 - **Container State Management**:
   - `COLD_START`: `docker create [container]`
   - `RUNNING`: `docker start [container]`
@@ -201,6 +203,7 @@ serverless-sim/
   - Direct Docker daemon API interaction
 
 #### System Metrics Collector (`system_metrics.py`)
+
 - **Metrics Sources**:
   - CPU usage: `/proc/stat`
   - Memory usage: `/proc/meminfo`
@@ -214,12 +217,14 @@ serverless-sim/
 ## Usage
 
 ### Starting Central Node
+
 ```bash
 cd serverless-sim
 python main.py --mode central --port 5001
 ```
 
 ### Starting Edge Nodes (Cloudlet Nodes)
+
 ```bash
 # Edge Node 1
 python main.py --mode edge --node-id edge_001 --port 5002 --central-url http://localhost:5001
@@ -229,6 +234,7 @@ python main.py --mode edge --node-id edge_002 --port 5003 --central-url http://l
 ```
 
 ### Command Line Options
+
 - `--mode`: Node type (`central` or `edge`)
 - `--node-id`: Unique identifier for edge nodes
 - `--central-url`: Central node URL (for edge nodes)
@@ -240,6 +246,7 @@ python main.py --mode edge --node-id edge_002 --port 5003 --central-url http://l
 ## API Examples
 
 ### Schedule a Request (Central Node)
+
 ```bash
 curl -X POST http://localhost:5001/api/v1/central/schedule \
   -H "Content-Type: application/json" \
@@ -251,6 +258,7 @@ curl -X POST http://localhost:5001/api/v1/central/schedule \
 ```
 
 ### Execute Function (Edge Node)
+
 ```bash
 curl -X POST http://localhost:5002/api/v1/edge/execute \
   -H "Content-Type: application/json" \
@@ -262,11 +270,13 @@ curl -X POST http://localhost:5002/api/v1/edge/execute \
 ```
 
 ### Get Cluster Status
+
 ```bash
 curl http://localhost:5001/api/v1/central/cluster/status
 ```
 
 ### Get Simulation Data (Legacy UI Compatibility)
+
 ```bash
 # Get vehicle data for timestep
 curl "http://localhost:5001/get_sample?timestep=28800.00"
@@ -304,19 +314,23 @@ The central node supports the simulation UI through the integrated UI handler in
 ## Monitoring and Metrics
 
 ### Real-time Metrics
+
 - CPU usage, memory usage, network I/O, disk I/O
 - Container states and resource consumption
 - Request latency and throughput
 - Energy consumption calculations
 
 ### Cluster Analytics
+
 - Load distribution across nodes
 - Migration patterns and success rates
 - Prediction accuracy
 - Health status monitoring
 
 ### Data Export
+
 Metrics can be exported in JSON format:
+
 ```bash
 curl "http://localhost:5001/api/v1/central/metrics/export?duration_hours=1&format=json"
 ```
@@ -345,8 +359,6 @@ conda activate serverless-sim
 ```bash
 pip install -r requirements.txt
 ```
-
-## Usage
 
 ```bash
 python main.py

@@ -4,7 +4,6 @@ import logging
 from flask import Flask
 from flask_cors import CORS
 
-from control.ui_handler import app as ui_app
 from central_node.api_layer.central_api import register_central_api
 from edge_node.api_layer.edge_api import register_edge_api, initialize_edge_api
 from config import Config, NodeType
