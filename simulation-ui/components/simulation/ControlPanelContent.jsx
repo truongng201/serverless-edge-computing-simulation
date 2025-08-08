@@ -44,7 +44,6 @@ export default function ControlPanelContent({
   editMode,
   setEditMode,
   models,
-  setSelectedModel,
   deleteSelectedUser,
   resetSimulation,
   addEdgeNode,
@@ -61,7 +60,7 @@ export default function ControlPanelContent({
   resetZoom,
   leftPanelOpen,
   setLeftPanelOpen,
-  socketData,
+  simulationData,
   placementAlgorithm,
   setPlacementAlgorithm,
   maxCoverageDistance,
@@ -131,119 +130,6 @@ export default function ControlPanelContent({
             )}
           </CardContent>
         </Card>
-
-        {/* Manual Connection Controls */}
-        {/* <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Link className="w-4 h-4" />
-              Connection Control
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Auto Assignment</Label>
-              <Switch checked={autoAssignment} onCheckedChange={setAutoAssignment} />
-            </div>
-            {selectedUser && (
-              <div className="space-y-3">
-                <div className="p-2 bg-gray-50 rounded text-xs">
-                  <div className="font-medium mb-1">Selected User: {selectedUser.id}</div>
-                  <div>
-                    Connected to: {selectedUser.assignedEdge || selectedUser.assignedCentral || (
-                      <span className="text-red-500">None</span>
-                    )}
-                  </div>
-                  <div>
-                    Connection: <Badge variant={selectedUser.manualConnection ? "default" : "secondary"} className="text-xs">{selectedUser.manualConnection ? "Manual" : "Auto"}</Badge>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Connect to Node:</Label>
-                  <Select
-                    value=""
-                    onValueChange={(value) => {
-                      const [nodeType, nodeId] = value.split(":")
-                      connectUserToNode(selectedUser.id, nodeId, nodeType)
-                    }}
-                  >
-                    <SelectTrigger className="h-8">
-                      <SelectValue placeholder="Choose node..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {edgeNodes.map((edge) => (
-                        <SelectItem key={`edge:${edge.id}`} value={`edge:${edge.id}`}>
-                          🟢 {edge.id} (Load: {Math.round(edge.currentLoad)}%)
-                        </SelectItem>
-                      ))}
-                      {centralNodes.map((central) => (
-                        <SelectItem key={`central:${central.id}`} value={`central:${central.id}`}>
-                          💎 {central.id} (Load: {Math.round(central.currentLoad)}%)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex gap-2">
-                  <Button onClick={() => disconnectUser(selectedUser.id)} size="sm" variant="outline" className="flex-1">
-                    <Unlink className="w-4 h-4 mr-1" />
-                    Disconnect
-                  </Button>
-                </div>
-              </div>
-            )}
-            <Button onClick={resetAllConnections} size="sm" variant="outline" className="w-full">
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Reset All Connections
-            </Button>
-          </CardContent>
-        </Card> */}
-
-        {/* User Editor */}
-        {/* {selectedUser && (
-          <Card className="mb-4">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
-                <Move className="w-4 h-4" />
-                User Editor
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <div className="p-2 bg-blue-50 rounded text-xs">
-                <div className="font-medium mb-2">Editing: {selectedUser.id}</div>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div>
-                    <Label className="text-xs">X Position</Label>
-                    <Input type="number" value={Math.round(selectedUser.x)} onChange={(e) => updateSelectedUser({ x: Number.parseFloat(e.target.value) || 0 })} className="h-6 text-xs" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Y Position</Label>
-                    <Input type="number" value={Math.round(selectedUser.y)} onChange={(e) => updateSelectedUser({ y: Number.parseFloat(e.target.value) || 0 })} className="h-6 text-xs" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                  <div>
-                    <Label className="text-xs">X Velocity</Label>
-                    <Input type="number" step="0.1" value={selectedUser.vx.toFixed(1)} onChange={(e) => updateSelectedUser({ vx: Number.parseFloat(e.target.value) || 0 })} className="h-6 text-xs" />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Y Velocity</Label>
-                    <Input type="number" step="0.1" value={selectedUser.vy.toFixed(1)} onChange={(e) => updateSelectedUser({ vy: Number.parseFloat(e.target.value) || 0 })} className="h-6 text-xs" />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">Size: {selectedUser.size}</Label>
-                  <Slider value={[selectedUser.size]} onValueChange={([value]) => updateSelectedUser({ size: value })} max={20} min={5} step={1} className="h-4" />
-                </div>
-                <div className="mt-2 text-xs text-gray-600">
-                  <div>Latency: {selectedUser.latency}ms</div>
-                  <div>Edge: {selectedUser.assignedEdge || "None"}</div>
-                  <div>Central: {selectedUser.assignedCentral || "None"}</div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )} */}
 
         {/* Clear All Controls */}
         <Card className="mb-4">
@@ -374,13 +260,21 @@ export default function ControlPanelContent({
           </CardHeader>
           
           <CardContent className="space-y-3">
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${socketData?.isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
-              <span className="text-xs">{socketData?.isConnected ? 'Connected' : 'Disconnected'}</span>
-            </div>
-            {socketData?.currentStep && (
-              <div className="text-xs text-gray-600">
-                Current Step: {socketData.currentStep}
+           
+            {simulationData?.currentStep && (
+              <div className="space-y-1">
+                <div className="text-xs text-gray-600">
+                  Current Timestep: {simulationData.currentStep.toFixed(2)}
+                </div>
+                <div className="text-xs text-gray-500">
+                  Status: {simulationData.simulationStatus || 'stopped'}
+                  {simulationData.isLoading && ' (loading...)'}
+                </div>
+                {simulationData.error && (
+                  <div className="text-xs text-red-500">
+                    Error: {simulationData.error}
+                  </div>
+                )}
               </div>
             )}
             <div className="flex gap-2">
