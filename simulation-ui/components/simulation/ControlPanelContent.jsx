@@ -271,6 +271,12 @@ export default function ControlPanelContent({
       setCurrentStep(28800); // Set initial step for Vehicle
       await fetchVehicleSample()
     }
+    
+    // If real mode was active, maintain it after data type change
+    if (simulationMode === "real") {
+      // Re-initialize real mode to ensure it continues working
+      await handleSimulationModeChange("real")
+    }
   }
 
   // Effect to handle simulation intervals

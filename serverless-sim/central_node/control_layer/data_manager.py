@@ -92,21 +92,53 @@ class DactDataLoader:
 
     def _normalize_coordinates(self, items: List[Dict]) -> List[Dict]:
         """
-        Normalize the x (latitude) and y (longitude) coordinates to a range of 0 to 1 and apply a new scaling factor.
+        Scale coordinates for UI visibility while preserving relative positioning.
+        Uses global min/max from entire dataset to maintain consistency across timesteps.
         """
-        if not items:
+        if not items or not self._data:
             return items
 
-        min_lat = min(item['x'] for item in items)
-        max_lat = max(item['x'] for item in items)
-        min_lon = min(item['y'] for item in items)
-        max_lon = max(item['y'] for item in items)
+        # Get global min/max from entire dataset to preserve movement continuity
+        if not hasattr(self, '_global_bounds'):
+            all_lats = []
+            all_lons = []
+            for trip in self._data:
+                for step in trip['steps']:
+                    all_lats.append(step['location']['lat'])
+                    all_lons.append(step['location']['lon'])
+            
+            self._global_bounds = {
+                'min_lat': min(all_lats) if all_lats else 0,
+                'max_lat': max(all_lats) if all_lats else 1,
+                'min_lon': min(all_lons) if all_lons else 0,
+                'max_lon': max(all_lons) if all_lons else 1
+            }
+
+        # Scale factor for UI visibility with larger distances between items
+        scale_x = 2000  # Much larger scale for better separation
+        scale_y = 1500  # Much larger scale for better separation
+        offset_x = 200  # Larger offset from edge
+        offset_y = 200  # Larger offset from edge
+        offset_y = 150  # Larger offset from edge
 
         for item in items:
-            item['x'] = (item['x'] - min_lat) / (max_lat - min_lat) if max_lat > min_lat else 0.5
-            item['x'] *= 1000  # Adjusted scale for better visibility
-            item['y'] = (item['y'] - min_lon) / (max_lon - min_lon) if max_lon > min_lon else 0.5
-            item['y'] *= 1000
+            # Normalize using global bounds to preserve relative positioning
+            lat_range = self._global_bounds['max_lat'] - self._global_bounds['min_lat']
+            lon_range = self._global_bounds['max_lon'] - self._global_bounds['min_lon']
+            
+            if lat_range > 0:
+                normalized_lat = (item['x'] - self._global_bounds['min_lat']) / lat_range
+            else:
+                normalized_lat = 0.5
+                
+            if lon_range > 0:
+                normalized_lon = (item['y'] - self._global_bounds['min_lon']) / lon_range
+            else:
+                normalized_lon = 0.5
+            
+            # Apply scaling and offset for UI
+            item['x'] = normalized_lat * scale_x + offset_x
+            item['y'] = normalized_lon * scale_y + offset_y
 
         return items
 
@@ -201,21 +233,47 @@ class VehicleDataLoader:
             
     def _normalize_coordinates(self, items: List[Dict]) -> List[Dict]:
         """
-        Normalize the x (latitude) and y (longitude) coordinates to a range of 0 to 1 and apply a new scaling factor.
+        Scale coordinates for UI visibility while preserving relative positioning.
+        Uses global min/max from entire dataset to maintain consistency across timesteps.
         """
-        if not items:
+        if not items or not self._data:
             return items
 
-        min_lat = min(item['x'] for item in items)
-        max_lat = max(item['x'] for item in items)
-        min_lon = min(item['y'] for item in items)
-        max_lon = max(item['y'] for item in items)
+        # Get global min/max from entire dataset to preserve movement continuity
+        if not hasattr(self, '_global_bounds'):
+            all_lats = [row['lat'] for row in self._data]
+            all_lons = [row['lon'] for row in self._data]
+            self._global_bounds = {
+                'min_lat': min(all_lats),
+                'max_lat': max(all_lats),
+                'min_lon': min(all_lons),
+                'max_lon': max(all_lons)
+            }
+
+        # Scale factor for UI visibility with larger distances between items
+        scale_x = 2000  # Much larger scale for better separation
+        scale_y = 1500  # Much larger scale for better separation
+        offset_x = 200  # Larger offset from edge
+        offset_y = 200  # Larger offset from edge
 
         for item in items:
-            item['x'] = (item['x'] - min_lat) / (max_lat - min_lat) if max_lat > min_lat else 0.5
-            item['x'] *= 1000  # Adjusted scale for better visibility
-            item['y'] = (item['y'] - min_lon) / (max_lon - min_lon) if max_lon > min_lon else 0.5
-            item['y'] *= 1000
+            # Normalize using global bounds to preserve relative positioning
+            lat_range = self._global_bounds['max_lat'] - self._global_bounds['min_lat']
+            lon_range = self._global_bounds['max_lon'] - self._global_bounds['min_lon']
+            
+            if lat_range > 0:
+                normalized_lat = (item['x'] - self._global_bounds['min_lat']) / lat_range
+            else:
+                normalized_lat = 0.5
+                
+            if lon_range > 0:
+                normalized_lon = (item['y'] - self._global_bounds['min_lon']) / lon_range
+            else:
+                normalized_lon = 0.5
+            
+            # Apply scaling and offset for UI
+            item['x'] = normalized_lat * scale_x + offset_x
+            item['y'] = normalized_lon * scale_y + offset_y
 
         return items
             
