@@ -97,11 +97,11 @@ display_status() {
         echo "✅ Central node: Online"
         
         # Extract node counts
-        total_nodes=$(echo "$status_json" | grep -o '"total_nodes":[0-9]*' | cut -d':' -f2)
-        healthy_nodes=$(echo "$status_json" | grep -o '"healthy_nodes":[0-9]*' | cut -d':' -f2)
-        
-        echo "🖥️  Total nodes: ${total_nodes:-0}"
-        echo "✅ Healthy nodes: ${healthy_nodes:-0}"
+        total_nodes=$(echo "$status_json" | jq -r '.cluster_info.total_nodes // 0')
+        healthy_nodes=$(echo "$status_json" | jq -r '.cluster_info.healthy_nodes // 0')
+
+        echo "🖥️  Total nodes: $total_nodes"
+        echo "✅ Healthy nodes: $healthy_nodes"
         
         # Calculate unhealthy nodes
         if [[ -n "$total_nodes" && -n "$healthy_nodes" ]]; then
@@ -112,8 +112,8 @@ display_status() {
         fi
         
         # Extract container info
-        total_containers=$(echo "$status_json" | grep -o '"total_containers":[0-9]*' | cut -d':' -f2)
-        echo "📦 Total containers: ${total_containers:-0}"
+        total_containers=$(echo "$status_json" | jq -r '.health.total_containers // 0')
+        echo "📦 Total containers: ${total_containers}"
         
         # Extract load info
         echo ""
@@ -121,22 +121,17 @@ display_status() {
         echo "---------------------"
         
         # Try to extract CPU usage
-        if echo "$status_json" | grep -q '"total_cpu_usage"'; then
-            cpu_usage=$(echo "$status_json" | grep -o '"total_cpu_usage":[0-9.]*' | cut -d':' -f2)
-            echo "💻 Average CPU usage: ${cpu_usage:-0}%"
-        fi
-        
+        cpu_usage=$(echo "$status_json" | jq -r '.metrics.total_cpu_usage // 0')
+        echo "💻 Average CPU usage: ${cpu_usage}%"
+
         # Try to extract memory usage
-        if echo "$status_json" | grep -q '"total_memory_usage"'; then
-            memory_usage=$(echo "$status_json" | grep -o '"total_memory_usage":[0-9.]*' | cut -d':' -f2)
-            echo "💾 Average memory usage: ${memory_usage:-0}%"
-        fi
-        
+        memory_usage=$(echo "$status_json" | jq -r '.metrics.total_memory_usage // 0')
+        echo "💾 Average memory usage: ${memory_usage}%"
+
         # Try to extract energy consumption
-        if echo "$status_json" | grep -q '"total_energy"'; then
-            energy=$(echo "$status_json" | grep -o '"total_energy":[0-9.]*' | cut -d':' -f2)
-            echo "⚡ Total energy: ${energy:-0} kWh"
-        fi
+        energy=$(echo "$status_json" | jq -r '.metrics.total_energy // 0')
+        echo "⚡ Total energy: ${energy} kWh"
+
         
     else
         echo "❌ Central node: Error"
