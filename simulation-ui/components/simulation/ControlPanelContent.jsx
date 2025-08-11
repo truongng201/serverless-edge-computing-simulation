@@ -106,17 +106,18 @@ export default function ControlPanelContent({
       // Ensure each user has required properties
       const processedUsers = userData.map((user, index) => ({
         id: user.id || `user_${step}_${index}`,
-        x: Number(user.x) || Math.random() * 800,
-        y: Number(user.y) || Math.random() * 600,
+        x: Number(user.x) || 0, // Use actual coordinates from backend, default to 0
+        y: Number(user.y) || 0, // Use actual coordinates from backend, default to 0
         ...user,
         // Add default properties if missing
-        vx: user.vx || (Math.random() - 0.5) * 2,
-        vy: user.vy || (Math.random() - 0.5) * 2,
+        vx: 0, // Set to 0 to prevent frontend movement
+        vy: 0, // Set to 0 to prevent frontend movement
         manualConnection: user.manualConnection || false,
         latency: user.latency || 0,
         assignedRoad: user.assignedRoad || null,
         roadDirection: user.roadDirection || 1,
-        constrainedToRoad: user.constrainedToRoad || false
+        constrainedToRoad: user.constrainedToRoad || false,
+        isBackendControlled: true // Flag to indicate this user is controlled by backend
       }));
       
       console.log(`Setting users from ${endpoint}:`, processedUsers);
@@ -153,7 +154,16 @@ export default function ControlPanelContent({
   // Handle data type change
   const handleDataTypeChange = async (value) => {
     setDataType(value)
-    if (value === "dact") {
+    
+    // If switching to "none", restore normal user movement
+    if (value === "none") {
+      setUsers(prevUsers => prevUsers.map(user => ({
+        ...user,
+        vx: user.vx || (Math.random() - 0.5) * 2,
+        vy: user.vy || (Math.random() - 0.5) * 2,
+        isBackendControlled: false
+      })));
+    } else if (value === "dact") {
       setCurrentStep(659); // Set initial step for DACT
       await fetchDACTSample()
     } else if (value === "vehicle") {
