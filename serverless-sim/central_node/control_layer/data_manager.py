@@ -116,7 +116,6 @@ class DactDataLoader:
         """
         if not self._data:
             return None
-        self.logger.info(f"Data: {self._data[0]} items loaded")
         items = []
         for item in self._data:
             for step in item['steps']:
