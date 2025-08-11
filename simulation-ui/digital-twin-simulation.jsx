@@ -296,6 +296,10 @@ export default function Component() {
           showRoads={state.showRoads}
           setShowRoads={state.setShowRoads}
           roads={state.roads}
+          simulationMode={state.simulationMode}
+          setSimulationMode={state.setSimulationMode}
+          realModeData={state.realModeData}
+          setRealModeData={state.setRealModeData}
         />
       </ControlPanel>
 
@@ -316,6 +320,8 @@ export default function Component() {
           selectedModel={state.selectedModel}
           rightPanelOpen={state.rightPanelOpen}
           setRightPanelOpen={state.setRightPanelOpen}
+          simulationMode={state.simulationMode}
+          realModeData={state.realModeData}
         />
       </MetricsPanel>
 

@@ -72,13 +72,123 @@ export default function ControlPanelContent({
   setRoadMode,
   showRoads,
   setShowRoads,
-  roads
+  roads,
+  simulationMode,
+  setSimulationMode,
+  realModeData,
+  setRealModeData
 }) {
   const [dataType, setDataType] = useState("none")
   const [loadingData, setLoadingData] = useState(false)
   const [dataError, setDataError] = useState("")
   const [currentStep, setCurrentStep] = useState(28800) // Starting step for vehicle data
   const intervalRef = useRef(null)
+  const realModeIntervalRef = useRef(null)
+
+    // Function to fetch real cluster status
+  const fetchRealClusterStatus = async () => {
+    try {
+      setLoadingData(true)
+      setDataError("")
+      
+      const response = await axios.get('http://192.168.2.4:5001/api/v1/central/cluster/status')
+      
+      if (response.data && response.data.success) {
+        console.log('Real cluster status:', response.data)
+        setRealModeData(response.data)
+        
+        // Get canvas center for positioning nodes
+        const canvasWidth = window.innerWidth
+        const canvasHeight = window.innerHeight
+        const centerX = canvasWidth / 2
+        const centerY = canvasHeight / 2
+        
+        // Create/Update central node based on real data
+        if (response.data.central_node && simulationMode === "real") {
+          const realCentralNode = {
+            id: "central_node",
+            x: centerX,
+            y: centerY - 100, // Slightly above center
+            capacity: response.data.central_node.container_count || 0,
+            coverage: centralCoverage[0] || 150,
+            connections: [],
+            cpu_usage: response.data.central_node.cpu_usage || 0,
+            memory_usage: response.data.central_node.memory_usage || 0,
+            active_requests: response.data.central_node.active_requests || 0,
+            energy_consumption: response.data.central_node.energy_consumption || 0,
+            currentLoad: response.data.central_node.cpu_usage || 0,
+            isWarm: true,
+            lastAccessTime: Date.now()
+          }
+          
+          // Update central nodes array
+          setCentralNodes([realCentralNode])
+        }
+        
+        // Create/Update edge nodes based on real data
+        if (response.data.health && response.data.health.nodes_details && simulationMode === "real") {
+          const nodeCount = response.data.health.nodes_details.length
+          const radius = Math.min(200, Math.max(150, nodeCount * 30)) // Dynamic radius based on node count
+          
+          const realEdgeNodes = response.data.health.nodes_details.map((node, index) => {
+            // Position nodes in a circle around the center
+            const angle = (2 * Math.PI * index) / nodeCount
+            const x = centerX + radius * Math.cos(angle)
+            const y = centerY + radius * Math.sin(angle)
+            
+            return {
+              id: node.node_id,
+              x: x,
+              y: y,
+              capacity: node.container_count || 0,
+              coverage: edgeCoverage[0] || 80,
+              connections: [],
+              cpu_usage: (node.cpu_usage * 100) || 0,
+              memory_usage: (node.memory_usage * 100) || 0,
+              status: node.status,
+              last_seen: node.last_seen,
+              active_requests: node.active_requests || 0,
+              currentLoad: (node.cpu_usage * 100) || 0,
+              isWarm: node.status === 'healthy',
+              lastAccessTime: node.status === 'healthy' ? Date.now() : null
+            }
+          })
+          
+          // Update edge nodes array
+          setEdgeNodes(realEdgeNodes)
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching real cluster status:', error)
+      setDataError(`Failed to fetch real data: ${error.message}`)
+    } finally {
+      setLoadingData(false)
+    }
+  }
+
+  // Handle simulation mode change
+  const handleSimulationModeChange = async (mode) => {
+    setSimulationMode(mode)
+    
+    if (mode === "real") {
+      // Fetch initial real data
+      await fetchRealClusterStatus()
+      
+      // Start real-time polling every 5 seconds
+      if (realModeIntervalRef.current) {
+        clearInterval(realModeIntervalRef.current)
+      }
+      
+      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, 5000)
+    } else {
+      // Stop real-time polling
+      if (realModeIntervalRef.current) {
+        clearInterval(realModeIntervalRef.current)
+        realModeIntervalRef.current = null
+      }
+      setRealModeData(null)
+    }
+  }
 
   // Generic function to fetch sample data with step
   const fetchSampleData = async (endpoint, step) => {
@@ -210,6 +320,9 @@ export default function ControlPanelContent({
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
+      if (realModeIntervalRef.current) {
+        clearInterval(realModeIntervalRef.current);
+      }
     };
   }, [isSimulating, dataType]);
 
@@ -219,7 +332,13 @@ export default function ControlPanelContent({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
+    if (realModeIntervalRef.current) {
+      clearInterval(realModeIntervalRef.current);
+      realModeIntervalRef.current = null;
+    }
     setIsSimulating(false);
+    setSimulationMode("demo");
+    setRealModeData(null);
     resetSimulation();
   };
   return (
@@ -431,6 +550,65 @@ export default function ControlPanelContent({
           </CardContent>
         </Card>
 
+        {/* Simulation Mode Selector */}
+        <Card className="mb-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Server className="w-4 h-4" />
+              Simulation Mode
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-xs">Mode</Label>
+              <Select value={simulationMode} onValueChange={handleSimulationModeChange}>
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="demo">Demo Mode</SelectItem>
+                  <SelectItem value="real">Real Mode (Live Data)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            
+            {simulationMode === "real" && (
+              <div className="space-y-2">
+                <div className="text-xs text-green-600 font-medium">
+                  Real Mode Active - Live data from API
+                </div>
+                
+                <div className="bg-green-50 p-2 rounded text-xs">
+                  <div className="flex items-center justify-between">
+                    <span>Status:</span>
+                    <Badge variant="default" className="text-xs bg-green-600">
+                      Connected
+                    </Badge>
+                  </div>
+                  <div className="mt-1 text-gray-600">
+                    📊 View detailed metrics in the right panel →
+                  </div>
+                  {realModeData && (
+                    <div className="mt-2 text-gray-700">
+                      <div>Nodes: {realModeData.health?.healthy_nodes || 0}/{realModeData.health?.total_nodes || 0} healthy</div>
+                      <div>Central CPU: {realModeData.central_node?.cpu_usage?.toFixed(1)}%</div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
+            {simulationMode === "demo" && (
+              <div className="text-xs text-gray-600">
+                Demo mode - manual control of nodes and users
+              </div>
+            )}
+            
+            {loadingData && <div className="text-xs text-blue-600">Fetching real data...</div>}
+            {dataError && <div className="text-xs text-red-600">{dataError}</div>}
+          </CardContent>
+        </Card>
+
         {/* Simulation Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -582,16 +760,23 @@ export default function ControlPanelContent({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Button onClick={addCentralNode} size="sm" variant="outline" className="flex-1">
-                <Plus className="w-4 h-4" />
-                Add
-              </Button>
-              <Button onClick={removeCentralNode} size="sm" variant="outline" className="flex-1">
-                <Minus className="w-4 h-4" />
-                Remove
-              </Button>
-            </div>
+            {simulationMode !== "real" && (
+              <div className="flex gap-2">
+                <Button onClick={addCentralNode} size="sm" variant="outline" className="flex-1">
+                  <Plus className="w-4 h-4" />
+                  Add
+                </Button>
+                <Button onClick={removeCentralNode} size="sm" variant="outline" className="flex-1">
+                  <Minus className="w-4 h-4" />
+                  Remove
+                </Button>
+              </div>
+            )}
+            {simulationMode === "real" && (
+              <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
+                Central Node managed by real system
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="text-xs">Capacity: {centralCapacity[0]}</Label>
               <Slider value={centralCapacity} onValueChange={setCentralCapacity} max={1000} min={200} step={50} />
@@ -618,16 +803,23 @@ export default function ControlPanelContent({
             <CardTitle className="text-sm">Edge Nodes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Button onClick={addEdgeNode} size="sm" variant="outline" className="flex-1">
-                <Plus className="w-4 h-4" />
-                Add
-              </Button>
-              <Button onClick={removeEdgeNode} size="sm" variant="outline" className="flex-1">
-                <Minus className="w-4 h-4" />
-                Remove
-              </Button>
-            </div>
+            {simulationMode !== "real" && (
+              <div className="flex gap-2">
+                <Button onClick={addEdgeNode} size="sm" variant="outline" className="flex-1">
+                  <Plus className="w-4 h-4" />
+                  Add
+                </Button>
+                <Button onClick={removeEdgeNode} size="sm" variant="outline" className="flex-1">
+                  <Minus className="w-4 h-4" />
+                  Remove
+                </Button>
+              </div>
+            )}
+            {simulationMode === "real" && (
+              <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
+                Edge Nodes managed by real system
+              </div>
+            )}
             <div className="space-y-2">
               <Label className="text-xs">Capacity: {edgeCapacity[0]}</Label>
               <Slider value={edgeCapacity} onValueChange={setEdgeCapacity} max={200} min={50} step={10} />

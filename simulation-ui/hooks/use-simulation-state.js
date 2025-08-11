@@ -52,6 +52,10 @@ export function useSimulationState() {
   const [manualConnectionMode, setManualConnectionMode] = useState(false);
   const [autoAssignment, setAutoAssignment] = useState(true);
 
+  // Simulation mode state
+  const [simulationMode, setSimulationMode] = useState("demo"); // "demo" or "real"
+  const [realModeData, setRealModeData] = useState(null);
+
   // Auto Placement state
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
   const [maxCoverageDistance, setMaxCoverageDistance] = useState([100]);
@@ -175,6 +179,10 @@ export function useSimulationState() {
     setManualConnectionMode,
     autoAssignment,
     setAutoAssignment,
+    simulationMode,
+    setSimulationMode,
+    realModeData,
+    setRealModeData,
     placementAlgorithm,
     setPlacementAlgorithm,
     maxCoverageDistance,

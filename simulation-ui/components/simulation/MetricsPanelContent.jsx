@@ -19,6 +19,8 @@ export default function MetricsPanelContent({
   setSelectedModel,
   rightPanelOpen,
   setRightPanelOpen,
+  simulationMode,
+  realModeData,
 }) {
   return (
     <>
@@ -90,6 +92,125 @@ export default function MetricsPanelContent({
             </div>
           </CardContent>
         </Card>
+
+        {/* Real-Time Metrics for Real Mode */}
+        {simulationMode === "real" && realModeData && (
+          <Card className="mb-4">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Server className="w-4 h-4 text-green-600" />
+                Live System Metrics
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {/* Central Node Metrics */}
+              <div className="bg-blue-50 p-3 rounded">
+                <div className="font-medium text-blue-800 mb-2 flex items-center gap-2">
+                  <Database className="w-4 h-4" />
+                  Central Node
+                </div>
+                <div className="space-y-1 text-xs">
+                  <div className="flex justify-between">
+                    <span>CPU Usage:</span>
+                    <span className="font-medium">{realModeData.central_node?.cpu_usage?.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={realModeData.central_node?.cpu_usage || 0} className="h-2" />
+                  
+                  <div className="flex justify-between">
+                    <span>Memory Usage:</span>
+                    <span className="font-medium">{realModeData.central_node?.memory_usage?.toFixed(1)}%</span>
+                  </div>
+                  <Progress value={realModeData.central_node?.memory_usage || 0} className="h-2" />
+                  
+                  <div className="flex justify-between">
+                    <span>Active Requests:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {realModeData.central_node?.active_requests || 0}
+                    </Badge>
+                  </div>
+                  
+                  <div className="flex justify-between">
+                    <span>Containers:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {realModeData.central_node?.container_count || 0}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Edge Nodes Summary */}
+              <div className="bg-green-50 p-3 rounded">
+                <div className="font-medium text-green-800 mb-2 flex items-center gap-2">
+                  <Server className="w-4 h-4" />
+                  Edge Nodes Overview
+                </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
+                  <div className="text-center">
+                    <div className="font-medium text-lg">{realModeData.health?.total_nodes || 0}</div>
+                    <div className="text-gray-600">Total</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium text-lg text-green-600">{realModeData.health?.healthy_nodes || 0}</div>
+                    <div className="text-gray-600">Healthy</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium text-lg text-red-600">{realModeData.health?.unhealthy_nodes || 0}</div>
+                    <div className="text-gray-600">Unhealthy</div>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Individual Edge Node Status */}
+              <div className="space-y-2">
+                <div className="font-medium text-sm text-gray-700">Individual Node Status</div>
+                {realModeData.health?.nodes_details?.map((node, index) => (
+                  <div key={node.node_id} className={`p-2 rounded border text-xs ${
+                    node.status === 'healthy' 
+                      ? 'bg-green-50 border-green-200' 
+                      : 'bg-red-50 border-red-200'
+                  }`}>
+                    <div className="flex justify-between items-center mb-1">
+                      <div className={`font-medium ${
+                        node.status === 'healthy' ? 'text-green-800' : 'text-red-800'
+                      }`}>
+                        {node.node_id}
+                      </div>
+                      <Badge variant={node.status === 'healthy' ? 'default' : 'destructive'} className="text-xs">
+                        {node.status}
+                      </Badge>
+                    </div>
+                    
+                    <div className="space-y-1">
+                      <div className="flex justify-between">
+                        <span>CPU:</span>
+                        <span className="font-medium">{(node.cpu_usage * 100).toFixed(1)}%</span>
+                      </div>
+                      <Progress value={node.cpu_usage * 100} className="h-1" />
+                      
+                      <div className="flex justify-between">
+                        <span>Memory:</span>
+                        <span className="font-medium">{(node.memory_usage * 100).toFixed(1)}%</span>
+                      </div>
+                      <Progress value={node.memory_usage * 100} className="h-1" />
+                      
+                      <div className="flex justify-between">
+                        <span>Last seen:</span>
+                        <span className="font-medium">{node.last_seen?.toFixed(1)}s ago</span>
+                      </div>
+                      
+                      <div className="flex justify-between">
+                        <span>Requests:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {node.active_requests || 0}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Connection Status */}
         <Card className="mb-4">
