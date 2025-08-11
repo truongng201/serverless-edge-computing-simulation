@@ -478,7 +478,7 @@ export default function ControlPanelContent({
                 variant={isSimulating ? "destructive" : "default"} 
                 size="sm" 
                 className="flex-1"
-                disabled={dataType === "none"}
+                disabled={users?.length === 0} // Disable if no users
               >
                 {isSimulating ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 {isSimulating ? "Pause" : "Start"}
