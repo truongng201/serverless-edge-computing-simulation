@@ -243,15 +243,20 @@ class GlobalMetricsCollector:
     def get_cluster_health_summary(self) -> Dict[str, Any]:
         """Get overall cluster health summary"""
         all_nodes = list(self.node_metrics.keys())
+        nodes_details = []
         node_health = {
             node_id: self.get_node_health_status(node_id)
             for node_id in all_nodes
         }
-        
-        healthy_count = len([h for h in node_health.values() if h["status"] == "healthy"])
-        warning_count = len([h for h in node_health.values() if h["status"] == "warning"])
-        unhealthy_count = len([h for h in node_health.values() if h["status"] == "unhealthy"])
-        
+        for node_id in all_nodes:
+            current_health_status = self.get_node_health_status(node_id)
+            current_health_status["node_id"] = node_id
+            nodes_details.append(current_health_status)
+
+        healthy_count = len([h for h in nodes_details if h["status"] == "healthy"])
+        warning_count = len([h for h in nodes_details if h["status"] == "warning"])
+        unhealthy_count = len([h for h in nodes_details if h["status"] == "unhealthy"])
+
         latest_cluster = self.get_cluster_metrics()
         
         return {
@@ -262,7 +267,7 @@ class GlobalMetricsCollector:
             "cluster_load": latest_cluster.total_cpu_usage if latest_cluster else 0,
             "total_containers": latest_cluster.total_containers if latest_cluster else 0,
             "total_energy": latest_cluster.total_energy if latest_cluster else 0,
-            "node_details": node_health
+            "nodes_details": nodes_details
         }
         
     def export_metrics(self, format_type: str = "json", duration_hours: int = 1) -> str:

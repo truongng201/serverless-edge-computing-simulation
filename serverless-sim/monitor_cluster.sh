@@ -115,22 +115,24 @@ display_status() {
         total_containers=$(echo "$status_json" | jq -r '.health.total_containers // 0')
         echo "📦 Total containers: ${total_containers}"
         
-        # Extract load info
+
+        # Display central node metrics if available
         echo ""
-        echo "📈 PERFORMANCE METRICS"
-        echo "---------------------"
+        echo "🏛️  CENTRAL NODE METRICS"
+        echo "------------------------"
         
-        # Try to extract CPU usage
-        cpu_usage=$(echo "$status_json" | jq -r '.metrics.total_cpu_usage // 0')
-        echo "💻 Average CPU usage: $(echo "$cpu_usage * 100" | bc)%"
-
-        # Try to extract memory usage
-        memory_usage=$(echo "$status_json" | jq -r '.metrics.total_memory_usage // 0')
-        echo "💾 Average memory usage: $(echo "$memory_usage * 100" | bc)%"
-
-        # Try to extract energy consumption
-        energy=$(echo "$status_json" | jq -r '.metrics.total_energy // 0')
-        echo "⚡ Total energy: ${energy} kWh"
+        central_cpu=$(echo "$status_json" | jq -r '.central_node.cpu_usage // 0')
+        central_memory=$(echo "$status_json" | jq -r '.central_node.memory_usage // 0')
+        central_energy=$(echo "$status_json" | jq -r '.central_node.energy_consumption // 0')
+        central_uptime=$(echo "$status_json" | jq -r '.central_node.uptime // 0')
+        
+        if [[ "$central_cpu" != "0" || "$central_memory" != "0" ]]; then
+            echo "💻 Central CPU: $(echo "$central_cpu" | bc)%"
+            echo "💾 Central Memory: $(echo "$central_memory" | bc)%"
+            echo "⚡ Central Energy: ${central_energy} kWh"
+        else
+            echo "Central node metrics not available"
+        fi
 
         
     else
@@ -147,13 +149,23 @@ display_node_details() {
     echo "🏢 EDGE NODES"
     echo "-------------"
     
-    # This is a simplified display - in a real implementation,
-    # you'd parse the JSON properly to show individual node status
-    if echo "$status_json" | grep -q '"node_details"'; then
-        echo "Individual node details available in full JSON response"
-        echo "Use: curl $CENTRAL_URL/api/v1/central/cluster/status | jq"
+    # Check if edge nodes data is available
+    edge_nodes_count=$(echo "$status_json" | jq -r '.health.nodes_details | length // 0')
+    
+    if [[ "$edge_nodes_count" -gt 0 ]]; then
+        echo "Total edge nodes: $edge_nodes_count"
+        
+        # Display basic info for each edge node
+        echo "$status_json" | jq -r '
+            .health.nodes_details[] |
+            "🖥️  Node: \(.node_id)\n   Status: \(.status)\n   CPU: \((.cpu_usage * 100 | floor))%\n   Memory: \((.memory_usage * 100 | floor))%\n   Containers: \(.container_count)\n"
+        ' 2>/dev/null || {
+            echo "Edge nodes detected but details parsing failed"
+            echo "Use: curl $CENTRAL_URL/api/v1/central/cluster/status | jq '.health.nodes_details'"
+        }
     else
-        echo "No detailed node information available"
+        echo "No edge nodes currently registered"
+        echo "Use: curl $CENTRAL_URL/api/v1/central/cluster/status | jq"
     fi
 }
 
@@ -207,6 +219,9 @@ echo ""
 echo "📋 ADDITIONAL COMMANDS"
 echo "----------------------"
 echo "• Health check: curl $CENTRAL_URL/api/v1/central/health"
+echo "• Cluster info: curl $CENTRAL_URL/api/v1/central/cluster/info | jq"
 echo "• Full status: curl $CENTRAL_URL/api/v1/central/cluster/status | jq"
+echo "• Central metrics: curl $CENTRAL_URL/api/v1/central/metrics/central | jq"
+echo "• Edge metrics: curl $CENTRAL_URL/api/v1/central/metrics/edge | jq"
 echo "• Export metrics: curl \"$CENTRAL_URL/api/v1/central/metrics/export?duration_hours=1\""
 echo "• Simulation UI: $CENTRAL_URL"
