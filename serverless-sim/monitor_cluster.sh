@@ -122,11 +122,11 @@ display_status() {
         
         # Try to extract CPU usage
         cpu_usage=$(echo "$status_json" | jq -r '.metrics.total_cpu_usage // 0')
-        echo "💻 Average CPU usage: ${cpu_usage}%"
+        echo "💻 Average CPU usage: $(echo "$cpu_usage * 100" | bc)%"
 
         # Try to extract memory usage
         memory_usage=$(echo "$status_json" | jq -r '.metrics.total_memory_usage // 0')
-        echo "💾 Average memory usage: ${memory_usage}%"
+        echo "💾 Average memory usage: $(echo "$memory_usage * 100" | bc)%"
 
         # Try to extract energy consumption
         energy=$(echo "$status_json" | jq -r '.metrics.total_energy // 0')
