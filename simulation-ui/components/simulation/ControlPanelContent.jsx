@@ -16,7 +16,9 @@ export default function ControlPanelContent({
   users,
   setUsers,
   edgeNodes,
+  setEdgeNodes,
   centralNodes,
+  setCentralNodes,
   isSimulating,
   setIsSimulating,
   simulationSpeed,
@@ -95,68 +97,57 @@ export default function ControlPanelContent({
       
       if (response.data && response.data.success) {
         console.log('Real cluster status:', response.data)
+        console.log('Central node CPU usage:', response.data.central_node?.cpu_usage)
+        console.log('Edge nodes CPU usage:', response.data.health?.nodes_details?.map(n => n.cpu_usage))
         setRealModeData(response.data)
         
         // Get canvas center for positioning nodes
-        const canvasWidth = window.innerWidth
-        const canvasHeight = window.innerHeight
-        const centerX = canvasWidth / 2
-        const centerY = canvasHeight / 2
-        
-        // Create/Update central node based on real data
-        if (response.data.central_node && simulationMode === "real") {
-          const realCentralNode = {
-            id: "central_node",
-            x: centerX,
-            y: centerY - 100, // Slightly above center
-            capacity: response.data.central_node.container_count || 0,
-            coverage: centralCoverage[0] || 150,
-            connections: [],
-            cpu_usage: response.data.central_node.cpu_usage || 0,
-            memory_usage: response.data.central_node.memory_usage || 0,
-            active_requests: response.data.central_node.active_requests || 0,
-            energy_consumption: response.data.central_node.energy_consumption || 0,
-            currentLoad: response.data.central_node.cpu_usage || 0,
-            isWarm: true,
-            lastAccessTime: Date.now()
-          }
-          
-          // Update central nodes array
-          setCentralNodes([realCentralNode])
+        const centerX = 600  // Fixed center X
+        const centerY = 400  // Fixed center Y
+        const realCentralNode = {
+          id: "central_node",
+          x: centerX,
+          y: centerY - 100, // Slightly above center
+          capacity: response.data.central_node.container_count || 0,
+          coverage: centralCoverage[0] || 150,
+          connections: [],
+          cpu_usage: response.data.central_node.cpu_usage || 0,
+          memory_usage: response.data.central_node.memory_usage || 0,
+          active_requests: response.data.central_node.active_requests || 0,
+          energy_consumption: response.data.central_node.energy_consumption || 0,
+          currentLoad: response.data.central_node.cpu_usage || 0,
+          isWarm: true,
+          lastAccessTime: Date.now()
         }
+
+        setCentralNodes([realCentralNode])
+        console.log(centralNodes)
         
-        // Create/Update edge nodes based on real data
-        if (response.data.health && response.data.health.nodes_details && simulationMode === "real") {
-          const nodeCount = response.data.health.nodes_details.length
-          const radius = Math.min(200, Math.max(150, nodeCount * 30)) // Dynamic radius based on node count
-          
-          const realEdgeNodes = response.data.health.nodes_details.map((node, index) => {
-            // Position nodes in a circle around the center
-            const angle = (2 * Math.PI * index) / nodeCount
-            const x = centerX + radius * Math.cos(angle)
-            const y = centerY + radius * Math.sin(angle)
-            
-            return {
-              id: node.node_id,
-              x: x,
-              y: y,
-              capacity: node.container_count || 0,
-              coverage: edgeCoverage[0] || 80,
-              connections: [],
-              cpu_usage: (node.cpu_usage * 100) || 0,
-              memory_usage: (node.memory_usage * 100) || 0,
-              status: node.status,
-              last_seen: node.last_seen,
-              active_requests: node.active_requests || 0,
-              currentLoad: (node.cpu_usage * 100) || 0,
-              isWarm: node.status === 'healthy',
-              lastAccessTime: node.status === 'healthy' ? Date.now() : null
-            }
-          })
-          
-          // Update edge nodes array
-          setEdgeNodes(realEdgeNodes)
-        }
+        // Create/Update edge nodes based on real data (always update regardless of conditions)
+        const realEdgeNodes = (response.data.health.nodes_details || []).map((node, index) => ({
+          id: node.node_id || `edge_${index}`,
+          x: centerX + 700 * Math.cos((index * 5 * Math.PI) / Math.max(response.data.health.nodes_details.length, 1)),
+          y: centerY + 700 * Math.sin((index * 5 * Math.PI) / Math.max(response.data.health.nodes_details.length, 1)),
+          capacity: node.container_count || 0,
+          coverage: edgeCoverage[0] || 100,
+          connections: [],
+          currentLoad: node.cpu_usage * 100 || 0,
+          memory_usage: node.memory_usage || 0,
+          active_requests: node.active_requests || 0,
+          energy_consumption: node.energy_consumption || 0,
+          currentLoad: node.cpu_usage || 0,
+          lastAccessTime: node.last_seen ? new Date(node.last_seen).getTime() : Date.now(),
+          status: node.status || "unhealthy", // Default to unhealthy if not specified
+          isWarm: node.status === "healthy", // Only warm if explicitly healthy
+          isHealthy: node.status === "healthy",
+          lastUpdated: Date.now()
+        }))
+        
+        console.log('Creating edge nodes:', realEdgeNodes)
+        // Always update edge nodes array
+        setEdgeNodes(realEdgeNodes)
+        console.log('Edge nodes state updated')
+        
       }
     } catch (error) {
       console.error('Error fetching real cluster status:', error)
