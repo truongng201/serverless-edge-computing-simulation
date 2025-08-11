@@ -49,7 +49,7 @@ class UIHandler:
         except Exception as e:
             self.logger.error(f"Error getting sample data: {e}")
             return None
-            
+
     def get_dact_sample_data(self, step_id: int) -> Optional[Dict[str, Any]]:
         """
         Get sample data for a specific step from DACT dataset.
@@ -78,7 +78,6 @@ def get_sample_data():
     
     timestep = request.args.get('timestep', 28800.00, type=float)
     sample_data = ui_handler.get_sample_data(timestep)
-    
     if sample_data:
         return jsonify({"status": "success", "data": sample_data}), 200
     else:
@@ -90,7 +89,7 @@ def get_dact_sample_data():
     """
     from flask import request, jsonify
     
-    step_id = request.args.get('step_id', 1, type=int)
+    step_id = request.args.get('step_id', 659, type=int)
     sample_data = ui_handler.get_dact_sample_data(step_id)
     
     if sample_data:

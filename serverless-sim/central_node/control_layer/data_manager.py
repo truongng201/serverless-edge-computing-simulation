@@ -37,7 +37,7 @@ class DactDataLoader:
         # Look for data in the project data directory
         if data_path is None:
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            data_path = os.path.join(project_root, 'data', 'DACT-Easy-Dataset.csv')
+            data_path = os.path.join(project_root, 'mock_data', 'DACT-Easy-Dataset.csv')
         
         self._data_path = data_path
         self._data = None
@@ -116,7 +116,7 @@ class DactDataLoader:
         """
         if not self._data:
             return None
-
+        self.logger.info(f"Data: {self._data[0]} items loaded")
         items = []
         for item in self._data:
             for step in item['steps']:
@@ -134,7 +134,6 @@ class DactDataLoader:
                     break
         
         items = self._normalize_coordinates(items)
-
         return {
             "step_id": step_id,
             "items": items
@@ -157,7 +156,7 @@ class VehicleDataLoader:
         # Look for data in the project data directory
         if data_path is None:
             project_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-            data_path = os.path.join(project_root, 'data', 'vehicles_data_5min.csv')
+            data_path = os.path.join(project_root, 'mock_data', 'vehicles_data_5min.csv')
         
         self._data_path = data_path
         self._data = None
