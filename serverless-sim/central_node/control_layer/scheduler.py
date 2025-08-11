@@ -58,6 +58,22 @@ class Scheduler:
             self.edge_nodes[node_id].available_resources = metrics.get('resources', {})
             self.edge_nodes[node_id].last_heartbeat = time.time()
             
+        # Clean up dead nodes after each update
+        self._cleanup_dead_nodes()
+            
+    def _cleanup_dead_nodes(self):
+        """Remove nodes that haven't sent heartbeat for too long"""
+        current_time = time.time()
+        dead_nodes = []
+        
+        for node_id, node in self.edge_nodes.items():
+            if current_time - node.last_heartbeat > 20: # 20 seconds time out
+                dead_nodes.append(node_id)
+                
+        for node_id in dead_nodes:
+            self.logger.warning(f"Removing dead node: {node_id} (last seen: {current_time - self.edge_nodes[node_id].last_heartbeat:.1f}s ago)")
+            del self.edge_nodes[node_id]
+            
     def schedule_request(self, request_data: Dict[str, Any]) -> Optional[SchedulingDecision]:
         """Schedule a request to the best available edge node"""
         available_nodes = self._get_healthy_nodes()
@@ -83,7 +99,7 @@ class Scheduler:
         healthy_nodes = []
         
         for node in self.edge_nodes.values():
-            if current_time - node.last_heartbeat < 30:  # 30 seconds timeout
+            if current_time - node.last_heartbeat < 60:  # 1 minute timeout (consistent with cleanup)
                 healthy_nodes.append(node)
                 
         return healthy_nodes
@@ -132,17 +148,33 @@ class Scheduler:
         total_load = sum(node.current_load for node in healthy_nodes)
         avg_load = total_load / len(healthy_nodes) if healthy_nodes else 0
         
+        current_time = time.time()
+        all_nodes_info = []
+        unhealthy_nodes = []
+        
+        for node in self.edge_nodes.values():
+            last_seen = current_time - node.last_heartbeat
+            is_healthy = last_seen < 60
+            
+            node_info = {
+                "node_id": node.node_id,
+                "load": node.current_load,
+                "location": node.location,
+                "last_seen": last_seen,
+                "status": "healthy" if is_healthy else "unhealthy",
+                "endpoint": node.endpoint
+            }
+            
+            all_nodes_info.append(node_info)
+            if not is_healthy:
+                unhealthy_nodes.append(node_info)
+        
         return {
             "total_nodes": len(self.edge_nodes),
             "healthy_nodes": len(healthy_nodes),
+            "unhealthy_nodes": len(unhealthy_nodes),
             "average_load": avg_load,
-            "nodes": [
-                {
-                    "node_id": node.node_id,
-                    "load": node.current_load,
-                    "location": node.location,
-                    "last_seen": time.time() - node.last_heartbeat
-                }
-                for node in self.edge_nodes.values()
-            ]
+            "nodes": all_nodes_info,
+            "healthy_nodes_list": [node.node_id for node in healthy_nodes],
+            "unhealthy_nodes_list": [node["node_id"] for node in unhealthy_nodes]
         }

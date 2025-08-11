@@ -144,8 +144,7 @@ class CentralNodeAPI:
     def update_node_metrics(self, node_id: str, metrics_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update metrics from an edge node"""
         try:
-            
-            # Update scheduler with basic metrics
+            # Update scheduler with basic metrics (this will also clean up dead nodes)
             self.scheduler.update_node_metrics(node_id, metrics_data)
             
             # Add to global metrics collection
@@ -170,6 +169,9 @@ class CentralNodeAPI:
             )
             
             migration_suggested = migration_reason is not None
+            
+            # Log the heartbeat
+            self.logger.debug(f"Received metrics from node {node_id}: CPU={metrics_data.get('cpu_usage', 0):.1f}%, Memory={metrics_data.get('memory_usage', 0):.1f}%")
             
             return {
                 "success": True,
@@ -240,6 +242,43 @@ class CentralNodeAPI:
                 "success": False,
                 "error": str(e),
                 "code": "PREDICTION_ERROR"
+            }
+
+    def cleanup_dead_nodes(self) -> Dict[str, Any]:
+        """Manually trigger cleanup of dead nodes"""
+        try:
+            # Get status before cleanup
+            status_before = self.scheduler.get_cluster_status()
+            nodes_before = status_before["total_nodes"]
+            
+            # Trigger cleanup in scheduler
+            self.scheduler._cleanup_dead_nodes()
+            
+            # Trigger cleanup in metrics collector
+            metrics_nodes_removed = self.metrics_collector.cleanup_dead_nodes()
+            
+            # Get status after cleanup
+            status_after = self.scheduler.get_cluster_status()
+            nodes_after = status_after["total_nodes"]
+            
+            removed_count = nodes_before - nodes_after
+            
+            return {
+                "success": True,
+                "scheduler_nodes_removed": removed_count,
+                "metrics_nodes_removed": metrics_nodes_removed,
+                "total_nodes_before": nodes_before,
+                "total_nodes_after": nodes_after,
+                "healthy_nodes": status_after["healthy_nodes"],
+                "unhealthy_nodes": status_after["unhealthy_nodes"]
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Dead node cleanup failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "code": "CLEANUP_ERROR"
             }
 
 # Global instance
@@ -319,6 +358,13 @@ def health_check():
             "metrics_collector": "running"
         }
     })
+
+@central_api.route('/nodes/cleanup', methods=['POST'])
+def cleanup_dead_nodes():
+    """Manually trigger cleanup of dead/disconnected nodes"""
+    result = central_node_api.cleanup_dead_nodes()
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
 
 def register_central_api(app: Flask):
     """Register central node API with Flask app"""
