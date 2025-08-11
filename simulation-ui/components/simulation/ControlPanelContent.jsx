@@ -223,7 +223,8 @@ export default function ControlPanelContent({
       
       console.log(`Setting users from ${endpoint}:`, processedUsers);
       setUsers(processedUsers);
-      setCurrentStep(step);
+      // Don't override currentStep here - let the interval manage it
+      // setCurrentStep(step);
       
     } catch (err) {
       console.error(`Error fetching from ${endpoint}:`, err);
@@ -293,11 +294,19 @@ export default function ControlPanelContent({
       intervalRef.current = setInterval(() => {
         setCurrentStep(prevStep => {
           const nextStep = prevStep + 1;
-          console.log(`Fetching next step: ${nextStep}`);
+          console.log(`Fetching next step: ${nextStep} (previous was ${prevStep})`);
           
           // Determine endpoint based on dataType
           const endpoint = dataType === "dact" ? "/get_dact_sample" : "/get_sample";
-          fetchSampleData(endpoint, nextStep);
+          
+          // Use the nextStep directly in the async call to avoid closure issues
+          (async () => {
+            try {
+              await fetchSampleData(endpoint, nextStep);
+            } catch (error) {
+              console.error(`Error fetching step ${nextStep}:`, error);
+            }
+          })();
           
           return nextStep;
         });

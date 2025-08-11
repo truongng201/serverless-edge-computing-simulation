@@ -20,6 +20,11 @@ export const useSimulationLogic = (state, actions) => {
 
     setUsers((prevUsers) =>
       prevUsers.map((user) => {
+        // Skip movement for backend-controlled users
+        if (user.isBackendControlled) {
+          return user;
+        }
+
         // Road-constrained movement
         if (roadMode && user.assignedRoad) {
           const road = roads.find(r => r.id === user.assignedRoad);

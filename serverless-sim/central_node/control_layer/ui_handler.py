@@ -71,13 +71,13 @@ def home():
 
 def get_sample_data():
     """
-    Endpoint to receive sample vehicle data by timestep.
+    Endpoint to receive sample vehicle data by step_id.
     Legacy endpoint for simulation UI compatibility.
     """
     from flask import request, jsonify
     
-    timestep = request.args.get('timestep', 28800.00, type=float)
-    sample_data = ui_handler.get_sample_data(timestep)
+    step_id = request.args.get('step_id', 28800, type=float)
+    sample_data = ui_handler.get_sample_data(step_id)
     if sample_data:
         return jsonify({"status": "success", "data": sample_data}), 200
     else:
