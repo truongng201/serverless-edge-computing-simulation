@@ -4,15 +4,17 @@ import { Badge } from "@/components/ui/badge"
 import { Slider } from "@/components/ui/slider"
 import { Switch } from "@/components/ui/switch"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import {
   Play, Pause, RotateCcw, Users, Server, Plus, Minus, Database, Trash2, Link, Unlink, Edit3, Move, ChevronLeft, MapPin, Target, Navigation, Eye, EyeOff
 } from "lucide-react"
+import { useState, useEffect, useRef } from "react"
+import axios from "axios";
 
 export default function ControlPanelContent({
   users,
+  setUsers,
   edgeNodes,
   centralNodes,
   isSimulating,
@@ -72,6 +74,144 @@ export default function ControlPanelContent({
   setShowRoads,
   roads
 }) {
+  const [dataType, setDataType] = useState("none")
+  const [loadingData, setLoadingData] = useState(false)
+  const [dataError, setDataError] = useState("")
+  const [currentStep, setCurrentStep] = useState(28800) // Starting step for vehicle data
+  const intervalRef = useRef(null)
+
+  // Generic function to fetch sample data with step
+  const fetchSampleData = async (endpoint, step) => {
+    try {
+      const params = { step_id: step };
+      const res = await axios.get(`http://192.168.2.4:5001${endpoint}`, { params });
+      
+      if (!res.data || res.data.status !== "success") {
+        throw new Error(`Failed to fetch data from ${endpoint}`);
+      }
+      
+      console.log(`Data from ${endpoint} at step ${step}:`, res.data);
+      
+      // Extract user data and ensure it's an array
+      let userData = res.data.data;
+      if (userData && userData.items) {
+        userData = userData.items;
+      }
+      
+      if (!Array.isArray(userData)) {
+        console.warn("Expected array but got:", typeof userData, userData);
+        userData = [];
+      }
+      
+      // Ensure each user has required properties
+      const processedUsers = userData.map((user, index) => ({
+        id: user.id || `user_${step}_${index}`,
+        x: Number(user.x) || Math.random() * 800,
+        y: Number(user.y) || Math.random() * 600,
+        ...user,
+        // Add default properties if missing
+        vx: user.vx || (Math.random() - 0.5) * 2,
+        vy: user.vy || (Math.random() - 0.5) * 2,
+        manualConnection: user.manualConnection || false,
+        latency: user.latency || 0,
+        assignedRoad: user.assignedRoad || null,
+        roadDirection: user.roadDirection || 1,
+        constrainedToRoad: user.constrainedToRoad || false
+      }));
+      
+      console.log(`Setting users from ${endpoint}:`, processedUsers);
+      setUsers(processedUsers);
+      setCurrentStep(step);
+      
+    } catch (err) {
+      console.error(`Error fetching from ${endpoint}:`, err);
+      setDataError(err.message);
+    }
+  };
+  // API call for DACT sample
+  const fetchDACTSample = async () => {
+    setLoadingData(true)
+    setDataError("")
+    try {
+      await fetchSampleData("/get_dact_sample", 659);
+    } finally {
+      setLoadingData(false);
+    }
+  }
+
+  // API call for Vehicle sample
+  const fetchVehicleSample = async () => {
+    setLoadingData(true)
+    setDataError("")
+    try {
+      await fetchSampleData("/get_sample", 28800);
+    } finally {
+      setLoadingData(false);
+    }
+  }
+
+  // Handle data type change
+  const handleDataTypeChange = async (value) => {
+    setDataType(value)
+    if (value === "dact") {
+      setCurrentStep(659); // Set initial step for DACT
+      await fetchDACTSample()
+    } else if (value === "vehicle") {
+      setCurrentStep(28800); // Set initial step for Vehicle
+      await fetchVehicleSample()
+    }
+  }
+
+  // Effect to handle simulation intervals
+  useEffect(() => {
+    if (isSimulating && dataType !== "none") {
+      console.log(`Starting simulation for ${dataType} at step ${currentStep}`);
+      
+      // Clear any existing interval
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      // Set up interval to fetch data every 2 seconds
+      intervalRef.current = setInterval(() => {
+        setCurrentStep(prevStep => {
+          const nextStep = prevStep + 1;
+          console.log(`Fetching next step: ${nextStep}`);
+          
+          // Determine endpoint based on dataType
+          const endpoint = dataType === "dact" ? "/get_dact_sample" : "/get_sample";
+          fetchSampleData(endpoint, nextStep);
+          
+          return nextStep;
+        });
+      }, 2000); // 2 seconds interval
+
+    } else {
+      console.log("Stopping simulation");
+      // Clear interval when simulation stops
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    }
+
+    // Cleanup on unmount
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+    };
+  }, [isSimulating, dataType]);
+
+  // Override resetSimulation to stop intervals
+  const handleResetSimulation = () => {
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+    setIsSimulating(false);
+    resetSimulation();
+  };
   return (
     <>
       {/* Close panel - small left arrow button at the very top, outside all cards */}
@@ -253,6 +393,34 @@ export default function ControlPanelContent({
           </CardContent>
         </Card>
 
+                
+        {/* Data Type Selector */}
+        <Card className="mb-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Database className="w-4 h-4" />
+              Select Data Type
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-xs">Data Type</Label>
+              <Select value={dataType} onValueChange={handleDataTypeChange}>
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (UI/Clicked Data)</SelectItem>
+                  <SelectItem value="dact">DACT</SelectItem>
+                  <SelectItem value="vehicle">Vehicle</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            {loadingData && <div className="text-xs text-blue-600">Loading data...</div>}
+            {dataError && <div className="text-xs text-red-600">{dataError}</div>}
+          </CardContent>
+        </Card>
+
         {/* Simulation Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -260,6 +428,23 @@ export default function ControlPanelContent({
           </CardHeader>
           
           <CardContent className="space-y-3">
+            <div className="space-y-1">
+              <div className="text-xs text-gray-600">
+                Current Step: {currentStep}
+              </div>
+              <div className="text-xs text-gray-500">
+                Data Type: {dataType}
+              </div>
+              <div className="text-xs text-gray-500">
+                Status: {isSimulating ? 'running' : 'stopped'}
+                {loadingData && ' (loading...)'}
+              </div>
+              {dataError && (
+                <div className="text-xs text-red-500">
+                  Error: {dataError}
+                </div>
+              )}
+            </div>
            
             {simulationData?.currentStep && (
               <div className="space-y-1">
@@ -278,11 +463,17 @@ export default function ControlPanelContent({
               </div>
             )}
             <div className="flex gap-2">
-              <Button onClick={() => setIsSimulating(!isSimulating)} variant={isSimulating ? "destructive" : "default"} size="sm" className="flex-1">
+              <Button 
+                onClick={() => setIsSimulating(!isSimulating)} 
+                variant={isSimulating ? "destructive" : "default"} 
+                size="sm" 
+                className="flex-1"
+                disabled={dataType === "none"}
+              >
                 {isSimulating ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                 {isSimulating ? "Pause" : "Start"}
               </Button>
-              <Button onClick={resetSimulation} variant="outline" size="sm">
+              <Button onClick={handleResetSimulation} variant="outline" size="sm">
                 <RotateCcw className="w-4 h-4" />
               </Button>
             </div>
