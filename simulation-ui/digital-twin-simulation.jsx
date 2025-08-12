@@ -12,7 +12,6 @@ import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 
 // Import custom hooks and utilities
 import { useSimulationState } from "@/hooks/use-simulation-state";
-import { useRoadInitialization } from "@/lib/road-utils";
 import { useEventHandlers } from "@/lib/event-handlers";
 import { useSimulationLogic, getEditModeDescription } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
@@ -23,9 +22,6 @@ import * as UserManagement from "@/lib/user-management";
 export default function Component() {
   // Get all state from the custom hook
   const state = useSimulationState();
-
-  // Initialize roads
-  useRoadInitialization(state.setRoads);
 
   // Get event handlers
   const eventHandlers = useEventHandlers(state, state);
@@ -291,11 +287,6 @@ export default function Component() {
           maxCoverageDistance={state.maxCoverageDistance}
           setMaxCoverageDistance={state.setMaxCoverageDistance}
           runPlacementAlgorithm={userActions.runPlacementAlgorithm}
-          roadMode={state.roadMode}
-          setRoadMode={state.setRoadMode}
-          showRoads={state.showRoads}
-          setShowRoads={state.setShowRoads}
-          roads={state.roads}
           simulationMode={state.simulationMode}
           setSimulationMode={state.setSimulationMode}
           realModeData={state.realModeData}

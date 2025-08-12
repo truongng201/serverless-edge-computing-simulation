@@ -5,7 +5,7 @@ import {
   randomNearestPlacement,
   calculateLatency 
 } from "./placement-algorithms";
-import { calculateDistance } from "./road-utils";
+import { calculateDistance } from "./helper";
 
 // Main placement algorithm runner
 export const runPlacementAlgorithm = (

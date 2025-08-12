@@ -1,5 +1,4 @@
 import { useCallback } from "react";
-import { moveUserAlongRoad } from "./road-utils";
 
 // Simulation Functions
 export const useSimulationLogic = (state, actions) => {
@@ -23,21 +22,6 @@ export const useSimulationLogic = (state, actions) => {
         // Skip movement for backend-controlled users
         if (user.isBackendControlled) {
           return user;
-        }
-
-        // Road-constrained movement
-        if (roadMode && user.assignedRoad) {
-          const road = roads.find(r => r.id === user.assignedRoad);
-          if (road) {
-            const movement = moveUserAlongRoad(user, road, userSpeed);
-            return {
-              ...user,
-              x: movement.x,
-              y: movement.y,
-              roadDirection: movement.roadDirection,
-              constrainedToRoad: movement.constrainedToRoad
-            };
-          }
         }
 
         // Free movement (original logic)
