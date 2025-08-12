@@ -45,7 +45,7 @@ mkdir -p logs
 mkdir -p data/models
 
 # Set default configuration
-PORT=${PORT:-5001}
+PORT=${PORT:-8000}
 HOST=${HOST:-0.0.0.0}
 LOG_LEVEL=${LOG_LEVEL:-INFO}
 

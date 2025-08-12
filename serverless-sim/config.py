@@ -21,9 +21,9 @@ class Config:
     METRICS_COLLECTION_INTERVAL = 10  # seconds
     
     # Node Configuration
-    CENTRAL_NODE_PORT = 5001
-    EDGE_NODE_PORT_RANGE = (5002, 5020)
-    
+    CENTRAL_NODE_PORT = 8000
+    EDGE_NODE_PORT_RANGE = (8001, 8100)
+
     # API Endpoints
     CENTRAL_API_PREFIX = "/api/v1/central"
     EDGE_API_PREFIX = "/api/v1/edge"

@@ -41,7 +41,7 @@ def setup_logging(log_level: str = "INFO"):
 def main():
     parser = argparse.ArgumentParser(description='Serverless Central Node')
     parser.add_argument('--port', type=int, default=Config.CENTRAL_NODE_PORT,
-                       help='Port to run on (default: 5001)')
+                       help='Port to run on (default: 8000)')
     parser.add_argument('--host', type=str, default='0.0.0.0',
                        help='Host to bind to (default: 0.0.0.0)')
     parser.add_argument('--debug', action='store_true',
