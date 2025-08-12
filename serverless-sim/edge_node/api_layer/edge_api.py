@@ -10,8 +10,8 @@ from typing import Dict, Any, Optional, List
 from flask import Flask, request, jsonify, Blueprint
 import requests
 
-from shared.docker_manager import DockerManager, ContainerState
-from shared.system_metrics import SystemMetricsCollector
+from shared_resource_layer.docker_manager import DockerManager, ContainerState
+from shared_resource_layer.system_metrics import SystemMetricsCollector
 from config import Config
 
 # Create blueprint for edge node API

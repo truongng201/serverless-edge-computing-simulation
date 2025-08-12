@@ -16,7 +16,7 @@ from central_node.control_layer.ui_handler import register_ui_handler
 
 from central_node.control_layer.global_metrics import NodeMetrics
 
-from shared.system_metrics import SystemMetricsCollector
+from shared_resource_layer.system_metrics import SystemMetricsCollector
 
 from config import Config
 

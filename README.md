@@ -95,7 +95,7 @@ This project implements a hierarchical distributed system with two main componen
 │   │   └── 📄 edge_api.py   # Edge API endpoints
 │   └── 📁 resource_layer/   # Local resource management
 │
-└── 📁 shared/               # Common utilities
+└── 📁 shared_resource_layer/              # shared_resource_layer
     ├── 📄 docker_manager.py # Docker operations
     └── 📄 system_metrics.py # System monitoring
 ```
