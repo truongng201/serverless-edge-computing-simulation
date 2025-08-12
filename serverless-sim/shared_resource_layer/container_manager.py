@@ -160,18 +160,18 @@ class ContainerManager:
             memory_percentage = (memory_usage / memory_limit) if memory_limit > 0 else 0
             
             # Parse network stats
-            networks = stats.get('networks', {})
-            network_io = {
-                'rx_bytes': sum(net.get('rx_bytes', 0) for net in networks.values()),
-                'tx_bytes': sum(net.get('tx_bytes', 0) for net in networks.values())
-            }
+            # networks = stats.get('networks', {})
+            # network_io = {
+            #     'rx_bytes': sum(net.get('rx_bytes', 0) for net in networks.values()),
+            #     'tx_bytes': sum(net.get('tx_bytes', 0) for net in networks.values())
+            # }
             
             return {
                 'container_id': container_id,
                 'cpu_usage': cpu_usage,
                 'memory_usage': memory_usage,
                 'memory_percentage': memory_percentage,
-                'network_io': network_io,
+                # 'network_io': network_io,
                 'timestamp': time.time()
             }
             

@@ -169,8 +169,8 @@ class SystemMetricsCollector:
         if not base_metrics:
             return {}
             
-        network_io = self.get_network_io()
-        disk_io = self.get_disk_io()
+        # network_io = self.get_network_io()
+        # disk_io = self.get_disk_io()
         
         return {
             'timestamp': base_metrics.timestamp,
@@ -181,6 +181,6 @@ class SystemMetricsCollector:
             'cpu_energy_kwh': base_metrics.cpu_energy_kwh,
             'load_average': base_metrics.load_average,
             'uptime': base_metrics.uptime,
-            'network_io': network_io,
-            'disk_io': disk_io
+            # 'network_io': network_io,
+            # 'disk_io': disk_io
         }
