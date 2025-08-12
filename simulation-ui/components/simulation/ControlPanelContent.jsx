@@ -99,9 +99,6 @@ export default function ControlPanelContent({
       const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/cluster/status`)
 
       if (response.data && response.data.success) {
-        console.log('Real cluster status:', response.data)
-        console.log('Central node CPU usage:', response.data.central_node?.cpu_usage)
-        console.log('Edge nodes CPU usage:', response.data.health?.nodes_details?.map(n => n.cpu_usage))
         setRealModeData(response.data)
         
         // Get canvas center for positioning nodes
