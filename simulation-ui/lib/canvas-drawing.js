@@ -329,7 +329,10 @@ const drawEdgeNodes = (ctx, edgeNodes, selectedEdge, editMode, visibleLeft, visi
     ctx.font = `${fontSize}px sans-serif`;
     ctx.textAlign = "center";
     ctx.fillText(edge.id, edge.x, edge.y - 35);
-    ctx.fillText(`${Math.round(edge.currentLoad)}%`, edge.x, edge.y + 45);
+    
+    // Handle both decimal (0-1) and percentage (0-100) formats
+    const displayLoad = edge.currentLoad <= 1 ? edge.currentLoad * 100 : edge.currentLoad;
+    ctx.fillText(`${Math.round(displayLoad)}%`, edge.x, edge.y + 45);
   });
 };
 

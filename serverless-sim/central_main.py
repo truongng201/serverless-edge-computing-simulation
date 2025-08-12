@@ -77,7 +77,7 @@ def main():
     
     logger.info("-" * 60)
     logger.info("Available endpoints:")
-    logger.info("  • Simulation UI: http://{}:{}".format(args.host, args.port))
+    logger.info("  • For simulation UI: http://{}:{}".format(args.host, args.port))
     logger.info("  • Central API: http://{}:{}/api/v1/central".format(args.host, args.port))
     logger.info("  • Legacy UI Data: http://{}:{}/get_sample".format(args.host, args.port))
     logger.info("  • Health Check: http://{}:{}/api/v1/central/health".format(args.host, args.port))

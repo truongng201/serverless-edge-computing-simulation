@@ -5,14 +5,19 @@ Handles requests from simulation UI and coordinates with control layer
 
 import logging
 from flask import Flask, request, jsonify, Blueprint
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import time
 
-from central_node.control_layer.scheduler import Scheduler, SchedulingStrategy
+from central_node.control_layer.scheduler import Scheduler
 from central_node.control_layer.prediction import WorkloadPredictor
 from central_node.control_layer.migration import MigrationManager
 from central_node.control_layer.global_metrics import GlobalMetricsCollector
 from central_node.control_layer.ui_handler import register_ui_handler
+
+from central_node.control_layer.global_metrics import NodeMetrics
+
+from shared.system_metrics import SystemMetricsCollector
+
 from config import Config
 
 # Create blueprint for central node API
@@ -27,12 +32,58 @@ class CentralNodeAPI:
         self.predictor = WorkloadPredictor()
         self.migration_manager = MigrationManager()
         self.metrics_collector = GlobalMetricsCollector()
+        self.central_metrics_monitor = SystemMetricsCollector()
         
-        # Start metrics collection
+        # Start metrics collection and monitoring
         self.metrics_collector.start_collection()
         
-        self.logger.info("Central Node API initialized")
-        
+        # Initialize with default values, will be updated by get_current_central_metrics()
+        self.container_count = 0
+        self.active_requests = 0
+        self.response_time_avg = 0.0
+
+    def get_current_central_metrics(self) -> NodeMetrics:
+        """Get real-time central node metrics"""
+        try:
+            detailed_metrics = self.central_metrics_monitor.get_detailed_metrics()
+            
+            return NodeMetrics(
+                node_id="central_node",
+                timestamp=detailed_metrics.get('timestamp', time.time()),
+                cpu_usage=detailed_metrics.get('cpu_usage', 0.0),
+                memory_usage=detailed_metrics.get('memory_usage', 0.0),
+                network_io=detailed_metrics.get('network_io', {}),
+                disk_io=detailed_metrics.get('disk_io', {}),
+                container_count=self.container_count,
+                active_requests=self.active_requests,
+                response_time_avg=self.response_time_avg,
+                energy_consumption=detailed_metrics.get('cpu_energy_kwh', 0.0)
+            )
+        except Exception as e:
+            self.logger.error(f"Failed to get central metrics: {e}")
+            # Return default metrics if collection fails
+            return NodeMetrics(
+                node_id="central_node",
+                timestamp=time.time(),
+                cpu_usage=0.0,
+                memory_usage=0.0,
+                network_io={},
+                disk_io={},
+                container_count=self.container_count,
+                active_requests=self.active_requests,
+                response_time_avg=self.response_time_avg,
+                energy_consumption=0.0
+            )
+
+    def update_central_node_stats(self, container_count: int = None, active_requests: int = None, response_time_avg: float = None):
+        """Update central node dynamic statistics"""
+        if container_count is not None:
+            self.container_count = container_count
+        if active_requests is not None:
+            self.active_requests = active_requests
+        if response_time_avg is not None:
+            self.response_time_avg = response_time_avg
+
     def schedule_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Schedule a request to an edge node"""
         try:
@@ -93,9 +144,7 @@ class CentralNodeAPI:
     def update_node_metrics(self, node_id: str, metrics_data: Dict[str, Any]) -> Dict[str, Any]:
         """Update metrics from an edge node"""
         try:
-            from central_node.control_layer.global_metrics import NodeMetrics
-            
-            # Update scheduler with basic metrics
+            # Update scheduler with basic metrics (this will also clean up dead nodes)
             self.scheduler.update_node_metrics(node_id, metrics_data)
             
             # Add to global metrics collection
@@ -121,6 +170,9 @@ class CentralNodeAPI:
             
             migration_suggested = migration_reason is not None
             
+            # Log the heartbeat
+            self.logger.debug(f"Received metrics from node {node_id}: CPU={metrics_data.get('cpu_usage', 0):.1f}%, Memory={metrics_data.get('memory_usage', 0):.1f}%")
+            
             return {
                 "success": True,
                 "migration_suggested": migration_suggested,
@@ -136,17 +188,19 @@ class CentralNodeAPI:
             }
             
     def get_cluster_status(self) -> Dict[str, Any]:
-        """Get overall cluster status"""
+        """Get overall cluster status including central node metrics"""
         try:
             scheduler_status = self.scheduler.get_cluster_status()
-            cluster_metrics = self.metrics_collector.get_cluster_metrics()
             health_summary = self.metrics_collector.get_cluster_health_summary()
             migration_stats = self.migration_manager.get_migration_stats()
+            
+            # Get real-time central node metrics
+            central_metrics = self.get_current_central_metrics()
             
             return {
                 "success": True,
                 "cluster_info": scheduler_status,
-                "metrics": cluster_metrics.__dict__ if cluster_metrics else None,
+                "central_node": central_metrics,
                 "health": health_summary,
                 "migrations": migration_stats,
                 "timestamp": time.time()
@@ -188,6 +242,43 @@ class CentralNodeAPI:
                 "success": False,
                 "error": str(e),
                 "code": "PREDICTION_ERROR"
+            }
+
+    def cleanup_dead_nodes(self) -> Dict[str, Any]:
+        """Manually trigger cleanup of dead nodes"""
+        try:
+            # Get status before cleanup
+            status_before = self.scheduler.get_cluster_status()
+            nodes_before = status_before["total_nodes"]
+            
+            # Trigger cleanup in scheduler
+            self.scheduler._cleanup_dead_nodes()
+            
+            # Trigger cleanup in metrics collector
+            metrics_nodes_removed = self.metrics_collector.cleanup_dead_nodes()
+            
+            # Get status after cleanup
+            status_after = self.scheduler.get_cluster_status()
+            nodes_after = status_after["total_nodes"]
+            
+            removed_count = nodes_before - nodes_after
+            
+            return {
+                "success": True,
+                "scheduler_nodes_removed": removed_count,
+                "metrics_nodes_removed": metrics_nodes_removed,
+                "total_nodes_before": nodes_before,
+                "total_nodes_after": nodes_after,
+                "healthy_nodes": status_after["healthy_nodes"],
+                "unhealthy_nodes": status_after["unhealthy_nodes"]
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Dead node cleanup failed: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "code": "CLEANUP_ERROR"
             }
 
 # Global instance
@@ -267,6 +358,13 @@ def health_check():
             "metrics_collector": "running"
         }
     })
+
+@central_api.route('/nodes/cleanup', methods=['POST'])
+def cleanup_dead_nodes():
+    """Manually trigger cleanup of dead/disconnected nodes"""
+    result = central_node_api.cleanup_dead_nodes()
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
 
 def register_central_api(app: Flask):
     """Register central node API with Flask app"""

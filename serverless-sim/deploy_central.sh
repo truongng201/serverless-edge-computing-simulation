@@ -18,8 +18,8 @@ if ! command -v pip3 &> /dev/null; then
 fi
 
 # Install dependencies
-echo "📦 Installing dependencies..."
-pip3 install -r requirements.txt
+# echo "📦 Installing dependencies..."
+# pip3 install -r requirements.txt
 
 # Check if Docker is installed and running
 if ! command -v docker &> /dev/null; then

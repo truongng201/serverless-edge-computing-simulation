@@ -8,6 +8,7 @@ import time
 import os
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
+import psutil
 
 @dataclass
 class SystemMetrics:
@@ -52,71 +53,24 @@ class SystemMetricsCollector:
             return None
             
     def get_cpu_usage(self) -> float:
-        """Get CPU usage percentage from /proc/stat"""
+        """Get CPU usage percentage using psutil"""
         try:
-            with open('/proc/stat', 'r') as f:
-                line = f.readline()
-                
-            # Parse CPU times
-            times = [int(x) for x in line.split()[1:]]
-            
-            # Calculate total and idle time
-            total_time = sum(times)
-            idle_time = times[3]  # idle time is the 4th value
-            
-            current_time = time.time()
-            
-            if self.last_cpu_times is not None and self.last_cpu_measurement_time is not None:
-                # Calculate differences
-                total_diff = total_time - self.last_cpu_times[0]
-                idle_diff = idle_time - self.last_cpu_times[1]
-                
-                if total_diff > 0:
-                    cpu_usage = ((total_diff - idle_diff) / total_diff) * 100.0
-                else:
-                    cpu_usage = 0.0
-            else:
-                cpu_usage = 0.0
-                
-            # Store current values for next calculation
-            self.last_cpu_times = (total_time, idle_time)
-            self.last_cpu_measurement_time = current_time
-            
-            return max(0.0, min(100.0, cpu_usage))
-            
+            # psutil.cpu_percent() returns the CPU utilization as a percentage
+            return psutil.cpu_percent(interval=1)
         except Exception as e:
             self.logger.error(f"Failed to read CPU usage: {e}")
             return 0.0
             
     def get_memory_info(self) -> Dict[str, Any]:
-        """Get memory information from /proc/meminfo"""
+        """Get memory information using psutil"""
         try:
-            memory_info = {}
-            
-            with open('/proc/meminfo', 'r') as f:
-                for line in f:
-                    if line.startswith(('MemTotal:', 'MemFree:', 'MemAvailable:', 'Buffers:', 'Cached:')):
-                        key, value = line.split(':')
-                        # Convert kB to bytes
-                        memory_info[key] = int(value.split()[0]) * 1024
-                        
-            total = memory_info.get('MemTotal', 0)
-            available = memory_info.get('MemAvailable', memory_info.get('MemFree', 0))
-            
-            # Add buffers and cached to available if MemAvailable is not present
-            if 'MemAvailable' not in memory_info:
-                available += memory_info.get('Buffers', 0) + memory_info.get('Cached', 0)
-                
-            used = total - available
-            usage_percentage = (used / total * 100.0) if total > 0 else 0.0
-            
+            mem = psutil.virtual_memory()
             return {
-                'total': total,
-                'available': available,
-                'used': used,
-                'usage_percentage': usage_percentage
+                'total': mem.total,
+                'available': mem.available,
+                'used': mem.used,
+                'usage_percentage': mem.percent
             }
-            
         except Exception as e:
             self.logger.error(f"Failed to read memory info: {e}")
             return {
@@ -148,97 +102,65 @@ class SystemMetricsCollector:
             return 0.0
             
     def get_load_average(self) -> tuple:
-        """Get system load average"""
+        """Get system load average using os.getloadavg()"""
         try:
-            with open('/proc/loadavg', 'r') as f:
-                load_data = f.read().strip().split()
-                
-            return (
-                float(load_data[0]),  # 1 minute
-                float(load_data[1]),  # 5 minutes
-                float(load_data[2])   # 15 minutes
-            )
-            
+            return os.getloadavg()
         except Exception as e:
-            self.logger.error(f"Failed to read load average: {e}")
+            self.logger.error(f"Failed to get load average: {e}")
             return (0.0, 0.0, 0.0)
             
     def get_uptime(self) -> float:
-        """Get system uptime in seconds"""
+        """Get system uptime in seconds using psutil"""
         try:
-            with open('/proc/uptime', 'r') as f:
-                uptime_seconds = float(f.read().split()[0])
-            return uptime_seconds
-            
+            boot_time = psutil.boot_time()
+            return time.time() - boot_time
         except Exception as e:
-            self.logger.error(f"Failed to read uptime: {e}")
+            self.logger.error(f"Failed to get uptime: {e}")
             return 0.0
             
     def get_network_io(self) -> Dict[str, Any]:
-        """Get network I/O statistics"""
+        """Get network I/O statistics using psutil"""
         try:
+            net_io = psutil.net_io_counters(pernic=True)
             network_stats = {}
-            
-            with open('/proc/net/dev', 'r') as f:
-                lines = f.readlines()
-                
-            for line in lines[2:]:  # Skip header lines
-                parts = line.split(':')
-                if len(parts) != 2:
-                    continue
-                    
-                interface = parts[0].strip()
-                stats = parts[1].split()
-                
+            total_rx = 0
+            total_tx = 0
+            for interface, stats in net_io.items():
                 if interface != 'lo':  # Skip loopback interface
                     network_stats[interface] = {
-                        'rx_bytes': int(stats[0]),
-                        'rx_packets': int(stats[1]),
-                        'tx_bytes': int(stats[8]),
-                        'tx_packets': int(stats[9])
+                        'rx_bytes': stats.bytes_recv,
+                        'rx_packets': stats.packets_recv,
+                        'tx_bytes': stats.bytes_sent,
+                        'tx_packets': stats.packets_sent
                     }
-                    
-            # Calculate totals
-            total_rx = sum(stats['rx_bytes'] for stats in network_stats.values())
-            total_tx = sum(stats['tx_bytes'] for stats in network_stats.values())
-            
+                    total_rx += stats.bytes_recv
+                    total_tx += stats.bytes_sent
             return {
                 'interfaces': network_stats,
                 'total_rx_bytes': total_rx,
                 'total_tx_bytes': total_tx
             }
-            
         except Exception as e:
-            self.logger.error(f"Failed to read network stats: {e}")
+            self.logger.error(f"Failed to get network stats: {e}")
             return {'interfaces': {}, 'total_rx_bytes': 0, 'total_tx_bytes': 0}
             
     def get_disk_io(self) -> Dict[str, Any]:
-        """Get disk I/O statistics"""
+        """Get disk I/O statistics using psutil"""
         try:
+            disk_io = psutil.disk_io_counters(perdisk=True)
             disk_stats = {}
-            
-            with open('/proc/diskstats', 'r') as f:
-                lines = f.readlines()
-                
-            for line in lines:
-                parts = line.split()
-                if len(parts) >= 14:
-                    device = parts[2]
-                    
-                    # Only include actual disk devices (not partitions)
-                    if device.startswith(('sd', 'hd', 'vd', 'nvme')):
-                        disk_stats[device] = {
-                            'read_ios': int(parts[3]),
-                            'read_sectors': int(parts[5]),
-                            'write_ios': int(parts[7]),
-                            'write_sectors': int(parts[9]),
-                            'io_time': int(parts[12])
-                        }
-                        
+            for device, stats in disk_io.items():
+                disk_stats[device] = {
+                    'read_count': stats.read_count,
+                    'write_count': stats.write_count,
+                    'read_bytes': stats.read_bytes,
+                    'write_bytes': stats.write_bytes,
+                    'read_time': stats.read_time,
+                    'write_time': stats.write_time
+                }
             return disk_stats
-            
         except Exception as e:
-            self.logger.error(f"Failed to read disk stats: {e}")
+            self.logger.error(f"Failed to get disk stats: {e}")
             return {}
             
     def get_detailed_metrics(self) -> Dict[str, Any]:

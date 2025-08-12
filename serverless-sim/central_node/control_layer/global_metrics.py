@@ -104,6 +104,7 @@ class GlobalMetricsCollector:
         
     def _collection_loop(self):
         """Main collection loop"""
+        cleanup_counter = 0
         while self.is_collecting:
             try:
                 # Collect and aggregate cluster metrics
@@ -113,6 +114,12 @@ class GlobalMetricsCollector:
                     
                 # Clean old cluster metrics
                 self._cleanup_old_cluster_metrics()
+                
+                # Clean up dead nodes every 6 cycles (60 seconds if collection_interval is 10s)
+                cleanup_counter += 1
+                if cleanup_counter >= 6:
+                    self.cleanup_dead_nodes()
+                    cleanup_counter = 0
                 
                 time.sleep(self.collection_interval)
                 
@@ -197,6 +204,26 @@ class GlobalMetricsCollector:
             if m.timestamp >= cutoff_time
         ]
         
+    def cleanup_dead_nodes(self):
+        """Remove nodes that haven't sent metrics for too long"""
+        current_time = time.time()
+        dead_nodes = []
+        
+        for node_id, metrics_list in self.node_metrics.items():
+            if not metrics_list:
+                dead_nodes.append(node_id)
+                continue
+                
+            latest_metric = max(metrics_list, key=lambda m: m.timestamp)
+            if current_time - latest_metric.timestamp > 120:  # 2 minutes timeout
+                dead_nodes.append(node_id)
+                
+        for node_id in dead_nodes:
+            self.logger.warning(f"Removing dead node from metrics: {node_id}")
+            del self.node_metrics[node_id]
+            
+        return len(dead_nodes)
+        
     def get_node_health_status(self, node_id: str) -> Dict[str, Any]:
         """Get health status for a specific node"""
         latest_metrics = self.get_latest_node_metrics(node_id)
@@ -243,15 +270,17 @@ class GlobalMetricsCollector:
     def get_cluster_health_summary(self) -> Dict[str, Any]:
         """Get overall cluster health summary"""
         all_nodes = list(self.node_metrics.keys())
-        node_health = {
-            node_id: self.get_node_health_status(node_id)
-            for node_id in all_nodes
-        }
-        
-        healthy_count = len([h for h in node_health.values() if h["status"] == "healthy"])
-        warning_count = len([h for h in node_health.values() if h["status"] == "warning"])
-        unhealthy_count = len([h for h in node_health.values() if h["status"] == "unhealthy"])
-        
+        nodes_details = []
+       
+        for node_id in all_nodes:
+            current_health_status = self.get_node_health_status(node_id)
+            current_health_status["node_id"] = node_id
+            nodes_details.append(current_health_status)
+
+        healthy_count = len([h for h in nodes_details if h["status"] == "healthy"])
+        warning_count = len([h for h in nodes_details if h["status"] == "warning"])
+        unhealthy_count = len([h for h in nodes_details if h["status"] == "unhealthy"])
+
         latest_cluster = self.get_cluster_metrics()
         
         return {
@@ -262,7 +291,7 @@ class GlobalMetricsCollector:
             "cluster_load": latest_cluster.total_cpu_usage if latest_cluster else 0,
             "total_containers": latest_cluster.total_containers if latest_cluster else 0,
             "total_energy": latest_cluster.total_energy if latest_cluster else 0,
-            "node_details": node_health
+            "nodes_details": nodes_details
         }
         
     def export_metrics(self, format_type: str = "json", duration_hours: int = 1) -> str:
