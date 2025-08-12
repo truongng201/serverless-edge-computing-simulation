@@ -118,7 +118,6 @@ class DactDataLoader:
         scale_x = 2000  # Much larger scale for better separation
         scale_y = 1500  # Much larger scale for better separation
         offset_x = 200  # Larger offset from edge
-        offset_y = 200  # Larger offset from edge
         offset_y = 150  # Larger offset from edge
 
         for item in items:

@@ -351,6 +351,25 @@ const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visibleTop, 
       return;
     }
 
+    // Apply transition properties if they exist
+    const opacity = user.opacity !== undefined ? user.opacity : 1;
+    const scale = user.scale !== undefined ? user.scale : 1;
+    
+    // Skip drawing if fully transparent
+    if (opacity <= 0) return;
+
+    ctx.save();
+    
+    // Apply opacity
+    ctx.globalAlpha = opacity;
+    
+    // Apply scale transformation
+    if (scale !== 1) {
+      ctx.translate(user.x, user.y);
+      ctx.scale(scale, scale);
+      ctx.translate(-user.x, -user.y);
+    }
+
     // User
     const isSelected = selectedUser && selectedUser.id === user.id;
     ctx.fillStyle = isSelected
@@ -408,5 +427,7 @@ const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visibleTop, 
       ctx.textAlign = "center";
       ctx.fillText(user.id, user.x, user.y - user.size - 10);
     }
+    
+    ctx.restore();
   });
 };

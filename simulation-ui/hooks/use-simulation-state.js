@@ -66,7 +66,9 @@ export function useSimulationState() {
   const [showRoads, setShowRoads] = useState(false);
 
   // Simulation data management using REST API
-  const simulationData = useSimulation('http://localhost:5001', isSimulating, simulationSpeed[0], setUsers);
+  // Disabled to prevent conflicts with ControlPanelContent direct API calls
+  // const simulationData = useSimulation('http://localhost:5001', isSimulating, simulationSpeed[0], setUsers);
+  const simulationData = null; // Temporarily disabled
 
   // Update coverage for existing nodes when slider changes
   useEffect(() => {
