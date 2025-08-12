@@ -10,7 +10,7 @@ from typing import Dict, Any, Optional, List
 from flask import Flask, request, jsonify, Blueprint
 import requests
 
-from shared_resource_layer.docker_manager import DockerManager, ContainerState
+from shared_resource_layer.container_manager import ContainerManager, ContainerState
 from shared_resource_layer.system_metrics import SystemMetricsCollector
 from config import Config
 
@@ -24,7 +24,7 @@ class EdgeNodeAPI:
         self.central_node_url = central_node_url
         
         # Initialize managers
-        self.docker_manager = DockerManager()
+        self.container_manager = ContainerManager()
         self.metrics_collector = SystemMetricsCollector()
         
         # Metrics reporting
@@ -92,7 +92,7 @@ class EdgeNodeAPI:
         
     def _get_node_resources(self) -> Dict[str, Any]:
         """Get node resource information"""
-        docker_info = self.docker_manager.get_docker_info()
+        docker_info = self.container_manager.get_docker_info()
         return {
             "memory_total": docker_info.get("memory_total", 0) if docker_info else 0,
             "cpus": docker_info.get("cpus", 1) if docker_info else 1,
@@ -121,7 +121,7 @@ class EdgeNodeAPI:
                 return None
                 
             # Get container information
-            containers = self.docker_manager.list_containers()
+            containers = self.container_manager.list_containers()
             running_containers = len([c for c in containers if c.state == ContainerState.RUNNING])
             
             # Calculate average response time
@@ -213,22 +213,22 @@ class EdgeNodeAPI:
     def _get_or_create_container(self, function_id: str, image: str, environment: Dict[str, str]) -> Optional[str]:
         """Get existing container or create new one"""
         # Check for existing idle container for this function
-        containers = self.docker_manager.list_containers(ContainerState.IDLE)
+        containers = self.container_manager.list_containers(ContainerState.IDLE)
         for container in containers:
             if container.name == f"function_{function_id}":
                 # Reuse existing container (warm start)
-                if self.docker_manager.start_container(container.container_id):
+                if self.container_manager.start_container(container.container_id):
                     self.logger.info(f"Warm start for function {function_id}")
                     return container.container_id
                     
         # Create new container (cold start)
-        container_id = self.docker_manager.create_container(
+        container_id = self.container_manager.create_container(
             name=f"function_{function_id}_{int(time.time())}",
             image=image,
             environment=environment
         )
         
-        if container_id and self.docker_manager.start_container(container_id):
+        if container_id and self.container_manager.start_container(container_id):
             self.logger.info(f"Cold start for function {function_id}")
             return container_id
             
@@ -256,17 +256,17 @@ class EdgeNodeAPI:
     def cleanup_idle_containers(self, max_idle_time: int = 300):
         """Clean up containers that have been idle too long"""
         current_time = time.time()
-        idle_containers = self.docker_manager.list_containers(ContainerState.IDLE)
+        idle_containers = self.container_manager.list_containers(ContainerState.IDLE)
         
         for container in idle_containers:
             if container.stopped_at and (current_time - container.stopped_at) > max_idle_time:
-                self.docker_manager.remove_container(container.container_id)
+                self.container_manager.remove_container(container.container_id)
                 self.logger.info(f"Cleaned up idle container: {container.container_id[:12]}")
                 
     def get_node_status(self) -> Dict[str, Any]:
         """Get current node status"""
         system_metrics = self.metrics_collector.collect_metrics()
-        containers = self.docker_manager.list_containers()
+        containers = self.container_manager.list_containers()
         
         container_states = {}
         for state in ContainerState:

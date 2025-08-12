@@ -1,9 +1,8 @@
 from enum import Enum
 
 class ContainerState(Enum):
-    COLD_START = "cold_start"  # docker create [container]
-    RUNNING = "running"        # docker start [container]
-    IDLE = "idle"             # docker stop [container]
+    RUNNING = "running"        # docker run [container]
+    IDLE = "idle"             # docker stop [container] - warm start
     DEAD = "dead"             # docker rm [container]
 
 class NodeType(Enum):
@@ -12,7 +11,7 @@ class NodeType(Enum):
 
 class Config:
     # Container Configuration
-    DEFAULT_CONTAINER_IMAGE = "serverless-handler:latest"
+    DEFAULT_CONTAINER_IMAGE = "python-serverless-handler:latest"
     DEFAULT_CONTAINER_COMMAND = "sleep infinity"
     DEFAULT_CONTAINER_DETACH_MODE = True
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB

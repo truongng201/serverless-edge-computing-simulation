@@ -23,7 +23,7 @@ class ContainerInfo:
     environment: Dict[str, str]
     resource_limits: Dict[str, str]
 
-class DockerManager:
+class ContainerManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         try:
@@ -37,14 +37,13 @@ class DockerManager:
             
         self.containers: Dict[str, ContainerInfo] = {}
         
-    def create_container(self, name: str, image: str = None, 
+    def start_container(self, name: str, image: str = None, 
                         environment: Dict[str, str] = None,
                         ports: Dict[str, int] = None,
-                        resource_limits: Dict[str, str] = None) -> Optional[str]:
-        """Create a new container (COLD_START state)"""
+                        resource_limits: Dict[str, str] = None) -> bool:
+        """Start a container (RUNNING)"""
         if not self.client:
-            self.logger.error("Docker client not available")
-            return None
+            return False
             
         try:
             image = image or Config.DEFAULT_CONTAINER_IMAGE
@@ -68,7 +67,7 @@ class DockerManager:
                 container_id=container.id,
                 name=name,
                 image=image,
-                state=ContainerState.COLD_START,
+                state=ContainerState.RUNNING,
                 created_at=time.time(),
                 started_at=None,
                 stopped_at=None,
@@ -78,33 +77,14 @@ class DockerManager:
             )
             
             self.containers[container.id] = container_info
-            
-            self.logger.info(f"Container created: {name} ({container.id[:12]})")
-            return container.id
-            
-        except Exception as e:
-            self.logger.error(f"Failed to create container {name}: {e}")
-            return None
-            
-    def start_container(self, container_id: str) -> bool:
-        """Start a container (COLD_START -> RUNNING)"""
-        if not self.client:
-            return False
-            
-        try:
-            container = self.client.containers.get(container_id)
-            container.start()
-            
-            if container_id in self.containers:
-                self.containers[container_id].state = ContainerState.RUNNING
-                self.containers[container_id].started_at = time.time()
-                
+            container_id = container.id
             self.logger.info(f"Container started: {container_id[:12]}")
             return True
             
         except Exception as e:
             self.logger.error(f"Failed to start container {container_id}: {e}")
             return False
+        
             
     def stop_container(self, container_id: str) -> bool:
         """Stop a container (RUNNING -> IDLE)"""
@@ -125,6 +105,7 @@ class DockerManager:
         except Exception as e:
             self.logger.error(f"Failed to stop container {container_id}: {e}")
             return False
+        
             
     def remove_container(self, container_id: str, force: bool = False) -> bool:
         """Remove a container (IDLE -> DEAD)"""
@@ -136,7 +117,6 @@ class DockerManager:
             container.remove(force=force)
             
             if container_id in self.containers:
-                self.containers[container_id].state = ContainerState.DEAD
                 del self.containers[container_id]
                 
             self.logger.info(f"Container removed: {container_id[:12]}")
