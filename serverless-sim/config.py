@@ -17,8 +17,9 @@ class Config:
     DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
-    DEFAULT_MAX_IDLE_TIME = 10 # seconds
-    
+    DEFAULT_MAX_IDLE_TIME = 30 # seconds
+    CLEANUP_IDLE_CONTAINERS_INTERVAL = 5  # seconds
+
     # Metrics Collection
     METRICS_COLLECTION_INTERVAL = 5  # seconds
     
@@ -37,3 +38,4 @@ class Config:
     # Docker Configuration
     DOCKER_SOCKET = "unix://Users/truongnguyen/.docker/run/docker.sock"
     CONTAINER_NETWORK = "serverless-network"
+    

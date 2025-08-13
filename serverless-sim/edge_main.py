@@ -169,11 +169,10 @@ def main():
     logger.info("  • Health Check: http://{}:{}/api/v1/edge/health".format(local_ip, args.port))
     logger.info("  • Container List: http://{}:{}/api/v1/edge/containers".format(local_ip, args.port))
     logger.info("-" * 60)
-    
+    from edge_node.api_layer.edge_api import edge_node_api
     # Start metrics reporting
     if args.auto_register:
         logger.info("Starting metrics reporting and registration...")
-        from edge_node.api_layer.edge_api import edge_node_api
         if edge_node_api:
             edge_node_api.start_metrics_reporting()
             logger.info("✓ Metrics reporting started")
@@ -184,6 +183,13 @@ def main():
     try:
         logger.info("Starting Edge Node server...")
         logger.info(f"Edge Node {args.node_id} is ready to accept requests!")
+
+        if edge_node_api:
+            edge_node_api.start_cleanup_containers()
+            logger.info("✓ Cleanup started")
+        else:
+            logger.warning("Failed to start cleanup")
+
         app.run(host=args.host, port=args.port, debug=args.debug)
     except KeyboardInterrupt:
         logger.info("Edge Node shutting down...")
@@ -192,6 +198,9 @@ def main():
         if edge_node_api:
             edge_node_api.stop_metrics_reporting()
             logger.info("Metrics reporting stopped")
+        if edge_node_api:
+            edge_node_api.stop_cleanup_containers()
+            logger.info("Cleanup stopped")
     except Exception as e:
         logger.error(f"Failed to start Edge Node: {e}")
         sys.exit(1)

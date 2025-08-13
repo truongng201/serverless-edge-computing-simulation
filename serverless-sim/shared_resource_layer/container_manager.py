@@ -168,6 +168,7 @@ class ContainerManager:
             
         try:
             container = self.client.containers.get(container_id)
+            container.stop()
             container.remove(force=force)
             
             if container_id in self.containers:

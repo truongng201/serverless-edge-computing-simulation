@@ -36,6 +36,11 @@ class EdgeNodeAPI:
         self.total_requests = 0
         self.response_times = []
         
+        # Cleanup idle containers
+        self.cleanup_thread = None
+        self.is_cleaning = False
+        self.cleanup_interval = Config.CLEANUP_IDLE_CONTAINERS_INTERVAL
+        
         self.logger.info(f"Edge Node API initialized: {node_id}")
         
     def start_metrics_reporting(self):
@@ -240,7 +245,7 @@ class EdgeNodeAPI:
             return container_id
         return None
 
-    def cleanup_idle_containers(self, max_idle_time: int = 300):
+    def _cleanup_idle_containers(self, max_idle_time: int = Config.DEFAULT_MAX_IDLE_TIME) -> None:
         """Clean up containers that have been idle too long"""
         current_time = time.time()
         idle_containers = self.container_manager.list_containers(ContainerState.IDLE)
@@ -249,7 +254,33 @@ class EdgeNodeAPI:
             if container.stopped_at and (current_time - container.stopped_at) > max_idle_time:
                 self.container_manager.remove_container(container.container_id)
                 self.logger.info(f"Cleaned up idle container: {container.container_id[:12]}")
-                
+   
+    def cleanup_idle_containers_loop(self):
+        """Periodically clean up idle containers"""
+        while True:
+            try:
+                self._cleanup_idle_containers()
+                time.sleep(self.cleanup_interval)
+            except Exception as e:
+                self.logger.error(f"Error in cleanup loop: {e}")
+                time.sleep(self.cleanup_interval)
+
+    def start_cleanup_containers(self):
+        """Start cleanup unused containers"""
+        if self.is_cleaning:
+            return
+        self.is_cleaning = True
+        self.cleanup_thread = threading.Thread(target=self.cleanup_idle_containers_loop)
+        self.cleanup_thread.daemon = True
+        self.cleanup_thread.start()
+        
+    def stop_cleanup_containers(self):
+        """Stop cleanup unused containers"""
+        self.is_cleaning = False
+        if self.cleanup_thread:
+            self.cleanup_thread.join()
+        self.logger.info("Cleanup thread stopped")
+
     def get_node_status(self) -> Dict[str, Any]:
         """Get current node status"""
         system_metrics = self.metrics_collector.collect_metrics()
