@@ -16,7 +16,7 @@ from shared_resource_layer.system_metrics import SystemMetricsCollector
 from config import Config
 
 
-class EdgeNodeAPI:
+class EdgeNodeAPIController:
     def __init__(self, node_id: str, central_node_url: str):
         self.logger = logging.getLogger(__name__)
         self.node_id = node_id

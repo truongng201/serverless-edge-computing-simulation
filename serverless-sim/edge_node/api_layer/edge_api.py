@@ -3,18 +3,18 @@ import time
 from typing import Optional
 from flask import Flask, request, jsonify, Blueprint
 
-from edge_node.api_layer.controller import EdgeNodeAPI
+from edge_node.api_layer.controller import EdgeNodeAPIController
 from config import Config
 
 edge_api = Blueprint('edge_api', __name__, url_prefix=Config.EDGE_API_PREFIX)
 
 # Global instance (will be initialized by the edge node app)
-edge_node_api: Optional[EdgeNodeAPI] = None
+edge_node_api: Optional[EdgeNodeAPIController] = None
 
 def initialize_edge_api(node_id: str, central_node_url: str):
     """Initialize the edge node API"""
     global edge_node_api
-    edge_node_api = EdgeNodeAPI(node_id, central_node_url)
+    edge_node_api = EdgeNodeAPIController(node_id, central_node_url)
     return edge_node_api
 
 # API Routes
