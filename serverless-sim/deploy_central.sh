@@ -39,11 +39,6 @@ else
     fi
 fi
 
-# Create necessary directories
-echo "📁 Creating directories..."
-mkdir -p logs
-mkdir -p data/models
-
 # Set default configuration
 PORT=${PORT:-8000}
 HOST=${HOST:-0.0.0.0}
@@ -59,7 +54,6 @@ echo "   Simulation UI: http://$HOST:$PORT"
 echo "   Central API: http://$HOST:$PORT/api/v1/central"
 echo "   Health Check: http://$HOST:$PORT/api/v1/central/health"
 echo ""
-echo "📝 Logs will be written to central_node.log"
 echo "🛑 Press Ctrl+C to stop"
 echo ""
 
