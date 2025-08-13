@@ -5,11 +5,10 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy function code
-COPY handler.py .
+COPY . .
 
 # Set environment variables
-ENV FUNCTION_ID="my_function"
-ENV EXECUTION_TIME="2.0"
+ENV EVENT="{}"
+ENV CONTEXT="{}"
 
-# Command to run the function
-CMD ["python", "-c", "import handler; handler.handler({}, {})"]
+CMD ["python", "main.py"]

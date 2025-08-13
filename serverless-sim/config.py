@@ -13,12 +13,12 @@ class NodeType(Enum):
 class Config:
     # Container Configuration
     DEFAULT_CONTAINER_IMAGE = "python-serverless-handler:latest"
-    DEFAULT_CONTAINER_COMMAND = "sleep infinity"
     DEFAULT_CONTAINER_DETACH_MODE = True
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
+    DEFAULT_CONTAINER_ID_LENGTH = 12
     
     # Metrics Collection
-    METRICS_COLLECTION_INTERVAL = 10  # seconds
+    METRICS_COLLECTION_INTERVAL = 5  # seconds
     
     # Node Configuration
     CENTRAL_NODE_PORT = 8000

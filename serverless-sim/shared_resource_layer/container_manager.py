@@ -20,7 +20,6 @@ class ContainerInfo:
     started_at: Optional[float]
     stopped_at: Optional[float]
     ports: Dict[str, int]
-    environment: Dict[str, str]
     resource_limits: Dict[str, str]
 
 class ContainerManager:
@@ -53,9 +52,8 @@ class ContainerManager:
             self.logger.info(f"Docker network {Config.CONTAINER_NETWORK} created successfully")
         except Exception as e:
             self.logger.error(f"Failed to create Docker network {Config.CONTAINER_NETWORK}: {e}")
-
+            
     def create_container(self, name: str, image: str = None,
-                        environment: Dict[str, str] = None,
                         ports: Dict[str, int] = None,
                         resource_limits: Dict[str, str] = None) -> Optional[str]:
         """Create a new container (COLD_START state)"""
@@ -65,7 +63,6 @@ class ContainerManager:
             
         try:
             image = image or Config.DEFAULT_CONTAINER_IMAGE
-            environment = environment or {}
             ports = ports or {}
             resource_limits = resource_limits or {"memory": Config.DEFAULT_CONTAINER_MEMORY_LIMIT}
             
@@ -73,16 +70,15 @@ class ContainerManager:
             container = self.client.containers.create(
                 image=image,
                 name=name,
-                command=Config.DEFAULT_CONTAINER_COMMAND,
                 detach=Config.DEFAULT_CONTAINER_DETACH_MODE,
-                environment=environment,
                 ports=ports,
                 mem_limit=resource_limits.get("memory", Config.DEFAULT_CONTAINER_MEMORY_LIMIT),
                 network=Config.CONTAINER_NETWORK if hasattr(Config, 'CONTAINER_NETWORK') else None
             )
+            container_id = container.id[:12]  # Shorten ID for display
             
             container_info = ContainerInfo(
-                container_id=container.id,
+                container_id=container_id,
                 name=name,
                 image=image,
                 state=ContainerState.INIT,
@@ -90,61 +86,57 @@ class ContainerManager:
                 started_at=None,
                 stopped_at=None,
                 ports=ports,
-                environment=environment,
                 resource_limits=resource_limits
             )
             
-            self.containers[container.id] = container_info
-            
-            self.logger.info(f"Container created: {name} ({container.id[:12]})")
-            return container.id
-            
+            self.containers[container_id] = container_info
+
+            self.logger.info(f"Container created: {name} ({container_id})")
+            return container_id
+
         except Exception as e:
             self.logger.error(f"Failed to create container {name}: {e}")
             return None
             
-    def start_container(self, container_id: str) -> bool:
-        """Start a container (COLD_START -> RUNNING)"""
+    def run_container(self, container_id: str) -> str:
+        """Start a container (COLD_START -> RUNNING -> IDLE)"""
         if not self.client:
             return False
-            
+
         try:
             container = self.client.containers.get(container_id)
             container.start()
-            
+
             if container_id in self.containers:
                 self.containers[container_id].state = ContainerState.RUNNING
                 self.containers[container_id].started_at = time.time()
-                
+
             self.logger.info(f"Container started: {container_id[:12]}")
-            return True
-            
-        except Exception as e:
-            self.logger.error(f"Failed to start container {container_id}: {e}")
-            return False
-        
-            
-    def stop_container(self, container_id: str) -> bool:
-        """Stop a container (RUNNING -> IDLE)"""
-        if not self.client:
-            return False
-            
-        try:
-            container = self.client.containers.get(container_id)
-            container.stop()
-            
+
+            container.wait()
+
+            # Get logs from container
+            output_logs = container.logs().decode("utf-8").strip()
+
+            # Mark as IDLE after completion
             if container_id in self.containers:
                 self.containers[container_id].state = ContainerState.IDLE
                 self.containers[container_id].stopped_at = time.time()
-                
-            self.logger.info(f"Container stopped: {container_id[:12]}")
-            return True
-            
+
+            marker = "Result of function"
+            if marker in output_logs:
+                final_result = output_logs.split(marker)[-1].strip()
+            else:
+                final_result = output_logs.strip()
+
+            return final_result
+        except docker.errors.NotFound:
+            self.logger.error(f"Container {container_id} not found")
+            return None
         except Exception as e:
-            self.logger.error(f"Failed to stop container {container_id}: {e}")
-            return False
-        
-            
+            self.logger.error(f"Failed to start container {container_id}: {e}")
+            return None
+
     def remove_container(self, container_id: str, force: bool = False) -> bool:
         """Remove a container (IDLE -> DEAD)"""
         if not self.client:

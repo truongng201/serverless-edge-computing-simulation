@@ -6,6 +6,8 @@ Handles container execution requests and reports metrics to central node
 import logging
 import time
 import threading
+import random
+import string
 from typing import Dict, Any, Optional
 import requests
 
@@ -120,6 +122,7 @@ class EdgeNodeAPI:
             # Get container information
             containers = self.container_manager.list_containers()
             running_containers = len([c for c in containers if c.state == ContainerState.RUNNING])
+            warm_containers = len([c for c in containers if c.state == ContainerState.IDLE])
             
             # Calculate average response time
             avg_response_time = 0.0
@@ -129,11 +132,10 @@ class EdgeNodeAPI:
                 self.response_times = self.response_times[-100:]
                 
             return {
-                "cpu_usage": system_metrics["cpu_usage"] / 100.0,  # Convert to 0-1 range
-                "memory_usage": system_metrics["memory_usage"] / 100.0,  # Convert to 0-1 range
-                # "network_io": system_metrics["network_io"],
-                # "disk_io": system_metrics["disk_io"],
-                "container_count": running_containers,
+                "cpu_usage": system_metrics["cpu_usage"],
+                "memory_usage": system_metrics["memory_usage"],
+                "running_container": running_containers,
+                "warm_container": warm_containers,
                 "active_requests": self.active_requests,
                 "total_requests": self.total_requests,
                 "response_time_avg": avg_response_time,
@@ -169,29 +171,28 @@ class EdgeNodeAPI:
         self.total_requests += 1
         
         try:
-            function_id = function_data.get("function_id")
+            random_string_name = ''.join(random.choices(string.ascii_letters + string.digits, k=Config.DEFAULT_CONTAINER_ID_LENGTH))
             image = function_data.get("image", Config.DEFAULT_CONTAINER_IMAGE)
-            environment = function_data.get("environment", {})
-            
+            function_data["function_name"] = f"fn_{random_string_name}"
+            function_data["image"] = image
+
             # Check if we need to create a new container or reuse existing
-            container_id = self._get_or_create_container(function_id, image, environment)
-            
-            if not container_id:
+            result, container_id = self._run_or_create_container(function_data["function_name"], image)
+
+            if not result:
                 return {
                     "success": False,
-                    "error": "Failed to create container",
+                    "error": "Failed to create or reuse container",
                     "execution_time": time.time() - start_time
                 }
-                
-            # Execute the function
-            result = self._execute_in_container(container_id, function_data)
-            
+
             execution_time = time.time() - start_time
             self.response_times.append(execution_time)
             
             return {
                 "success": True,
                 "result": result,
+                "function_name": function_data["function_name"],
                 "container_id": container_id,
                 "execution_time": execution_time,
                 "node_id": self.node_id
@@ -207,48 +208,29 @@ class EdgeNodeAPI:
         finally:
             self.active_requests -= 1
             
-    def _get_or_create_container(self, function_id: str, image: str, environment: Dict[str, str]) -> Optional[str]:
-        """Get existing container or create new one"""
+    def _run_or_create_container(self, function_name: str, image: str) -> Optional[str]:
+        """Run existing container or create new one"""
         # Check for existing idle container for this function
         containers = self.container_manager.list_containers(ContainerState.IDLE)
         for container in containers:
-            if container.name == f"function_{function_id}":
-                # Reuse existing container (warm start)
-                if self.container_manager.start_container(container.container_id):
-                    self.logger.info(f"Warm start for function {function_id}")
-                    return container.container_id
-                    
+            # Reuse existing container (warm start)
+            result = self.container_manager.run_container(container.container_id)
+            if not result:
+                continue
+            self.logger.info(f"Warm start for function {function_name}")
+            return result, container.container_id
+
         # Create new container (cold start)
         container_id = self.container_manager.create_container(
-            name=f"function_{function_id}_{int(time.time())}",
+            name=function_name,
             image=image,
-            environment=environment
         )
         
-        if container_id and self.container_manager.start_container(container_id):
-            self.logger.info(f"Cold start for function {function_id}")
-            return container_id
-            
-        return None
-        
-    def _execute_in_container(self, container_id: str, function_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Execute function logic in container"""
-        # This is a simplified execution - in practice, you would
-        # send the actual function code/data to the container
-        # and execute it, then return the results
-        
-        # For simulation, we'll just return some dummy results
-        execution_result = {
-            "function_id": function_data.get("function_id"),
-            "executed_at": time.time(),
-            "status": "completed",
-            "output": f"Function {function_data.get('function_id')} executed successfully"
-        }
-        
-        # Simulate some execution time
-        time.sleep(0.1)  # 100ms execution time
-        
-        return execution_result
+        if container_id:
+            result = self.container_manager.run_container(container_id)
+            self.logger.info(f"Cold start for function {function_name}")
+            return result, container_id
+        return None, None
         
     def cleanup_idle_containers(self, max_idle_time: int = 300):
         """Clean up containers that have been idle too long"""
