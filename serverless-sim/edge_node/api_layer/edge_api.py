@@ -3,7 +3,7 @@ import time
 from typing import Optional
 from flask import Flask, request, jsonify, Blueprint
 
-from edge_node.api_layer.controller import EdgeNodeAPIController
+from edge_node.api_layer.edge_controller import EdgeNodeAPIController
 from config import Config
 
 edge_api = Blueprint('edge_api', __name__, url_prefix=Config.EDGE_API_PREFIX)
