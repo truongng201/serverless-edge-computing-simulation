@@ -29,7 +29,7 @@ class Config:
 
     # API Endpoints
     CENTRAL_API_PREFIX = "/api/v1/central"
-    EDGE_API_PREFIX = "/api/v1/edge"
+    EDGE_ROUTE_PREFIX = "/api/v1/edge"
     
     # Scheduling Configuration
     DEFAULT_SCHEDULING_ALGORITHM = "round_robin"

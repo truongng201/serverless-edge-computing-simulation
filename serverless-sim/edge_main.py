@@ -17,7 +17,7 @@ from flask_cors import CORS
 # Add the parent directory to sys.path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from edge_node.api_layer.edge_api import register_edge_api, initialize_edge_api
+from edge_node.api_layer.edge_route import register_edge_route, initialize_edge_route
 from config import Config
 
 def create_edge_node_app(node_id: str, central_node_url: str):
@@ -26,8 +26,8 @@ def create_edge_node_app(node_id: str, central_node_url: str):
     CORS(app, resources={r"/*": {"origins": "*"}})
     
     # Initialize and register edge node API
-    initialize_edge_api(node_id, central_node_url)
-    register_edge_api(app)
+    initialize_edge_route(node_id, central_node_url)
+    register_edge_route(app)
 
     return app
 
@@ -169,12 +169,12 @@ def main():
     logger.info("  • Health Check: http://{}:{}/api/v1/edge/health".format(local_ip, args.port))
     logger.info("  • Container List: http://{}:{}/api/v1/edge/containers".format(local_ip, args.port))
     logger.info("-" * 60)
-    from edge_node.api_layer.edge_api import edge_node_api
+    from edge_node.api_layer.edge_route import edge_node_api_controller
     # Start metrics reporting
     if args.auto_register:
         logger.info("Starting metrics reporting and registration...")
-        if edge_node_api:
-            edge_node_api.start_metrics_reporting()
+        if edge_node_api_controller:
+            edge_node_api_controller.start_metrics_reporting()
             logger.info("✓ Metrics reporting started")
         else:
             logger.warning("Failed to start metrics reporting")
@@ -184,8 +184,8 @@ def main():
         logger.info("Starting Edge Node server...")
         logger.info(f"Edge Node {args.node_id} is ready to accept requests!")
 
-        if edge_node_api:
-            edge_node_api.start_cleanup_containers()
+        if edge_node_api_controller:
+            edge_node_api_controller.start_cleanup_containers()
             logger.info("✓ Cleanup started")
         else:
             logger.warning("Failed to start cleanup")
@@ -194,12 +194,12 @@ def main():
     except KeyboardInterrupt:
         logger.info("Edge Node shutting down...")
         # Stop metrics reporting
-        from edge_node.api_layer.edge_api import edge_node_api
-        if edge_node_api:
-            edge_node_api.stop_metrics_reporting()
+        from edge_node.api_layer.edge_route import edge_node_api_controller
+        if edge_node_api_controller:
+            edge_node_api_controller.stop_metrics_reporting()
             logger.info("Metrics reporting stopped")
-        if edge_node_api:
-            edge_node_api.stop_cleanup_containers()
+        if edge_node_api_controller:
+            edge_node_api_controller.stop_cleanup_containers()
             logger.info("Cleanup stopped")
     except Exception as e:
         logger.error(f"Failed to start Edge Node: {e}")
