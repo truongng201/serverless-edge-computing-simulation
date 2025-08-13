@@ -33,5 +33,5 @@ class Config:
     MIGRATION_THRESHOLD = 0.8  # CPU usage threshold for migration
     
     # Docker Configuration
-    DOCKER_SOCKET = "unix://var/run/docker.sock"
+    DOCKER_SOCKET = "unix://Users/truongnguyen/.docker/run/docker.sock"
     CONTAINER_NETWORK = "serverless-network"

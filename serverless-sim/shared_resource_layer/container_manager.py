@@ -27,9 +27,10 @@ class ContainerManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
         try:
-            self.client = docker.from_env()
+            self.client = docker.DockerClient(base_url=Config.DOCKER_SOCKET)
             # Test connection
             self.client.ping()
+            self._create_network()
             self.logger.info("Docker client initialized successfully")
         except Exception as e:
             self.logger.error(f"Failed to initialize Docker client: {e}")
@@ -37,7 +38,23 @@ class ContainerManager:
             
         self.containers: Dict[str, ContainerInfo] = {}
         
-    def create_container(self, name: str, image: str = None, 
+    def _create_network(self):
+        """Create a new Docker network"""
+        if not self.client:
+            self.logger.error("Docker client not available")
+            return
+        
+        try:
+            # Check if current network exist
+            self.client.networks.get(Config.CONTAINER_NETWORK)
+            self.logger.info(f"Docker network {Config.CONTAINER_NETWORK} already exists")
+        except docker.errors.NotFound:
+            self.client.networks.create(Config.CONTAINER_NETWORK)
+            self.logger.info(f"Docker network {Config.CONTAINER_NETWORK} created successfully")
+        except Exception as e:
+            self.logger.error(f"Failed to create Docker network {Config.CONTAINER_NETWORK}: {e}")
+
+    def create_container(self, name: str, image: str = None,
                         environment: Dict[str, str] = None,
                         ports: Dict[str, int] = None,
                         resource_limits: Dict[str, str] = None) -> Optional[str]:
