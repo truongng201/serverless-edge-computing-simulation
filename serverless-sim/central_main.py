@@ -11,20 +11,27 @@ import os
 from flask import Flask
 from flask_cors import CORS
 
+
+from central_node.control_layer.routes.central_route import register_central_route, initialize_central_route
+from central_node.control_layer.routes.ui_routes import register_ui_route, initialize_ui_route
+from config import Config
+
 # Add the parent directory to sys.path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from central_node.api_layer.central_api import register_central_api
-from config import Config
 
 def create_central_node_app():
     """Create Flask app for central node"""
     app = Flask(__name__)
     CORS(app, resources={r"/*": {"origins": "*"}})
+
+    # Initialize and register central node API
+    initialize_central_route()
+    register_central_route(app)
     
-    # Register central node API (includes UI handler)
-    register_central_api(app)
-    
+    # Initialize and register ui endpoint
+    initialize_ui_route()
+    register_ui_route(app)
+
     return app
 
 def setup_logging(log_level: str = "INFO"):

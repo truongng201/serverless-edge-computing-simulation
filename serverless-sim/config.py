@@ -28,7 +28,7 @@ class Config:
     EDGE_NODE_PORT_RANGE = (8001, 8100)
 
     # API Endpoints
-    CENTRAL_API_PREFIX = "/api/v1/central"
+    CENTRAL_ROUTE_PREFIX = "/api/v1/central"
     EDGE_ROUTE_PREFIX = "/api/v1/edge"
     
     # Scheduling Configuration
