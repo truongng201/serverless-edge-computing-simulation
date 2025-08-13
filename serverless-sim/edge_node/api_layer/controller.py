@@ -214,6 +214,8 @@ class EdgeNodeAPI:
         containers = self.container_manager.list_containers(ContainerState.IDLE)
         for container in containers:
             # Reuse existing container (warm start)
+            if time.time() - container.stopped_at > Config.DEFAULT_MAX_IDLE_TIME:
+                continue
             result = self.container_manager.run_container(container.container_id)
             if not result:
                 continue

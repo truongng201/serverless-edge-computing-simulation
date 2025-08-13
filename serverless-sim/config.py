@@ -16,6 +16,7 @@ class Config:
     DEFAULT_CONTAINER_DETACH_MODE = True
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
+    DEFAULT_MAX_IDLE_TIME = 10 # seconds
     
     # Metrics Collection
     METRICS_COLLECTION_INTERVAL = 5  # seconds
