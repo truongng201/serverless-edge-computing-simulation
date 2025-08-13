@@ -28,7 +28,7 @@ def create_edge_node_app(node_id: str, central_node_url: str):
     # Initialize and register edge node API
     initialize_edge_api(node_id, central_node_url)
     register_edge_api(app)
-    
+
     return app
 
 def setup_logging(log_level: str = "INFO", node_id: str = "edge"):
@@ -92,7 +92,7 @@ def main():
                        help='Port to run on (auto-detect if not specified)')
     parser.add_argument('--host', type=str, default='0.0.0.0',
                        help='Host to bind to (default: 0.0.0.0)')
-    parser.add_argument('--debug', action='store_true',
+    parser.add_argument('--debug', action='store_true', default=False,
                        help='Enable debug mode')
     parser.add_argument('--log-level', type=str, default='INFO',
                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],

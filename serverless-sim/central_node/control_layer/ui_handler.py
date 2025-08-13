@@ -9,20 +9,6 @@ from typing import Dict, Any, Optional
 
 from central_node.control_layer.data_manager import DataManager
 
-# Create blueprint for UI endpoints - only import Flask when needed
-ui_blueprint = None
-
-def _get_blueprint():
-    """Lazy import of Flask blueprint"""
-    global ui_blueprint
-    if ui_blueprint is None:
-        try:
-            from flask import Blueprint
-            ui_blueprint = Blueprint('ui', __name__)
-        except ImportError:
-            raise ImportError("Flask is required for UI functionality")
-    return ui_blueprint
-
 class UIHandler:
     """
     Handles UI-related requests for the simulation interface.

@@ -369,5 +369,5 @@ def cleanup_dead_nodes():
 def register_central_api(app: Flask):
     """Register central node API with Flask app"""
     app.register_blueprint(central_api)
-    register_ui_handler(app)  # Register UI handler for legacy compatibility
+    register_ui_handler(app)
     logging.getLogger(__name__).info("Central Node API and UI Handler registered")
