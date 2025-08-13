@@ -230,7 +230,7 @@ class EdgeNodeAPI:
             if time.time() - container.stopped_at > Config.DEFAULT_MAX_IDLE_TIME:
                 continue
 
-            if self.container_manager.start_container(container.container_id):
+            if self.container_manager.restart_container(container.container_id, function_name):
                 self.logger.info(f"Warm start for function {function_name}")
                 return container.container_id
 
@@ -273,6 +273,8 @@ class EdgeNodeAPI:
         self.cleanup_thread = threading.Thread(target=self.cleanup_idle_containers_loop)
         self.cleanup_thread.daemon = True
         self.cleanup_thread.start()
+        
+        self.logger.info("Cleanup thread started")
         
     def stop_cleanup_containers(self):
         """Stop cleanup unused containers"""

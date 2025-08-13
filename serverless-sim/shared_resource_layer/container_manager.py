@@ -118,6 +118,27 @@ class ContainerManager:
             self.logger.error(f"Failed to start container {container_id}: {e}")
             return False
 
+    def restart_container(self, container_id: str, new_function_name: str) -> bool:
+        """Restart a container (RUNNING -> RUNNING)"""
+        if not self.client:
+            return False
+            
+        try:
+            container = self.client.containers.get(container_id)
+            container.rename(new_function_name)
+            container.start()
+            
+            if container_id in self.containers:
+                self.containers[container_id].state = ContainerState.RUNNING
+                self.containers[container_id].started_at = time.time()
+                
+            self.logger.info(f"Container restarted: {container_id[:12]}")
+            return True
+            
+        except Exception as e:
+            self.logger.error(f"Failed to restart container {container_id}: {e}")
+            return False
+
     def execute_container(self, container_id, function_data) -> str:
         """Execute a function in a container"""
         if not self.client:
