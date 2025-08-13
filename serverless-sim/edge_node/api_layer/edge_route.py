@@ -17,6 +17,11 @@ def initialize_edge_route(node_id: str, central_node_url: str):
     edge_node_api_controller = EdgeNodeAPIController(node_id, central_node_url)
     return edge_node_api_controller
 
+def register_edge_route(app: Flask):
+    """Register the edge API blueprint with the Flask app"""
+    app.register_blueprint(edge_route)
+    logging.getLogger(__name__).info("Edge API routes registered successfully")
+
 # API Routes
 @edge_route.route('/execute', methods=['POST'])
 def execute_function():
@@ -81,8 +86,3 @@ def health_check():
         "timestamp": time.time(),
         "node_id": edge_node_api_controller.node_id if edge_node_api_controller else "unknown"
     })
-
-def register_edge_route(app: Flask):
-    """Register the edge API blueprint with the Flask app"""
-    app.register_blueprint(edge_route)
-    logging.getLogger(__name__).info("Edge API routes registered successfully")
