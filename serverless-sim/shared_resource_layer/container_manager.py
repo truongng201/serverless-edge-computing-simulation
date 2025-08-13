@@ -37,13 +37,14 @@ class ContainerManager:
             
         self.containers: Dict[str, ContainerInfo] = {}
         
-    def start_container(self, name: str, image: str = None, 
+    def create_container(self, name: str, image: str = None, 
                         environment: Dict[str, str] = None,
                         ports: Dict[str, int] = None,
-                        resource_limits: Dict[str, str] = None) -> bool:
-        """Start a container (RUNNING)"""
+                        resource_limits: Dict[str, str] = None) -> Optional[str]:
+        """Create a new container (COLD_START state)"""
         if not self.client:
-            return False
+            self.logger.error("Docker client not available")
+            return None
             
         try:
             image = image or Config.DEFAULT_CONTAINER_IMAGE
@@ -67,7 +68,7 @@ class ContainerManager:
                 container_id=container.id,
                 name=name,
                 image=image,
-                state=ContainerState.RUNNING,
+                state=ContainerState.INIT,
                 created_at=time.time(),
                 started_at=None,
                 stopped_at=None,
@@ -77,7 +78,27 @@ class ContainerManager:
             )
             
             self.containers[container.id] = container_info
-            container_id = container.id
+            
+            self.logger.info(f"Container created: {name} ({container.id[:12]})")
+            return container.id
+            
+        except Exception as e:
+            self.logger.error(f"Failed to create container {name}: {e}")
+            return None
+            
+    def start_container(self, container_id: str) -> bool:
+        """Start a container (COLD_START -> RUNNING)"""
+        if not self.client:
+            return False
+            
+        try:
+            container = self.client.containers.get(container_id)
+            container.start()
+            
+            if container_id in self.containers:
+                self.containers[container_id].state = ContainerState.RUNNING
+                self.containers[container_id].started_at = time.time()
+                
             self.logger.info(f"Container started: {container_id[:12]}")
             return True
             

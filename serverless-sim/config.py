@@ -1,6 +1,7 @@
 from enum import Enum
 
 class ContainerState(Enum):
+    INIT = "initialization"   # docker create [container] - cold start
     RUNNING = "running"        # docker run [container]
     IDLE = "idle"             # docker stop [container] - warm start
     DEAD = "dead"             # docker rm [container]
