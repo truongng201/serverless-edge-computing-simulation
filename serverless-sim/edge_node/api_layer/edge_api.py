@@ -73,17 +73,6 @@ def get_container_stats(container_id):
     else:
         return jsonify({"success": False, "error": "Container not found or stats unavailable"}), 404
 
-@edge_api.route('/cleanup', methods=['POST'])
-def cleanup_containers():
-    """Clean up idle containers"""
-    if not edge_node_api:
-        return jsonify({"success": False, "error": "Edge node not initialized"}), 500
-        
-    max_idle_time = request.json.get('max_idle_time', 300) if request.json else 300
-    edge_node_api.cleanup_idle_containers(max_idle_time)
-    
-    return jsonify({"success": True, "message": "Cleanup completed"})
-
 @edge_api.route('/health', methods=['GET'])
 def health_check():
     """Health check endpoint"""

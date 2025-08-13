@@ -131,6 +131,7 @@ class ContainerManager:
             if container_id in self.containers:
                 self.containers[container_id].state = ContainerState.RUNNING
                 self.containers[container_id].started_at = time.time()
+                self.containers[container_id].name = new_function_name
                 
             self.logger.info(f"Container restarted: {container_id[:12]}")
             return True
@@ -169,21 +170,21 @@ class ContainerManager:
             self.logger.error(f"Failed to exec in container {container_id}: {e}")
             return None
 
-    def idle_container(self, container_id: str) -> bool:
+    def warm_container(self, container_id: str) -> bool:
         if not container_id or container_id not in self.containers:
             return False
 
         try:
             self.containers[container_id].stopped_at = time.time()
-            self.containers[container_id].state = ContainerState.IDLE
-            self.logger.info(f"Container idled: {container_id[:12]}")
+            self.containers[container_id].state = ContainerState.WARM
+            self.logger.info(f"Container warmed: {container_id[:12]}")
             return True
         except Exception as e:
-            self.logger.error(f"Failed to idle container {container_id}: {e}")
+            self.logger.error(f"Failed to warm container {container_id}: {e}")
             return False
 
     def remove_container(self, container_id: str, force: bool = False) -> bool:
-        """Remove a container (IDLE -> DEAD)"""
+        """Remove a container (WARM -> DEAD)"""
         if not self.client:
             return False
             

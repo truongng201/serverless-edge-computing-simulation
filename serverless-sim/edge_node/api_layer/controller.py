@@ -36,10 +36,10 @@ class EdgeNodeAPI:
         self.total_requests = 0
         self.response_times = []
         
-        # Cleanup idle containers
+        # Cleanup warm containers
         self.cleanup_thread = None
         self.is_cleaning = False
-        self.cleanup_interval = Config.CLEANUP_IDLE_CONTAINERS_INTERVAL
+        self.cleanup_interval = Config.CLEANUP_WARM_CONTAINERS_INTERVAL
         
         self.logger.info(f"Edge Node API initialized: {node_id}")
         
@@ -127,7 +127,7 @@ class EdgeNodeAPI:
             # Get container information
             containers = self.container_manager.list_containers()
             running_containers = len([c for c in containers if c.state == ContainerState.RUNNING])
-            warm_containers = len([c for c in containers if c.state == ContainerState.IDLE])
+            warm_containers = len([c for c in containers if c.state == ContainerState.WARM])
             
             # Calculate average response time
             avg_response_time = 0.0
@@ -195,7 +195,7 @@ class EdgeNodeAPI:
             self.response_times.append(execution_time)
             result = self.container_manager.execute_container(container_id, function_data)
             
-            if not self.container_manager.idle_container(container_id):
+            if not self.container_manager.warm_container(container_id):
                 return {
                     "success": False,
                     "error": "Failed to create or reuse container",
@@ -223,11 +223,11 @@ class EdgeNodeAPI:
             
     def _get_or_create_container(self, function_name: str, image: str) -> Optional[str]:
         """Get existing container or create new one"""
-        # Check for existing idle container for this function
-        containers = self.container_manager.list_containers(ContainerState.IDLE)
+        # Check for existing warm container for this function
+        containers = self.container_manager.list_containers(ContainerState.WARM)
         for container in containers:
             # Reuse existing container (warm start)
-            if time.time() - container.stopped_at > Config.DEFAULT_MAX_IDLE_TIME:
+            if time.time() - container.stopped_at > Config.DEFAULT_MAX_WARM_TIME:
                 continue
 
             if self.container_manager.restart_container(container.container_id, function_name):
@@ -245,21 +245,21 @@ class EdgeNodeAPI:
             return container_id
         return None
 
-    def _cleanup_idle_containers(self, max_idle_time: int = Config.DEFAULT_MAX_IDLE_TIME) -> None:
-        """Clean up containers that have been idle too long"""
+    def _cleanup_warm_containers(self, max_warm_time: int = Config.DEFAULT_MAX_WARM_TIME) -> None:
+        """Clean up containers that have been warm too long"""
         current_time = time.time()
-        idle_containers = self.container_manager.list_containers(ContainerState.IDLE)
-        
-        for container in idle_containers:
-            if container.stopped_at and (current_time - container.stopped_at) > max_idle_time:
+        warm_containers = self.container_manager.list_containers(ContainerState.WARM)
+
+        for container in warm_containers:
+            if container.stopped_at and (current_time - container.stopped_at) > max_warm_time:
                 self.container_manager.remove_container(container.container_id)
-                self.logger.info(f"Cleaned up idle container: {container.container_id[:12]}")
+                self.logger.info(f"Cleaned up warm container: {container.container_id[:12]}")
    
-    def cleanup_idle_containers_loop(self):
-        """Periodically clean up idle containers"""
+    def cleanup_warm_containers_loop(self):
+        """Periodically clean up warm containers"""
         while True:
             try:
-                self._cleanup_idle_containers()
+                self._cleanup_warm_containers()
                 time.sleep(self.cleanup_interval)
             except Exception as e:
                 self.logger.error(f"Error in cleanup loop: {e}")
@@ -270,7 +270,7 @@ class EdgeNodeAPI:
         if self.is_cleaning:
             return
         self.is_cleaning = True
-        self.cleanup_thread = threading.Thread(target=self.cleanup_idle_containers_loop)
+        self.cleanup_thread = threading.Thread(target=self.cleanup_warm_containers_loop)
         self.cleanup_thread.daemon = True
         self.cleanup_thread.start()
         
@@ -290,6 +290,8 @@ class EdgeNodeAPI:
         
         container_states = {}
         for state in ContainerState:
+            if state.value in ["init", "dead"]:
+                continue
             container_states[state.value] = len([c for c in containers if c.state == state])
             
         return {

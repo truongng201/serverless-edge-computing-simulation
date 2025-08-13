@@ -1,9 +1,9 @@
 from enum import Enum
 
 class ContainerState(Enum):
-    INIT = "initialization"   # docker create [container] - cold start
+    INIT = "init"   # docker create [container] - cold start
     RUNNING = "running"        # docker run [container]
-    IDLE = "idle"             # docker stop [container] - warm start
+    WARM = "warm"             # docker stop [container] - warm start
     DEAD = "dead"             # docker rm [container]
 
 class NodeType(Enum):
@@ -17,8 +17,8 @@ class Config:
     DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
-    DEFAULT_MAX_IDLE_TIME = 30 # seconds
-    CLEANUP_IDLE_CONTAINERS_INTERVAL = 5  # seconds
+    DEFAULT_MAX_WARM_TIME = 30 # seconds
+    CLEANUP_WARM_CONTAINERS_INTERVAL = 5  # seconds
 
     # Metrics Collection
     METRICS_COLLECTION_INTERVAL = 5  # seconds
