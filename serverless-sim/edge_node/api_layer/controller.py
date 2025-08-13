@@ -177,9 +177,9 @@ class EdgeNodeAPI:
             function_data["image"] = image
 
             # Check if we need to create a new container or reuse existing
-            result, container_id = self._run_or_create_container(function_data["function_name"], image)
+            container_id = self._get_or_create_container(function_data["function_name"], image)
 
-            if not result:
+            if not container_id:
                 return {
                     "success": False,
                     "error": "Failed to create or reuse container",
@@ -188,7 +188,15 @@ class EdgeNodeAPI:
 
             execution_time = time.time() - start_time
             self.response_times.append(execution_time)
+            result = self.container_manager.execute_container(container_id, function_data)
             
+            if not self.container_manager.idle_container(container_id):
+                return {
+                    "success": False,
+                    "error": "Failed to create or reuse container",
+                    "execution_time": time.time() - start_time
+                }
+
             return {
                 "success": True,
                 "result": result,
@@ -208,32 +216,30 @@ class EdgeNodeAPI:
         finally:
             self.active_requests -= 1
             
-    def _run_or_create_container(self, function_name: str, image: str) -> Optional[str]:
-        """Run existing container or create new one"""
+    def _get_or_create_container(self, function_name: str, image: str) -> Optional[str]:
+        """Get existing container or create new one"""
         # Check for existing idle container for this function
         containers = self.container_manager.list_containers(ContainerState.IDLE)
         for container in containers:
             # Reuse existing container (warm start)
             if time.time() - container.stopped_at > Config.DEFAULT_MAX_IDLE_TIME:
                 continue
-            result = self.container_manager.run_container(container.container_id)
-            if not result:
-                continue
-            self.logger.info(f"Warm start for function {function_name}")
-            return result, container.container_id
+
+            if self.container_manager.start_container(container.container_id):
+                self.logger.info(f"Warm start for function {function_name}")
+                return container.container_id
 
         # Create new container (cold start)
         container_id = self.container_manager.create_container(
             name=function_name,
             image=image,
         )
-        
-        if container_id:
-            result = self.container_manager.run_container(container_id)
+
+        if container_id and self.container_manager.start_container(container_id):
             self.logger.info(f"Cold start for function {function_name}")
-            return result, container_id
-        return None, None
-        
+            return container_id
+        return None
+
     def cleanup_idle_containers(self, max_idle_time: int = 300):
         """Clean up containers that have been idle too long"""
         current_time = time.time()

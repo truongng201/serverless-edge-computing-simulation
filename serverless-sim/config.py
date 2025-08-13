@@ -14,6 +14,7 @@ class Config:
     # Container Configuration
     DEFAULT_CONTAINER_IMAGE = "python-serverless-handler:latest"
     DEFAULT_CONTAINER_DETACH_MODE = True
+    DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
     DEFAULT_MAX_IDLE_TIME = 10 # seconds

@@ -10,7 +10,6 @@ if __name__ == "__main__":
     # Parse to Python dicts
     event = json.loads(event_json)
     context = json.loads(context_json)
-    print("Result of function")
     # Call function and print result
     result = handler(event, context)
     print(result)

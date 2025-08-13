@@ -97,9 +97,9 @@ class ContainerManager:
         except Exception as e:
             self.logger.error(f"Failed to create container {name}: {e}")
             return None
-            
-    def run_container(self, container_id: str) -> str:
-        """Start a container (COLD_START -> RUNNING -> IDLE)"""
+        
+    def start_container(self, container_id: str) -> bool:
+        """Start a container (INIT -> RUNNING)"""
         if not self.client:
             return False
 
@@ -112,30 +112,54 @@ class ContainerManager:
                 self.containers[container_id].started_at = time.time()
 
             self.logger.info(f"Container started: {container_id[:12]}")
+            return True
 
-            container.wait()
-
-            # Get logs from container
-            output_logs = container.logs().decode("utf-8").strip()
-
-            # Mark as IDLE after completion
-            if container_id in self.containers:
-                self.containers[container_id].state = ContainerState.IDLE
-                self.containers[container_id].stopped_at = time.time()
-
-            marker = "Result of function"
-            if marker in output_logs:
-                final_result = output_logs.split(marker)[-1].strip()
-            else:
-                final_result = output_logs.strip()
-
-            return final_result
-        except docker.errors.NotFound:
-            self.logger.error(f"Container {container_id} not found")
-            return None
         except Exception as e:
             self.logger.error(f"Failed to start container {container_id}: {e}")
+            return False
+
+    def execute_container(self, container_id, function_data) -> str:
+        """Execute a function in a container"""
+        if not self.client:
             return None
+        
+        if not container_id or container_id not in self.containers:
+            self.logger.error("Invalid container ID")
+            return None
+        
+        try:
+            container = self.client.containers.get(container_id)
+
+            if container.status != "running":
+                self.logger.error(f"Container {container_id} is not running.")
+                return None
+
+            # Execute command inside the container
+            exec_result = container.exec_run(
+                cmd=Config.DEFAULT_CONTAINER_COMMAND,
+                stdout=True,
+                stderr=True
+            )
+
+            output = exec_result.output.decode("utf-8").strip()
+            self.logger.debug(f"Exec output from {container_id[:12]}:\n{output}")
+            return output
+        except Exception as e:
+            self.logger.error(f"Failed to exec in container {container_id}: {e}")
+            return None
+
+    def idle_container(self, container_id: str) -> bool:
+        if not container_id or container_id not in self.containers:
+            return False
+
+        try:
+            self.containers[container_id].stopped_at = time.time()
+            self.containers[container_id].state = ContainerState.IDLE
+            self.logger.info(f"Container idled: {container_id[:12]}")
+            return True
+        except Exception as e:
+            self.logger.error(f"Failed to idle container {container_id}: {e}")
+            return False
 
     def remove_container(self, container_id: str, force: bool = False) -> bool:
         """Remove a container (IDLE -> DEAD)"""

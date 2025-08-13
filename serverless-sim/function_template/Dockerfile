@@ -11,4 +11,4 @@ COPY . .
 ENV EVENT="{}"
 ENV CONTEXT="{}"
 
-CMD ["python", "main.py"]
+CMD ["sleep", "infinity"]
