@@ -67,7 +67,7 @@ class Scheduler:
         dead_nodes = []
         
         for node_id, node in self.edge_nodes.items():
-            if current_time - node.last_heartbeat > 20: # 20 seconds time out
+            if current_time - node.last_heartbeat > 10: # 10 seconds time out
                 dead_nodes.append(node_id)
                 
         for node_id in dead_nodes:

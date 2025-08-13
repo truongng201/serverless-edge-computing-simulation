@@ -158,7 +158,7 @@ display_node_details() {
         # Display basic info for each edge node
         echo "$status_json" | jq -r '
             .health.nodes_details[] |
-            "🖥️  Node: \(.node_id)\n   Status: \(.status)\n   CPU: \((.cpu_usage * 100 | floor))%\n   Memory: \((.memory_usage * 100 | floor))%\n   Containers: \(.container_count)\n"
+            "🖥️  Node: \(.node_id)\n   Status: \(.status)\n   CPU: \((.cpu_usage | floor))%\n   Memory: \((.memory_usage | floor))%\n   Warm containers: \(.warm_container_count)\n   Containers: \(.container_count)\n"
         ' 2>/dev/null || {
             echo "Edge nodes detected but details parsing failed"
             echo "Use: curl $CENTRAL_URL/api/v1/central/cluster/status | jq '.health.nodes_details'"
