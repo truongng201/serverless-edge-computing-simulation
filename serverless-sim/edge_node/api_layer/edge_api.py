@@ -47,7 +47,7 @@ def list_containers():
     if not edge_node_api:
         return jsonify({"success": False, "error": "Edge node not initialized"}), 500
         
-    containers = edge_node_api.docker_manager.list_containers()
+    containers = edge_node_api.container_manager.list_containers()
     container_list = [
         {
             "container_id": c.container_id,
@@ -67,7 +67,7 @@ def get_container_stats(container_id):
     if not edge_node_api:
         return jsonify({"success": False, "error": "Edge node not initialized"}), 500
         
-    stats = edge_node_api.docker_manager.get_container_stats(container_id)
+    stats = edge_node_api.container_manager.get_container_stats(container_id)
     if stats:
         return jsonify(stats)
     else:
