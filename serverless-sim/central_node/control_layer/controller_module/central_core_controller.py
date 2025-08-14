@@ -4,7 +4,7 @@ import time
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
-from central_node.control_layer.migration import MigrationManager
+from central_node.control_layer.migration_module.migration import MigrationManager
 from central_node.control_layer.metrics_module.global_metrics import GlobalMetricsCollector
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 from shared_resource_layer.container_manager import ContainerManager

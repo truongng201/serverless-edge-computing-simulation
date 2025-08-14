@@ -2,7 +2,7 @@ import logging
 import threading
 from typing import Dict, Any, Optional
 
-from central_node.control_layer.data_manager import DataManager
+from central_node.control_layer.helper_module.data_manager import DataManager
 
 
 class UIController:
