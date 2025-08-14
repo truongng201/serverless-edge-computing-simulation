@@ -49,38 +49,14 @@ export default function MetricsPanelContent({
               </span>
               <Badge variant="outline">{users.length}</Badge>
             </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2">
-                <Link className="w-4 h-4" />
-                Manual Connections
-              </span>
-              <Badge variant="outline">{users.filter((u) => u.manualConnection).length}</Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2">
-                <Server className="w-4 h-4" />
-                Edge Nodes (Warm)
-              </span>
-              <Badge variant="outline">
-                {edgeNodes.length} ({edgeNodes.filter(e => e.isWarm).length})
-              </Badge>
-            </div>
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-2">
-                <Database className="w-4 h-4" />
-                Central Nodes (Warm)
-              </span>
-              <Badge variant="outline">
-                {centralNodes.length} ({centralNodes.filter(c => c.isWarm).length})
-              </Badge>
-            </div>
+           
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2">
                 <Timer className="w-4 h-4" />
-                Avg Latency
+                Average Load
               </span>
-              <Badge variant={totalLatency > 500 ? "destructive" : totalLatency > 200 ? "secondary" : "default"}>
-                {totalLatency}ms
+              <Badge variant={realModeData?.cluster_info?.average_load > 90 ? "destructive" : realModeData?.cluster_info?.average_load > 70 ? "secondary" : "default"}>
+                {Math.round(realModeData?.cluster_info?.average_load, 2) ? Math.round(realModeData?.cluster_info?.average_load, 2) : 0}%
               </Badge>
             </div>
             <div className="space-y-2">
@@ -111,13 +87,13 @@ export default function MetricsPanelContent({
                 </div>
                 <div className="space-y-1 text-xs">
                   <div className="flex justify-between">
-                    <span>CPU Usage:</span>
+                    <span>CPU ({realModeData.central_node?.system_info?.cpu_cores_physical} cores):</span>
                     <span className="font-medium">{realModeData.central_node?.cpu_usage?.toFixed(1)}%</span>
                   </div>
                   <Progress value={realModeData.central_node?.cpu_usage || 0} className="h-2" />
                   
                   <div className="flex justify-between">
-                    <span>Memory Usage:</span>
+                    <span>Memory ({realModeData.central_node?.system_info?.memory_total} GB):</span>
                     <span className="font-medium">{realModeData.central_node?.memory_usage?.toFixed(1)}%</span>
                   </div>
                   <Progress value={realModeData.central_node?.memory_usage || 0} className="h-2" />
@@ -128,11 +104,25 @@ export default function MetricsPanelContent({
                       {realModeData.central_node?.active_requests || 0}
                     </Badge>
                   </div>
+
+                  <div className="flex justify-between">
+                    <span>Total Requests:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {realModeData.central_node?.total_requests || 0}
+                    </Badge>
+                  </div>
                   
                   <div className="flex justify-between">
-                    <span>Containers:</span>
+                    <span>Warm containers:</span>
                     <Badge variant="outline" className="text-xs">
-                      {realModeData.central_node?.container_count || 0}
+                      {realModeData.central_node?.warm_container || 0}
+                    </Badge>
+                  </div>
+
+                  <div className="flex justify-between">
+                    <span>Running containers:</span>
+                    <Badge variant="outline" className="text-xs">
+                      {realModeData.central_node?.running_container || 0}
                     </Badge>
                   </div>
                 </div>
@@ -144,17 +134,22 @@ export default function MetricsPanelContent({
                   <Server className="w-4 h-4" />
                   Edge Nodes Overview
                 </div>
-                <div className="grid grid-cols-3 gap-2 text-xs">
-                  <div className="text-center">
-                    <div className="font-medium text-lg">{realModeData.health?.total_nodes || 0}</div>
+                <div className="text-center">
+                    <div className="font-medium text-lg">{realModeData.cluster_info?.total_nodes || 0}</div>
                     <div className="text-gray-600">Total</div>
                   </div>
+                <div className="grid grid-cols-3 gap-2 text-xs">
                   <div className="text-center">
-                    <div className="font-medium text-lg text-green-600">{realModeData.health?.healthy_nodes || 0}</div>
+                    <div className="font-medium text-lg text-green-600">{realModeData.cluster_info?.healthy_node_count || 0}</div>
                     <div className="text-gray-600">Healthy</div>
                   </div>
+
                   <div className="text-center">
-                    <div className="font-medium text-lg text-red-600">{realModeData.health?.unhealthy_nodes || 0}</div>
+                    <div className="font-medium text-lg text-yellow-600">{realModeData.cluster_info?.warning_node_count || 0}</div>
+                    <div className="text-gray-600">Warning</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium text-lg text-red-600">{realModeData.cluster_info?.unhealthy_node_count || 0}</div>
                     <div className="text-gray-600">Unhealthy</div>
                   </div>
                 </div>
@@ -163,45 +158,78 @@ export default function MetricsPanelContent({
               {/* Individual Edge Node Status */}
               <div className="space-y-2">
                 <div className="font-medium text-sm text-gray-700">Individual Node Status</div>
-                {realModeData.health?.nodes_details?.map((node, index) => (
+                {realModeData.cluster_info?.edge_nodes_info?.map((node, index) => (
                   <div key={node.node_id} className={`p-2 rounded border text-xs ${
-                    node.status === 'healthy' 
-                      ? 'bg-green-50 border-green-200' 
-                      : 'bg-red-50 border-red-200'
+                    node.status === 'healthy'
+                      ? 'bg-green-50 border-green-200'
+                      : node.status === 'warning'
+                        ? 'bg-yellow-50 border-yellow-200'
+                        : 'bg-red-50 border-red-200'
                   }`}>
                     <div className="flex justify-between items-center mb-1">
                       <div className={`font-medium ${
-                        node.status === 'healthy' ? 'text-green-800' : 'text-red-800'
+                        node.status === 'healthy' 
+                          ? 'text-green-800' 
+                          : node.status === 'warning'
+                            ? 'text-yellow-800'
+                            : 'text-red-800'
                       }`}>
                         {node.node_id}
                       </div>
-                      <Badge variant={node.status === 'healthy' ? 'default' : 'destructive'} className="text-xs">
+                      <Badge variant={
+                        node.status === 'healthy' 
+                          ? 'default' 
+                          : node.status === 'warning'
+                            ? 'success'
+                            : 'destructive'
+                      } className="text-xs">
                         {node.status}
                       </Badge>
                     </div>
                     
                     <div className="space-y-1">
                       <div className="flex justify-between">
-                        <span>CPU:</span>
-                        <span className="font-medium">{(node.cpu_usage).toFixed(1)}%</span>
+                        <span>CPU ({node.system_info?.cpu_cores_physical} cores):</span>
+                        <span className="font-medium">{(node.metrics.cpu_usage).toFixed(1)}%</span>
                       </div>
-                      <Progress value={node.cpu_usage} className="h-1" />
+                      <Progress value={node.metrics.cpu_usage} className="h-1" />
                       
                       <div className="flex justify-between">
-                        <span>Memory:</span>
-                        <span className="font-medium">{(node.memory_usage).toFixed(1)}%</span>
+                        <span>Memory ({node.system_info?.memory_total} GB):</span>
+                        <span className="font-medium">{(node.metrics.memory_usage).toFixed(1)}%</span>
                       </div>
-                      <Progress value={node.memory_usage} className="h-1" />
-                      
+                      <Progress value={node.metrics.memory_usage} className="h-1" />
+
                       <div className="flex justify-between">
                         <span>Last seen:</span>
                         <span className="font-medium">{node.last_seen?.toFixed(1)}s ago</span>
                       </div>
                       
                       <div className="flex justify-between">
-                        <span>Requests:</span>
+                        <span>Active requests:</span>
                         <Badge variant="outline" className="text-xs">
-                          {node.active_requests || 0}
+                          {node.metrics.active_requests || 0}
+                        </Badge>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span>Total requests:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {node.metrics.total_requests || 0}
+                        </Badge>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span>Warm Container:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {node.metrics.warm_container || 0}
+                        </Badge>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <span>Running Container:</span>
+                        <Badge variant="outline" className="text-xs">
+                          {node.metrics.running_container || 0}
                         </Badge>
                       </div>
                     </div>
@@ -246,84 +274,7 @@ export default function MetricsPanelContent({
           </CardContent>
         </Card>
 
-        {/* Central Node Status */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Central Node Status</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {centralNodes.map((central) => (
-              <div
-                key={central.id}
-                className={`p-2 rounded cursor-pointer transition-colors ${
-                  selectedCentral && selectedCentral.id === central.id ? "bg-blue-100" : "hover:bg-gray-50"
-                }`}
-                onClick={() =>
-                  setSelectedCentral(selectedCentral && selectedCentral.id === central.id ? null : central)
-                }
-              >
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="flex items-center gap-1">
-                    <Database className="w-3 h-3" />
-                    {central.id}
-                    {central.isWarm && <span className="text-green-500">●</span>}
-                  </span>
-                  <Badge
-                    variant={
-                      central.currentLoad > 80
-                        ? "destructive"
-                        : central.currentLoad > 50
-                        ? "secondary"
-                        : "default"
-                    }
-                    className="text-xs"
-                  >
-                    {Math.round(central.currentLoad)}%
-                  </Badge>
-                </div>
-                <Progress value={central.currentLoad} className="h-1" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-
-        {/* Edge Node Status */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Edge Node Status</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            {edgeNodes.map((edge) => (
-              <div
-                key={edge.id}
-                className={`p-2 rounded cursor-pointer transition-colors ${
-                  selectedEdge && selectedEdge.id === edge.id ? "bg-green-100" : "hover:bg-gray-50"
-                }`}
-                onClick={() => setSelectedEdge(selectedEdge && selectedEdge.id === edge.id ? null : edge)}
-              >
-                <div className="flex justify-between text-xs mb-1">
-                  <span className="flex items-center gap-1">
-                    {edge.id}
-                    {edge.isWarm && <span className="text-green-500">●</span>}
-                  </span>
-                  <Badge
-                    variant={
-                      edge.currentLoad > 80
-                        ? "destructive"
-                        : edge.currentLoad > 50
-                        ? "secondary"
-                        : "default"
-                    }
-                    className="text-xs"
-                  >
-                    {Math.round(edge.currentLoad)}%
-                  </Badge>
-                </div>
-                <Progress value={edge.currentLoad} className="h-1" />
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        
 
         {/* Latency Breakdown - Show detailed metrics for selected node */}
         {((selectedEdge && selectedEdge.lastMetrics) || (selectedCentral && selectedCentral.lastMetrics)) && (

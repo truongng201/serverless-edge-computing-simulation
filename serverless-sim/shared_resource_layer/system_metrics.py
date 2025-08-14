@@ -196,7 +196,6 @@ class SystemMetricsCollector:
                 "version": platform.version(),
                 "machine": platform.machine(),
                 "processor": platform.processor(),
-                "cpu_cores_logical": psutil.cpu_count(logical=True),
                 "cpu_cores_physical": psutil.cpu_count(logical=False),
                 "memory_total": round(psutil.virtual_memory().total / (1024**3), 2),
                 "disk_size_total": 0,

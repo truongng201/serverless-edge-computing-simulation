@@ -124,5 +124,6 @@ class CentralNodeAPIController:
             "network_io": {},
             "disk_io": {},
             "timestamp": time.time(),
-            "uptime": system_metrics.uptime if system_metrics else 0
+            "uptime": system_metrics.uptime if system_metrics else 0,
+            "system_info": self.metrics_collector.get_system_info() if system_metrics else {}
         }

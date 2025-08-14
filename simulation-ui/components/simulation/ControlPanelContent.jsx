@@ -124,15 +124,15 @@ export default function ControlPanelContent({
         console.log(centralNodes)
         
         // Create/Update edge nodes based on real data (always update regardless of conditions)
-        const realEdgeNodes = (response.data.health.nodes_details || []).map((node, index) => ({
+        const realEdgeNodes = (response.data.cluster_info.edge_nodes_info || []).map((node, index) => ({
           id: node.node_id || `edge_${index}`,
-          x: centerX + 700 * Math.cos((index * 5 * Math.PI) / Math.max(response.data.health.nodes_details.length, 1)),
-          y: centerY + 700 * Math.sin((index * 5 * Math.PI) / Math.max(response.data.health.nodes_details.length, 1)),
+          x: centerX + 700 * Math.cos((index * 5 * Math.PI) / Math.max(response.data.cluster_info.edge_nodes_info.length, 1)),
+          y: centerY + 700 * Math.sin((index * 5 * Math.PI) / Math.max(response.data.cluster_info.edge_nodes_info.length, 1)),
           capacity: node.container_count || 0,
           coverage: edgeCoverage[0] || 100,
           connections: [],
-          currentLoad: node.cpu_usage * 100 || 0,
-          memory_usage: node.memory_usage || 0,
+          currentLoad: node.metrics.cpu_usage * 100 || 0,
+          memory_usage: node.metrics.memory_usage || 0,
           active_requests: node.active_requests || 0,
           energy_consumption: node.energy_consumption || 0,
           currentLoad: node.cpu_usage || 0,

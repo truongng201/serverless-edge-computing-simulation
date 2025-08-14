@@ -140,11 +140,10 @@ class CentralCoreController:
         try:
             scheduler_status = self.scheduler.get_cluster_status()
             central_node_status = self.central_node_api_controller.get_central_node_status()
-            central_metrics = NodeMetrics(**central_node_status)
-
+            
             return {
                 "success": True,
-                "central_node": central_metrics,
+                "central_node": central_node_status,
                 "cluster_info": scheduler_status,
                 "timestamp": time.time()
             }
