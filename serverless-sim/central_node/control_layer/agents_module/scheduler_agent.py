@@ -1,7 +1,7 @@
 import logging
 import threading
 import time
-
+import requests
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
 
 from config import Config
@@ -16,6 +16,7 @@ class SchedulerAgent:
         self.cleanup_dead_nodes_thread = None
         self.is_cleaning = False
         self.cleanup_dead_nodes_interval = Config.CLEANUP_DEAD_NODES_INTERVAL
+        self.max_attempts_call = 3
         
         self.logger.info("Scheduler Agent initialized")
         
@@ -24,9 +25,16 @@ class SchedulerAgent:
         dead_nodes = []
         
         for node_id, node in self.scheduler.edge_nodes.items():
-            if current_time - node.last_heartbeat > Config.EDGE_NODE_HEARTBEAT_TIMEOUT:
-                dead_nodes.append(node_id)
-                
+            for attempt in range(1, self.max_attempts_call + 1):
+                try:
+                    result = requests.get(f"http://{node.endpoint}/api/v1/edge/health")
+                    if result.status_code != 200:
+                        raise Exception(f"Node {node_id} is unhealthy, status code: {result.status_code}")
+                    break
+                except Exception as e:
+                    if attempt == self.max_attempts_call:
+                        dead_nodes.append(node_id)
+
         for node_id in dead_nodes:
             self.logger.warning(f"Removing dead node: {node_id} (last seen: {current_time - self.scheduler.edge_nodes[node_id].last_heartbeat:.1f}s ago)")
             del self.scheduler.edge_nodes[node_id]
