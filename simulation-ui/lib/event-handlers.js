@@ -302,6 +302,11 @@ export const useEventHandlers = (state, actions) => {
               : edge
           )
         );
+        // Update draggedNode with current position for API call
+        setDraggedNode(prev => ({
+          ...prev,
+          node: { ...prev.node, x: newX, y: newY }
+        }));
       } else if (draggedNode.type === "central") {
         setCentralNodes((prev) =>
           prev.map((central) =>
@@ -310,6 +315,11 @@ export const useEventHandlers = (state, actions) => {
               : central
           )
         );
+        // Update draggedNode with current position
+        setDraggedNode(prev => ({
+          ...prev,
+          node: { ...prev.node, x: newX, y: newY }
+        }));
       }
     } else {
       setIsDragging(true);
@@ -332,10 +342,43 @@ export const useEventHandlers = (state, actions) => {
     setSelectedUser,
     setEdgeNodes,
     setCentralNodes,
-    setIsDragging
+    setIsDragging,
+    setDraggedNode
   ]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback(async () => {
+    // Handle API call for edge node position update
+    if (isDraggingNode && draggedNode && draggedNode.type === "edge") {
+      try {
+        const payload = {
+          node_id: draggedNode.node.id,
+          location: {
+            x: Math.round(draggedNode.node.x),
+            y: Math.round(draggedNode.node.y)
+          }
+        };
+
+        // Only make API call if NEXT_PUBLIC_API_URL is available
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_edge_node`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            console.error('Failed to update edge node position:', response.statusText);
+          } else {
+            console.log('Edge node position updated successfully:', payload);
+          }
+        }
+      } catch (error) {
+        console.error('Error updating edge node position:', error);
+      }
+    }
+
     setIsPanning(false);
     setIsDraggingNode(false);
     setIsDraggingUser(false);
@@ -343,6 +386,8 @@ export const useEventHandlers = (state, actions) => {
     setDraggedUser(null);
     setTimeout(() => setIsDragging(false), 100);
   }, [
+    isDraggingNode,
+    draggedNode,
     setIsPanning,
     setIsDraggingNode,
     setIsDraggingUser,
