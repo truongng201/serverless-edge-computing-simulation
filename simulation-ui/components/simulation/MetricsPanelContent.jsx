@@ -62,9 +62,9 @@ export default function MetricsPanelContent({
             <div className="space-y-2">
               <div className="flex justify-between text-xs">
                 <span>Network Load</span>
-                <span>{Math.round(users.length * 8.33)}%</span>
+                <span>0%</span>
               </div>
-              <Progress value={Math.min(100, users.length * 8.33)} className="h-2" />
+              <Progress value={0} className="h-2" />
             </div>
           </CardContent>
         </Card>
