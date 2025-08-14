@@ -21,7 +21,7 @@ class SchedulingStrategy(Enum):
 class EdgeNodeInfo:
     node_id: str
     endpoint: str
-    location: Dict[str, float]  # {"lat": ..., "lng": ...}
+    location: Dict[str, float]  # {"x": ..., "y": ...}
     current_load: float
     available_resources: Dict[str, Any]
     last_heartbeat: float
@@ -53,6 +53,7 @@ class Scheduler:
             
     def update_node_metrics(self, node_id: str, metrics: Dict[str, Any]):
         """Update node metrics from heartbeat"""
+        print(metrics)
         if node_id in self.edge_nodes:
             self.edge_nodes[node_id].current_load = metrics.get('cpu_usage', 0.0)
             self.edge_nodes[node_id].available_resources = metrics.get('resources', {})

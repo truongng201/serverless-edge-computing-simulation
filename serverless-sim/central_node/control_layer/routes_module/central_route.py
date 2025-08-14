@@ -91,9 +91,3 @@ def health_check():
             "metrics_collector": "running"
         }
     })
-
-@central_route.route('/nodes/cleanup', methods=['POST'])
-def cleanup_dead_nodes():
-    result = central_core_controller.cleanup_dead_nodes()
-    status_code = 200 if result["success"] else 500
-    return jsonify(result), status_code

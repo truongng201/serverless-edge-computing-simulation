@@ -2,7 +2,7 @@ import logging
 from typing import Dict, Any
 import time
 
-from central_node.control_layer.scheduler import Scheduler
+from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.migration import MigrationManager
 from central_node.control_layer.metrics_module.global_metrics import GlobalMetricsCollector
@@ -104,12 +104,11 @@ class CentralCoreController:
     def register_edge_node(self, node_data: Dict[str, Any]) -> Dict[str, Any]:
         """Register a new edge node"""
         try:
-            from central_node.control_layer.scheduler import EdgeNodeInfo
             
             node_info = EdgeNodeInfo(
                 node_id=node_data["node_id"],
                 endpoint=node_data["endpoint"],
-                location=node_data.get("location", {"lat": 0.0, "lng": 0.0}),
+                location=node_data.get("location", {"x": 0.0, "y": 0.0}),
                 current_load=0.0,
                 available_resources=node_data.get("resources", {}),
                 last_heartbeat=time.time()
