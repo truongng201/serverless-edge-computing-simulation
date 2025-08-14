@@ -160,7 +160,6 @@ fi
 
 # Create necessary directories
 echo "📁 Creating directories..."
-mkdir -p logs
 
 # Get local IP
 LOCAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n1)
@@ -180,7 +179,6 @@ fi
 echo "   Local IP: $LOCAL_IP"
 echo "   Log Level: $LOG_LEVEL"
 echo ""
-echo "📝 Logs will be written to ${NODE_ID}.log"
 echo "🛑 Press Ctrl+C to stop"
 echo ""
 

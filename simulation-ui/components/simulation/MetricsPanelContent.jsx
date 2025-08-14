@@ -183,15 +183,15 @@ export default function MetricsPanelContent({
                     <div className="space-y-1">
                       <div className="flex justify-between">
                         <span>CPU:</span>
-                        <span className="font-medium">{(node.cpu_usage * 100).toFixed(1)}%</span>
+                        <span className="font-medium">{(node.cpu_usage).toFixed(1)}%</span>
                       </div>
-                      <Progress value={node.cpu_usage * 100} className="h-1" />
+                      <Progress value={node.cpu_usage} className="h-1" />
                       
                       <div className="flex justify-between">
                         <span>Memory:</span>
-                        <span className="font-medium">{(node.memory_usage * 100).toFixed(1)}%</span>
+                        <span className="font-medium">{(node.memory_usage).toFixed(1)}%</span>
                       </div>
-                      <Progress value={node.memory_usage * 100} className="h-1" />
+                      <Progress value={node.memory_usage} className="h-1" />
                       
                       <div className="flex justify-between">
                         <span>Last seen:</span>

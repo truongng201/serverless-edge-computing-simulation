@@ -7,7 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import {
-  Play, Pause, RotateCcw, Users, Server, Plus, Minus, Database, Trash2, Link, Unlink, Edit3, Move, ChevronLeft, MapPin, Target, Navigation, Eye, EyeOff
+  Play, Pause, RotateCcw, Users, Server, Plus, Minus, Database, Trash2, Link, Unlink, Edit3, Move, ChevronLeft, MapPin, Target, Navigation, Eye, EyeOff, ChevronRight, SkipBack, SkipForward
 } from "lucide-react"
 import { useState, useEffect, useRef } from "react"
 import axios from "axios";
@@ -84,21 +84,21 @@ export default function ControlPanelContent({
   const [loadingData, setLoadingData] = useState(false)
   const [dataError, setDataError] = useState("")
   const [currentStep, setCurrentStep] = useState(28800) // Starting step for vehicle data
+  const [isTransitioning, setIsTransitioning] = useState(false)
+  const [stepProgress, setStepProgress] = useState(0)
   const intervalRef = useRef(null)
   const realModeIntervalRef = useRef(null)
+  const transitionTimeoutRef = useRef(null)
 
     // Function to fetch real cluster status
   const fetchRealClusterStatus = async () => {
     try {
       setLoadingData(true)
       setDataError("")
-      
-      const response = await axios.get('http://192.168.2.4:5001/api/v1/central/cluster/status')
-      
+
+      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/cluster/status`)
+
       if (response.data && response.data.success) {
-        console.log('Real cluster status:', response.data)
-        console.log('Central node CPU usage:', response.data.central_node?.cpu_usage)
-        console.log('Edge nodes CPU usage:', response.data.health?.nodes_details?.map(n => n.cpu_usage))
         setRealModeData(response.data)
         
         // Get canvas center for positioning nodes
@@ -184,14 +184,29 @@ export default function ControlPanelContent({
   // Generic function to fetch sample data with step
   const fetchSampleData = async (endpoint, step) => {
     try {
+      // Start transition effect
+      setIsTransitioning(true);
+      setStepProgress(0);
+      
+      // First, immediately clear all users to prevent mixing old and new
+      setUsers([]);
+      
       const params = { step_id: step };
-      const res = await axios.get(`http://192.168.2.4:5001${endpoint}`, { params });
+      
+      // Simulate progress for better UX
+      setStepProgress(25);
+      
+      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, { params });
+      
+      setStepProgress(50);
       
       if (!res.data || res.data.status !== "success") {
         throw new Error(`Failed to fetch data from ${endpoint}`);
       }
       
       console.log(`Data from ${endpoint} at step ${step}:`, res.data);
+      
+      setStepProgress(75);
       
       // Extract user data and ensure it's an array
       let userData = res.data.data;
@@ -204,7 +219,7 @@ export default function ControlPanelContent({
         userData = [];
       }
       
-      // Ensure each user has required properties
+      // Always process the data, even if empty - this ensures complete replacement
       const processedUsers = userData.map((user, index) => ({
         id: user.id || `user_${step}_${index}`,
         x: Number(user.x) || 0, // Use actual coordinates from backend, default to 0
@@ -218,16 +233,44 @@ export default function ControlPanelContent({
         assignedRoad: user.assignedRoad || null,
         roadDirection: user.roadDirection || 1,
         constrainedToRoad: user.constrainedToRoad || false,
-        isBackendControlled: true // Flag to indicate this user is controlled by backend
+        isBackendControlled: true, // Flag to indicate this user is controlled by backend
+        // Add transition properties for smooth animation
+        opacity: 0,
+        scale: 0.8
       }));
       
-      console.log(`Setting users from ${endpoint}:`, processedUsers);
-      setUsers(processedUsers);
-      setCurrentStep(step);
+      console.log(`Setting ${processedUsers.length} new users from ${endpoint} at step ${step}`);
+      
+      setStepProgress(100);
+      
+      // Use setTimeout to ensure the clear operation completes before setting new users
+      setTimeout(() => {
+        setUsers(processedUsers);
+        
+        // Animate users in smoothly
+        setTimeout(() => {
+          setUsers(prev => prev.map(user => ({
+            ...user,
+            opacity: 1,
+            scale: 1
+          })));
+        }, 50);
+        
+        // End transition after animation
+        if (transitionTimeoutRef.current) {
+          clearTimeout(transitionTimeoutRef.current);
+        }
+        transitionTimeoutRef.current = setTimeout(() => {
+          setIsTransitioning(false);
+          setStepProgress(0);
+        }, 300);
+      }, 10);
       
     } catch (err) {
       console.error(`Error fetching from ${endpoint}:`, err);
       setDataError(err.message);
+      setIsTransitioning(false);
+      setStepProgress(0);
     }
   };
   // API call for DACT sample
@@ -256,20 +299,29 @@ export default function ControlPanelContent({
   const handleDataTypeChange = async (value) => {
     setDataType(value)
     
+    // Always clear users first to prevent mixing
+    setUsers([]);
+    
     // If switching to "none", restore normal user movement
     if (value === "none") {
-      setUsers(prevUsers => prevUsers.map(user => ({
-        ...user,
-        vx: user.vx || (Math.random() - 0.5) * 2,
-        vy: user.vy || (Math.random() - 0.5) * 2,
-        isBackendControlled: false
-      })));
+      // Don't restore any users - let user manually add them
+      console.log("Switched to none mode - users cleared");
     } else if (value === "dact") {
+      // Clear all existing users first, then load DACT data
+      console.log("Loading DACT data...");
       setCurrentStep(659); // Set initial step for DACT
       await fetchDACTSample()
     } else if (value === "vehicle") {
+      // Clear all existing users first, then load vehicle data
+      console.log("Loading Vehicle data...");
       setCurrentStep(28800); // Set initial step for Vehicle
       await fetchVehicleSample()
+    }
+    
+    // If real mode was active, maintain it after data type change
+    if (simulationMode === "real") {
+      // Re-initialize real mode to ensure it continues working
+      await handleSimulationModeChange("real")
     }
   }
 
@@ -283,19 +335,27 @@ export default function ControlPanelContent({
         clearInterval(intervalRef.current);
       }
       
-      // Set up interval to fetch data every 2 seconds
+      // Set up interval to fetch data every 1 second with smooth transitions
       intervalRef.current = setInterval(() => {
         setCurrentStep(prevStep => {
           const nextStep = prevStep + 1;
-          console.log(`Fetching next step: ${nextStep}`);
+          console.log(`Fetching next step: ${nextStep} (previous was ${prevStep})`);
           
           // Determine endpoint based on dataType
           const endpoint = dataType === "dact" ? "/get_dact_sample" : "/get_sample";
-          fetchSampleData(endpoint, nextStep);
+          
+          // Use the nextStep directly in the async call to avoid closure issues
+          (async () => {
+            try {
+              await fetchSampleData(endpoint, nextStep);
+            } catch (error) {
+              console.error(`Error fetching step ${nextStep}:`, error);
+            }
+          })();
           
           return nextStep;
         });
-      }, 2000); // 2 seconds interval
+      }, Math.max(500, 2000 / simulationSpeed[0])); // Adjust interval based on simulation speed, minimum 500ms
 
     } else {
       console.log("Stopping simulation");
@@ -314,8 +374,11 @@ export default function ControlPanelContent({
       if (realModeIntervalRef.current) {
         clearInterval(realModeIntervalRef.current);
       }
+      if (transitionTimeoutRef.current) {
+        clearTimeout(transitionTimeoutRef.current);
+      }
     };
-  }, [isSimulating, dataType]);
+  }, [isSimulating, dataType, simulationSpeed]);
 
   // Override resetSimulation to stop intervals
   const handleResetSimulation = () => {
@@ -327,9 +390,15 @@ export default function ControlPanelContent({
       clearInterval(realModeIntervalRef.current);
       realModeIntervalRef.current = null;
     }
+    if (transitionTimeoutRef.current) {
+      clearTimeout(transitionTimeoutRef.current);
+      transitionTimeoutRef.current = null;
+    }
     setIsSimulating(false);
     setSimulationMode("demo");
     setRealModeData(null);
+    setIsTransitioning(false);
+    setStepProgress(0);
     resetSimulation();
   };
   return (
@@ -420,45 +489,6 @@ export default function ControlPanelContent({
           </CardContent>
         </Card>
 
-        {/* Road Network Controls */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Navigation className="w-4 h-4" />
-              Road Network
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Road Mode</Label>
-              <Switch checked={roadMode} onCheckedChange={setRoadMode} />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Show Roads</Label>
-              <Switch checked={showRoads} onCheckedChange={setShowRoads} />
-            </div>
-            
-            <div className="text-xs text-gray-600 space-y-1">
-              <div>Available Roads: {roads?.length || 0}</div>
-              <div>Road Types: Highway, Main, Local</div>
-              {roadMode && (
-                <div className="text-blue-600 font-medium">
-                  Click near roads to place users
-                </div>
-              )}
-            </div>
-            
-            <div className="bg-blue-50 p-2 rounded text-xs">
-              <div className="font-medium mb-1">Road Mode Features:</div>
-              <div>• Users snap to nearest road</div>
-              <div>• Constrained movement along roads</div>
-              <div>• Bidirectional traffic</div>
-              <div>• Auto direction reversal</div>
-            </div>
-          </CardContent>
-        </Card>
-
         {/* Auto Placement Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -519,13 +549,26 @@ export default function ControlPanelContent({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Database className="w-4 h-4" />
-              Select Data Type
+              Select Dataset
+              {isTransitioning && (
+                <div className="ml-auto">
+                  <div className="w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
+                </div>
+              )}
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label className="text-xs">Data Type</Label>
-              <Select value={dataType} onValueChange={handleDataTypeChange}>
+              <Label className="text-xs flex items-center gap-2">
+                <span>Dataset</span>
+                {loadingData && !isTransitioning && (
+                  <span className="text-xs text-blue-600 flex items-center gap-2">
+                    <span className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></span>
+                    Loading initial data...
+                  </span>
+                )}
+              </Label>
+              <Select value={dataType} onValueChange={handleDataTypeChange} disabled={isTransitioning}>
                 <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
@@ -536,8 +579,37 @@ export default function ControlPanelContent({
                 </SelectContent>
               </Select>
             </div>
-            {loadingData && <div className="text-xs text-blue-600">Loading data...</div>}
-            {dataError && <div className="text-xs text-red-600">{dataError}</div>}
+            
+            
+            
+            {isTransitioning && (
+              <div className="space-y-2">
+                <div className="text-xs text-blue-600 flex items-center gap-2">
+                  <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+                  Transitioning to step {currentStep}...
+                </div>
+                {stepProgress > 0 && (
+                  <div className="space-y-1">
+                    <div className="text-xs text-gray-500">
+                      Progress: {Math.round(stepProgress)}%
+                    </div>
+                    <Progress value={stepProgress} className="h-1" />
+                  </div>
+                )}
+              </div>
+            )}
+            
+            {dataError && (
+              <div className="text-xs text-red-600 p-2 bg-red-50 rounded">
+                {dataError}
+              </div>
+            )}
+            
+            {dataType !== "none" && !loadingData && !isTransitioning && (
+              <div className="text-xs text-green-600 p-2 bg-green-50 rounded">
+                ✓ Data loaded successfully
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -617,7 +689,31 @@ export default function ControlPanelContent({
               <div className="text-xs text-gray-500">
                 Status: {isSimulating ? 'running' : 'stopped'}
                 {loadingData && ' (loading...)'}
+                {isTransitioning && ' (transitioning...)'}
               </div>
+              
+              {/* Step Progress Indicator */}
+              {isTransitioning && stepProgress > 0 && (
+                <div className="space-y-1">
+                  <div className="text-xs text-blue-600">
+                    Loading step {currentStep + 1}...
+                  </div>
+                  <Progress value={stepProgress} className="h-2" />
+                </div>
+              )}
+              
+              {/* Smooth transition indicator */}
+              {isSimulating && dataType !== "none" && (
+                <div className="space-y-1">
+                  <div className="text-xs text-green-600">
+                    ✓ Smooth transitions enabled
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Interval: {Math.max(500, 2000 / simulationSpeed[0])}ms
+                  </div>
+                </div>
+              )}
+              
               {dataError && (
                 <div className="text-xs text-red-500">
                   Error: {dataError}
@@ -641,6 +737,42 @@ export default function ControlPanelContent({
                 )}
               </div>
             )}
+            {/* Step Controls for Manual Navigation */}
+            {dataType !== "none" && (
+              <div className="flex gap-2 mt-2">
+                <Button 
+                  onClick={() => {
+                    const newStep = currentStep - 1;
+                    setCurrentStep(newStep);
+                    const endpoint = dataType === "dact" ? "/get_dact_sample" : "/get_sample";
+                    fetchSampleData(endpoint, newStep);
+                  }} 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex-1"
+                  disabled={loadingData || isTransitioning}
+                >
+                  <SkipBack className="w-4 h-4 mr-1" />
+                  Prev
+                </Button>
+                <Button 
+                  onClick={() => {
+                    const newStep = currentStep + 1;
+                    setCurrentStep(newStep);
+                    const endpoint = dataType === "dact" ? "/get_dact_sample" : "/get_sample";
+                    fetchSampleData(endpoint, newStep);
+                  }} 
+                  size="sm" 
+                  variant="outline" 
+                  className="flex-1"
+                  disabled={loadingData || isTransitioning}
+                >
+                  <SkipForward className="w-4 h-4 mr-1" />
+                  Next
+                </Button>
+              </div>
+            )}
+            
             <div className="flex gap-2">
               <Button 
                 onClick={() => setIsSimulating(!isSimulating)} 
@@ -657,8 +789,18 @@ export default function ControlPanelContent({
               </Button>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Speed: {simulationSpeed[0]}x</Label>
+              <Label className="text-xs">
+                Speed: {simulationSpeed[0]}x 
+                {isSimulating && dataType !== "none" && (
+                  <span className="text-blue-600 ml-1">
+                    ({Math.max(500, 2000 / simulationSpeed[0])}ms intervals)
+                  </span>
+                )}
+              </Label>
               <Slider value={simulationSpeed} onValueChange={setSimulationSpeed} max={5} min={0.1} step={0.1} />
+              <div className="text-xs text-gray-500">
+                Higher speed = faster step transitions
+              </div>
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-xs">Prediction</Label>

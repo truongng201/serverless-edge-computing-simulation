@@ -1,5 +1,5 @@
-import { calculateDistance, findNearestRoad, moveUserAlongRoad } from "./road-utils";
 import { useCallback } from "react";
+import { calculateDistance } from "./helper";
 
 // Event Handlers
 export const useEventHandlers = (state, actions) => {

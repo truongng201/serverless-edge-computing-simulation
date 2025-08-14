@@ -17,18 +17,18 @@ from flask_cors import CORS
 # Add the parent directory to sys.path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from edge_node.api_layer.edge_api import register_edge_api, initialize_edge_api
+from edge_node.api_layer.edge_route import register_edge_route, initialize_edge_route
 from config import Config
 
-def create_edge_node_app(node_id: str, central_node_url: str):
+def create_edge_node_app(node_id: str, central_node_url: str, node_port: int, edge_node_url: str):
     """Create Flask app for edge node"""
     app = Flask(__name__)
     CORS(app, resources={r"/*": {"origins": "*"}})
     
     # Initialize and register edge node API
-    initialize_edge_api(node_id, central_node_url)
-    register_edge_api(app)
-    
+    initialize_edge_route(node_id, central_node_url, node_port, edge_node_url)
+    register_edge_route(app)
+
     return app
 
 def setup_logging(log_level: str = "INFO", node_id: str = "edge"):
@@ -92,7 +92,7 @@ def main():
                        help='Port to run on (auto-detect if not specified)')
     parser.add_argument('--host', type=str, default='0.0.0.0',
                        help='Host to bind to (default: 0.0.0.0)')
-    parser.add_argument('--debug', action='store_true',
+    parser.add_argument('--debug', action='store_true', default=False,
                        help='Enable debug mode')
     parser.add_argument('--log-level', type=str, default='INFO',
                        choices=['DEBUG', 'INFO', 'WARNING', 'ERROR'],
@@ -154,8 +154,8 @@ def main():
     
     # Create edge node app
     logger.info("Initializing edge node...")
-    app = create_edge_node_app(args.node_id, args.central_url)
-    
+    app = create_edge_node_app(args.node_id, args.central_url, args.port, local_ip)
+
     logger.info("Edge Node components:")
     logger.info("  ✓ API Layer (Container execution, request handling)")
     logger.info("  ✓ Resource Layer (Docker management, system metrics)")
@@ -169,13 +169,12 @@ def main():
     logger.info("  • Health Check: http://{}:{}/api/v1/edge/health".format(local_ip, args.port))
     logger.info("  • Container List: http://{}:{}/api/v1/edge/containers".format(local_ip, args.port))
     logger.info("-" * 60)
-    
+    from edge_node.api_layer.edge_route import edge_node_api_agent
     # Start metrics reporting
     if args.auto_register:
         logger.info("Starting metrics reporting and registration...")
-        from edge_node.api_layer.edge_api import edge_node_api
-        if edge_node_api:
-            edge_node_api.start_metrics_reporting()
+        if edge_node_api_agent:
+            edge_node_api_agent.start_metrics_reporting()
             logger.info("✓ Metrics reporting started")
         else:
             logger.warning("Failed to start metrics reporting")
@@ -184,14 +183,22 @@ def main():
     try:
         logger.info("Starting Edge Node server...")
         logger.info(f"Edge Node {args.node_id} is ready to accept requests!")
+
+        if edge_node_api_agent:
+            edge_node_api_agent.start_cleanup_containers()
+            logger.info("✓ Cleanup started")
+        else:
+            logger.warning("Failed to start cleanup")
+
         app.run(host=args.host, port=args.port, debug=args.debug)
     except KeyboardInterrupt:
         logger.info("Edge Node shutting down...")
         # Stop metrics reporting
-        from edge_node.api_layer.edge_api import edge_node_api
-        if edge_node_api:
-            edge_node_api.stop_metrics_reporting()
+        if edge_node_api_agent:
+            edge_node_api_agent.stop_metrics_reporting()
             logger.info("Metrics reporting stopped")
+            edge_node_api_agent.stop_cleanup_containers()
+            logger.info("Cleanup stopped")
     except Exception as e:
         logger.error(f"Failed to start Edge Node: {e}")
         sys.exit(1)

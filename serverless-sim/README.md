@@ -79,9 +79,9 @@ serverless-sim/
 │   ├── api_layer/         # First layer - Request processing
 │   │   └── edge_api.py             # Edge node REST API
 │   └── resource_layer/    # Second layer - Docker and metrics
-├── shared/                # Shared components
+├── shared_resource_layer/                # Shared resourcer layer component
 │   ├── docker_manager.py           # Docker container lifecycle management
-│   └── system_metrics.py           # System metrics collection (/proc files)
+│   └── system_metrics.py           # System metrics collection
 ```
 
 ## Component Details

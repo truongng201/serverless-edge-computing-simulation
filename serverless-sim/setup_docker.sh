@@ -81,148 +81,19 @@ echo ""
 echo "🐳 Setting up container images..."
 
 # Create a simple serverless handler image
-HANDLER_IMAGE="serverless-handler:latest"
+HANDLER_IMAGE="python-serverless-handler:latest"
 
-if docker images | grep -q "serverless-handler"; then
-    echo "✅ Serverless handler image already exists"
+if docker images | grep -q "python-serverless-handler"; then
+    echo "✅ Python serverless handler image already exists"
 else
-    echo "Building serverless handler image..."
-    
-    # Create a temporary Dockerfile
-    cat > /tmp/Dockerfile.serverless-handler << 'EOF'
-FROM python:3.9-slim
+    echo "Building python serverless handler image..."
 
-# Install basic dependencies
-RUN apt-get update && apt-get install -y \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Create app directory
-WORKDIR /app
-
-# Create a simple handler script
-RUN echo '#!/usr/bin/env python3
-import json
-import sys
-import time
-import os
-
-def main():
-    print("Serverless function handler started")
-    
-    # Simulate function execution
-    function_id = os.environ.get("FUNCTION_ID", "unknown")
-    execution_time = float(os.environ.get("EXECUTION_TIME", "1.0"))
-    
-    print(f"Executing function: {function_id}")
-    print(f"Simulated execution time: {execution_time}s")
-    
-    # Simulate work
-    time.sleep(execution_time)
-    
-    result = {
-        "function_id": function_id,
-        "status": "completed",
-        "execution_time": execution_time,
-        "timestamp": time.time()
-    }
-    
-    print(f"Function result: {json.dumps(result)}")
-    return result
-
-if __name__ == "__main__":
-    main()
-' > /app/handler.py
-
-RUN chmod +x /app/handler.py
-
-# Default command
-CMD ["python3", "/app/handler.py"]
-EOF
-
-    if docker build -t "$HANDLER_IMAGE" -f /tmp/Dockerfile.serverless-handler /tmp; then
-        echo "✅ Serverless handler image built successfully"
-        rm -f /tmp/Dockerfile.serverless-handler
+    if docker build -t "$HANDLER_IMAGE" -f function_template/Dockerfile function_template; then
+        echo "✅ Python serverless handler image built successfully"
     else
-        echo "❌ Failed to build serverless handler image"
-        rm -f /tmp/Dockerfile.serverless-handler
+        echo "❌ Failed to build python serverless handler image"
         exit 1
     fi
-fi
-
-# Create additional test images
-echo ""
-echo "🧪 Creating test function images..."
-
-# Simple Python function
-TEST_IMAGES=("python-hello:latest" "nodejs-hello:latest")
-
-# Python test function
-if ! docker images | grep -q "python-hello"; then
-    echo "Building Python test function..."
-    cat > /tmp/Dockerfile.python-hello << 'EOF'
-FROM python:3.9-slim
-
-WORKDIR /app
-
-RUN echo '#!/usr/bin/env python3
-import json
-import time
-import os
-
-def hello_world():
-    name = os.environ.get("NAME", "World")
-    message = f"Hello, {name}! Time: {time.time()}"
-    
-    result = {
-        "message": message,
-        "language": "python",
-        "timestamp": time.time()
-    }
-    
-    print(json.dumps(result))
-    return result
-
-if __name__ == "__main__":
-    hello_world()
-' > /app/function.py
-
-RUN chmod +x /app/function.py
-
-CMD ["python3", "/app/function.py"]
-EOF
-
-    docker build -t "python-hello:latest" -f /tmp/Dockerfile.python-hello /tmp &> /dev/null
-    rm -f /tmp/Dockerfile.python-hello
-    echo "✅ Python test function image created"
-fi
-
-# Node.js test function
-if ! docker images | grep -q "nodejs-hello"; then
-    echo "Building Node.js test function..."
-    cat > /tmp/Dockerfile.nodejs-hello << 'EOF'
-FROM node:16-slim
-
-WORKDIR /app
-
-RUN echo 'const name = process.env.NAME || "World";
-const message = `Hello, ${name}! Time: ${Date.now()}`;
-
-const result = {
-    message: message,
-    language: "nodejs",
-    timestamp: Date.now()
-};
-
-console.log(JSON.stringify(result));
-' > /app/function.js
-
-CMD ["node", "/app/function.js"]
-EOF
-
-    docker build -t "nodejs-hello:latest" -f /tmp/Dockerfile.nodejs-hello /tmp &> /dev/null
-    rm -f /tmp/Dockerfile.nodejs-hello
-    echo "✅ Node.js test function image created"
 fi
 
 # Test container creation and execution

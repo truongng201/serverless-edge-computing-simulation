@@ -1,0 +1,103 @@
+import logging
+import time
+import random
+import string
+from typing import Dict, Any, Optional
+
+
+from shared_resource_layer.container_manager import ContainerManager
+
+from config import Config, ContainerState
+
+class CentralNodeAPIController:
+    def __init__(self):
+        self.logger = logging.getLogger(__name__)
+        
+        # Initialize control layer components
+        self.container_manager = ContainerManager()
+        
+        # Request tracking
+        self.active_requests = 0
+        self.total_requests = 0
+        self.response_times = []
+        
+        self.logger.info("Central Node API Controller initialized")
+        
+    def get_request_tracking(self):
+        return {
+            "active_requests": self.active_requests,
+            "total_requests": self.total_requests,
+            "response_times": self.response_times
+        }
+        
+    def execute_function(self, function_data: Dict[str, Any]) -> Dict[str, Any]:
+        start_time = time.time()
+        self.active_requests += 1
+        self.total_requests += 1
+
+        try:
+            random_string_name = ''.join(random.choices(string.ascii_letters + string.digits, k=Config.DEFAULT_CONTAINER_ID_LENGTH))
+            image = function_data.get("image", Config.DEFAULT_CONTAINER_IMAGE)
+            function_data["function_name"] = f"fn_{random_string_name}"
+            function_data["image"] = image
+            
+            # Check if we need to create a new container or reuse existing
+            container_id = self._get_or_create_container(function_data["function_name"], image)
+
+            if not container_id:
+                return {
+                    "success": False,
+                    "error": "Failed to create or reuse container",
+                    "execution_time": time.time() - start_time
+                }
+
+            execution_time = time.time() - start_time
+            self.response_times.append(execution_time)
+            result = self.container_manager.execute_container(container_id, function_data)
+            
+            if not self.container_manager.warm_container(container_id):
+                return {
+                    "success": False,
+                    "error": "Failed to create or reuse container",
+                    "execution_time": time.time() - start_time
+                }
+            return {
+                "success": True,
+                "result": result,
+                "function_name": function_data["function_name"],
+                "container_id": container_id,
+                "execution_time": execution_time,
+                "node_id": "central_node"
+            }
+        except Exception as e:
+            self.logger.error(f"Error occurred while executing function: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "execution_time": time.time() - start_time
+            }
+        finally:
+            self.active_requests -= 1
+
+    def _get_or_create_container(self, function_name: str, image: str) -> Optional[str]:
+        # Check for existing warm container for this function
+        containers = self.container_manager.list_containers(ContainerState.WARM)
+        for container in containers:
+            # Reuse existing container (warm start)
+            if time.time() - container.stopped_at > Config.DEFAULT_MAX_WARM_TIME:
+                continue
+
+            if self.container_manager.restart_container(container.container_id, function_name):
+                self.logger.info(f"Warm start for function {function_name}")
+                return container.container_id
+
+        # Create new container (cold start)
+        container_id = self.container_manager.create_container(
+            name=function_name,
+            image=image,
+        )
+
+        if container_id and self.container_manager.start_container(container_id):
+            self.logger.info(f"Cold start for function {function_name}")
+            return container_id
+        return None

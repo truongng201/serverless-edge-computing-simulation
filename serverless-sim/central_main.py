@@ -11,20 +11,27 @@ import os
 from flask import Flask
 from flask_cors import CORS
 
+
+from central_node.control_layer.routes_module.central_route import register_central_route, initialize_central_route
+from central_node.control_layer.routes_module.ui_route import register_ui_route, initialize_ui_route
+from config import Config
+
 # Add the parent directory to sys.path for imports
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-from central_node.api_layer.central_api import register_central_api
-from config import Config
 
 def create_central_node_app():
     """Create Flask app for central node"""
     app = Flask(__name__)
     CORS(app, resources={r"/*": {"origins": "*"}})
+
+    # Initialize and register central node API
+    initialize_central_route()
+    register_central_route(app)
     
-    # Register central node API (includes UI handler)
-    register_central_api(app)
-    
+    # Initialize and register ui endpoint
+    initialize_ui_route()
+    register_ui_route(app)
+
     return app
 
 def setup_logging(log_level: str = "INFO"):
@@ -41,7 +48,7 @@ def setup_logging(log_level: str = "INFO"):
 def main():
     parser = argparse.ArgumentParser(description='Serverless Central Node')
     parser.add_argument('--port', type=int, default=Config.CENTRAL_NODE_PORT,
-                       help='Port to run on (default: 5001)')
+                       help='Port to run on (default: 8000)')
     parser.add_argument('--host', type=str, default='0.0.0.0',
                        help='Host to bind to (default: 0.0.0.0)')
     parser.add_argument('--debug', action='store_true',
@@ -73,13 +80,11 @@ def main():
     logger.info("  ✓ Control Layer (Scheduler, Prediction, Migration, Metrics, Graph, UI, Data)")
     logger.info("  ✓ API Layer (REST endpoints)")
     logger.info("  ✓ Resource Layer (Docker management)")
-    logger.info("  ✓ Legacy UI Compatibility (Integrated)")
     
     logger.info("-" * 60)
     logger.info("Available endpoints:")
     logger.info("  • For simulation UI: http://{}:{}".format(args.host, args.port))
     logger.info("  • Central API: http://{}:{}/api/v1/central".format(args.host, args.port))
-    logger.info("  • Legacy UI Data: http://{}:{}/get_sample".format(args.host, args.port))
     logger.info("  • Health Check: http://{}:{}/api/v1/central/health".format(args.host, args.port))
     logger.info("  • Cluster Status: http://{}:{}/api/v1/central/cluster/status".format(args.host, args.port))
     logger.info("-" * 60)

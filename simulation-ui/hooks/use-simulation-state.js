@@ -60,13 +60,10 @@ export function useSimulationState() {
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
   const [maxCoverageDistance, setMaxCoverageDistance] = useState([100]);
 
-  // Road Network state
-  const [roadMode, setRoadMode] = useState(false);
-  const [roads, setRoads] = useState([]);
-  const [showRoads, setShowRoads] = useState(false);
-
   // Simulation data management using REST API
-  const simulationData = useSimulation('http://localhost:5001', isSimulating, simulationSpeed[0], setUsers);
+  // Disabled to prevent conflicts with ControlPanelContent direct API calls
+  // const simulationData = useSimulation('http://localhost:5001', isSimulating, simulationSpeed[0], setUsers);
+  const simulationData = null; // Temporarily disabled
 
   // Update coverage for existing nodes when slider changes
   useEffect(() => {
@@ -187,12 +184,5 @@ export function useSimulationState() {
     setPlacementAlgorithm,
     maxCoverageDistance,
     setMaxCoverageDistance,
-    roadMode,
-    setRoadMode,
-    roads,
-    setRoads,
-    showRoads,
-    setShowRoads,
-    simulationData,
   };
 }
