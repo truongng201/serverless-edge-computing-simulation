@@ -206,27 +206,75 @@ class CentralCoreController:
         return edge_node
     
     def create_user_node(self, data):
+        user_location = data.get("location", {"x": 0.0, "y": 0.0})
+        
+        # Find nearest node (edge or central)
+        nearest_node_id = self._find_nearest_node(user_location)
+        
         user_node = UserNodeInfo(
             user_id=data.get("user_id"),
-            assigned_node_id=data.get("assigned_node_id", ""),
-            location=data.get("location", {"x": 0.0, "y": 0.0}),
-            size=data.get("size", 0),
-            speed=data.get("speed", 0)
+            assigned_node_id=nearest_node_id,
+            location=user_location,
+            size=data.get("size", 10),
+            speed=data.get("speed", 5)
         )
         self.scheduler.create_user_node(user_node)
         return user_node
+    
+    def _find_nearest_node(self, user_location):
+        """Find the nearest node (edge or central) to the user location"""
+        min_distance = float('inf')
+        nearest_node_id = "central_node"  # default to central node
+        
+        # Check all edge nodes
+        for node_id, edge_node in self.scheduler.edge_nodes.items():
+            distance = self._calculate_distance(
+                user_location, 
+                edge_node.location
+            )
+            if distance < min_distance:
+                min_distance = distance
+                nearest_node_id = node_id
+        
+        # Check central node
+        central_node = self.scheduler.get_central_node_info()
+        central_distance = self._calculate_distance(
+            user_location,
+            central_node["location"]
+        )
+        if central_distance < min_distance:
+            nearest_node_id = "central_node"
+        
+        return nearest_node_id
+    
+    def _calculate_distance(self, location1, location2):
+        """Calculate Euclidean distance between two locations"""
+        dx = location1["x"] - location2["x"]
+        dy = location1["y"] - location2["y"]
+        return (dx ** 2 + dy ** 2) ** 0.5
     
     def get_all_users(self):
         """Get all user nodes"""
         try:
             users = []
             for user_id, user_node in self.scheduler.user_nodes.items():
+                # Determine if assigned to edge or central node
+                assigned_edge = None
+                assigned_central = None
+                
+                if user_node.assigned_node_id == "central_node":
+                    assigned_central = "central_node"
+                elif user_node.assigned_node_id in self.scheduler.edge_nodes:
+                    assigned_edge = user_node.assigned_node_id
+                
                 users.append({
                     "user_id": user_id,
                     "location": user_node.location,
                     "size": user_node.size,
                     "speed": user_node.speed,
                     "assigned_node_id": user_node.assigned_node_id,
+                    "assigned_edge": assigned_edge,
+                    "assigned_central": assigned_central,
                     "latency": 0  # Can be calculated if needed
                 })
             
