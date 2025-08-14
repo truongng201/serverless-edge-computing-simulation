@@ -82,23 +82,27 @@ export default function ControlPanelContent({
       setLoadingData(true)
       setDataError("")
 
-      const response = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/cluster/status`)
+      // Fetch cluster status and all users in parallel
+      const [clusterResponse, usersResponse] = await Promise.all([
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/cluster/status`),
+        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_all_users`)
+      ])
 
-      if (response.data && response.data.success) {
-        setRealModeData(response.data)
+      if (clusterResponse.data && clusterResponse.data.success) {
+        setRealModeData(clusterResponse.data)
         
         
         const realCentralNode = {
-          id: response.data.central_node.id || "central_node",
-          x: response.data.central_node.location.x || 600,
-          y: response.data.central_node.location.y || 400,
-          coverage: response.data.central_node.coverage || centralCoverage[0] || 500,
-          currentLoad: response.data.central_node.cpu_usage || 0,
+          id: clusterResponse.data.central_node.id || "central_node",
+          x: clusterResponse.data.central_node.location.x || 600,
+          y: clusterResponse.data.central_node.location.y || 400,
+          coverage: clusterResponse.data.central_node.coverage || centralCoverage[0] || 500,
+          currentLoad: clusterResponse.data.central_node.cpu_usage || 0,
         }
 
         setCentralNodes([realCentralNode])
         
-        const realEdgeNodes = (response.data.cluster_info.edge_nodes_info || []).map((node, index) => ({
+        const realEdgeNodes = (clusterResponse.data.cluster_info.edge_nodes_info || []).map((node, index) => ({
           id: node.node_id || `edge_${index}`,
           x: node.location.x || 100 + index * 100,
           y: node.location.y || 200 + index * 100,
@@ -109,6 +113,22 @@ export default function ControlPanelContent({
         
         // Always update edge nodes array
         setEdgeNodes(realEdgeNodes)
+
+        // Update users from API response
+        if (usersResponse.data && usersResponse.data.success && usersResponse.data.users) {
+          const realUsers = usersResponse.data.users.map((user, index) => ({
+            id: user.user_id || `user_${index}`,
+            x: user.location.x || 0,
+            y: user.location.y || 0,
+            vx: 0,
+            vy: 0,
+            assignedNode: user.assigned_node_id || null,
+            latency: user.latency || 0,
+            size: user.size || userSize[0] || 10,
+          }))
+          
+          setUsers(realUsers)
+        }
       }
     } catch (error) {
       console.error('Error fetching real cluster status:', error)

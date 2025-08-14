@@ -215,3 +215,30 @@ class CentralCoreController:
         )
         self.scheduler.create_user_node(user_node)
         return user_node
+    
+    def get_all_users(self):
+        """Get all user nodes"""
+        try:
+            users = []
+            for user_id, user_node in self.scheduler.user_nodes.items():
+                users.append({
+                    "user_id": user_id,
+                    "location": user_node.location,
+                    "size": user_node.size,
+                    "speed": user_node.speed,
+                    "assigned_node_id": user_node.assigned_node_id,
+                    "latency": 0  # Can be calculated if needed
+                })
+            
+            return {
+                "success": True,
+                "users": users,
+                "total_count": len(users)
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting all users: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "users": []
+            }

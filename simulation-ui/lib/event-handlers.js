@@ -131,6 +131,42 @@ export const useEventHandlers = (state, actions) => {
         constrainedToRoad: roadMode && assignedRoad !== null
       };
       setUsers((prev) => [...prev, newUser]);
+
+      // Call API to create user node
+      try {
+        const payload = {
+          user_id: newUser.id,
+          location: {
+            x: userX,
+            y: userY
+          },
+          speed: userSpeed[0],
+          size: userSize[0]
+        };
+
+        // Only make API call if NEXT_PUBLIC_API_URL is available
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/create_user_node`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          })
+          .then(response => {
+            if (!response.ok) {
+              console.error('Failed to create user node:', response.statusText);
+            } else {
+              console.log('User node created successfully:', payload);
+            }
+          })
+          .catch(error => {
+            console.error('Error creating user node:', error);
+          });
+        }
+      } catch (error) {
+        console.error('Error preparing user node creation:', error);
+      }
     }
   }, [
     isDragging,

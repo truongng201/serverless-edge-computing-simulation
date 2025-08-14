@@ -86,6 +86,13 @@ def create_user_node():
     else:
         return jsonify({"status": "error", "message": "Node User creation failed"}), 400
 
+@central_route.route("/get_all_users", methods=["GET"])
+def get_all_users():
+    """Get all user nodes"""
+    result = central_core_controller.get_all_users()
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
+
 @central_route.route('/health', methods=['GET'])
 def health_check():
     return jsonify({
