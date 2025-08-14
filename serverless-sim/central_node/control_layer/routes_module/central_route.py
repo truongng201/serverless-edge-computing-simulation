@@ -68,16 +68,51 @@ def predict_workload(node_id):
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
-@central_route.route('/metrics/export', methods=['GET'])
-def export_metrics():
-    duration = request.args.get('duration_hours', default=1, type=int)
-    format_type = request.args.get('format', default='json', type=str)
+@central_route.route("/update_edge_node", methods=["POST"])
+def update_edge_node():
+    node_data = request.get_json()
+    result = central_core_controller.update_edge_node(node_data)
+    if result:
+        return jsonify({"status": "success", "message": "Update edge node success"}), 200
+    else:
+        return jsonify({"status": "error", "message": "Edge node update failed"}), 400
     
-    try:
-        exported_data = central_core_controller.metrics_collector.export_metrics(format_type, duration)
-        return exported_data, 200, {'Content-Type': 'application/json'}
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+@central_route.route("/create_user_node", methods=["POST"])
+def create_user_node():
+    user_data = request.get_json()
+    result = central_core_controller.create_user_node(user_data)
+    if result:
+        return jsonify({"status": "success", "message": "Node user creation success"}), 201
+    else:
+        return jsonify({"status": "error", "message": "Node User creation failed"}), 400
+
+@central_route.route("/update_user_node", methods=["POST"])
+def update_user_node():
+    """Update user node location and recalculate assigned node"""
+    user_data = request.get_json()
+    if not user_data:
+        return jsonify({"status": "error", "message": "No user data provided"}), 400
+    
+    result = central_core_controller.update_user_node(user_data)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route("/get_all_users", methods=["GET"])
+def get_all_users():
+    """Get all user nodes"""
+    result = central_core_controller.get_all_users()
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
+
+@central_route.route('/execute', methods=['POST'])
+def execute_function():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+        
+    data = request.get_json()
+    result = central_core_controller.execute_function(data)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
 
 @central_route.route('/health', methods=['GET'])
 def health_check():

@@ -2,13 +2,13 @@ import logging
 from typing import Dict, Any
 import time
 
-from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo
+from central_node.api_layer.central_controller import CentralNodeAPIController
+
+from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo
+from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
+from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
-from central_node.control_layer.migration import MigrationManager
-from central_node.control_layer.metrics_module.global_metrics import GlobalMetricsCollector
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
-from shared_resource_layer.container_manager import ContainerManager
-from shared_resource_layer.system_metrics import SystemMetricsCollector
 
 
 class CentralCoreController:
@@ -18,60 +18,10 @@ class CentralCoreController:
         # Initialize control layer components
         self.scheduler = Scheduler()
         self.predictor = WorkloadPredictor()
-        self.migration_manager = MigrationManager()
-        self.metrics_collector = GlobalMetricsCollector()
-        self.central_metrics_monitor = SystemMetricsCollector()
-        self.container_manager = ContainerManager()
-        
-        # Start metrics collection and monitoring
-        self.metrics_collector.start_collection()
-        
-        # Initialize with default values, will be updated by get_current_central_metrics()
-        self.container_count = 0
-        self.active_requests = 0
-        self.response_time_avg = 0.0
+        self.central_node_api_controller = CentralNodeAPIController()
+        SchedulerAgent(self.scheduler).start_all_tasks()
+        UsersAgent(self.scheduler).start_all_tasks()
 
-    def get_current_central_metrics(self) -> NodeMetrics:
-        """Get real-time central node metrics"""
-        try:
-            detailed_metrics = self.central_metrics_monitor.get_detailed_metrics()
-            
-            return NodeMetrics(
-                node_id="central_node",
-                timestamp=detailed_metrics.get('timestamp', time.time()),
-                cpu_usage=detailed_metrics.get('cpu_usage', 0.0),
-                memory_usage=detailed_metrics.get('memory_usage', 0.0),
-                network_io=detailed_metrics.get('network_io', {}),
-                disk_io=detailed_metrics.get('disk_io', {}),
-                container_count=self.container_count,
-                active_requests=self.active_requests,
-                response_time_avg=self.response_time_avg,
-                energy_consumption=detailed_metrics.get('cpu_energy_kwh', 0.0)
-            )
-        except Exception as e:
-            self.logger.error(f"Failed to get central metrics: {e}")
-            # Return default metrics if collection fails
-            return NodeMetrics(
-                node_id="central_node",
-                timestamp=time.time(),
-                cpu_usage=0.0,
-                memory_usage=0.0,
-                network_io={},
-                disk_io={},
-                container_count=self.container_count,
-                active_requests=self.active_requests,
-                response_time_avg=self.response_time_avg,
-                energy_consumption=0.0
-            )
-
-    def update_central_node_stats(self, container_count: int = None, active_requests: int = None, response_time_avg: float = None):
-        """Update central node dynamic statistics"""
-        if container_count is not None:
-            self.container_count = container_count
-        if active_requests is not None:
-            self.active_requests = active_requests
-        if response_time_avg is not None:
-            self.response_time_avg = response_time_avg
 
     def schedule_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
         """Schedule a request to an edge node"""
@@ -104,14 +54,31 @@ class CentralCoreController:
     def register_edge_node(self, node_data: Dict[str, Any]) -> Dict[str, Any]:
         """Register a new edge node"""
         try:
-            
+            node_metrics = NodeMetrics(
+                node_id=node_data["node_id"],
+                cpu_usage=0.0,
+                memory_usage=0.0,
+                memory_total=0,
+                running_container=0,
+                warm_container=0,
+                active_requests=0,
+                total_requests=0,
+                response_time_avg=0.0,
+                energy_consumption=0.0,
+                load_average=[],
+                network_io={},
+                disk_io={},
+                timestamp=0,
+                uptime=0
+            )
+
             node_info = EdgeNodeInfo(
                 node_id=node_data["node_id"],
                 endpoint=node_data["endpoint"],
                 location=node_data.get("location", {"x": 0.0, "y": 0.0}),
-                current_load=0.0,
-                available_resources=node_data.get("resources", {}),
-                last_heartbeat=time.time()
+                system_info=node_data.get("system_info", {}),
+                last_heartbeat=time.time(),
+                metrics_info=node_metrics
             )
             
             self.scheduler.register_edge_node(node_info)
@@ -129,42 +96,37 @@ class CentralCoreController:
                 "code": "REGISTRATION_ERROR"
             }
             
-    def update_node_metrics(self, node_id: str, metrics_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Update metrics from an edge node"""
+    def update_node_metrics(self, node_id: str, request_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
-            # Update scheduler with basic metrics (this will also clean up dead nodes)
-            self.scheduler.update_node_metrics(node_id, metrics_data)
-            
             # Add to global metrics collection
             node_metrics = NodeMetrics(
                 node_id=node_id,
-                timestamp=time.time(),
-                cpu_usage=metrics_data.get("cpu_usage", 0.0),
-                memory_usage=metrics_data.get("memory_usage", 0.0),
-                network_io=metrics_data.get("network_io", {}),
-                disk_io=metrics_data.get("disk_io", {}),
-                container_count=metrics_data.get("container_count", 0),
-                active_requests=metrics_data.get("active_requests", 0),
-                response_time_avg=metrics_data.get("response_time_avg", 0.0),
-                energy_consumption=metrics_data.get("energy_consumption", 0.0)
+                cpu_usage=request_data.get("cpu_usage", 0.0),
+                memory_usage=request_data.get("memory_usage", 0.0),
+                memory_total=request_data.get("memory_total", 0),
+                running_container=request_data.get("running_container", 0),
+                warm_container=request_data.get("warm_container", 0),
+                active_requests=request_data.get("active_requests", 0),
+                total_requests=request_data.get("total_requests", 0),
+                response_time_avg=request_data.get("response_time_avg", 0.0),
+                energy_consumption=request_data.get("energy_consumption", 0.0),
+                load_average=request_data.get("load_average", []),
+                network_io=request_data.get("network_io", {}),
+                disk_io=request_data.get("disk_io", {}),
+                timestamp=request_data.get("timestamp", 0),
+                uptime=request_data.get("uptime", 0)
             )
-            
-            self.metrics_collector.add_node_metrics(node_metrics)
-            
-            # Check if migration is needed
-            migration_reason = self.migration_manager.should_migrate_container(
-                {"node_id": node_id}, metrics_data
-            )
-            
-            migration_suggested = migration_reason is not None
-            
+            system_info = request_data.get("system_info", {})
+            endpoint = request_data.get("endpoint", "")
+
+            self.scheduler.update_node_metrics(node_id, node_metrics, system_info, endpoint)
+
             # Log the heartbeat
-            self.logger.debug(f"Received metrics from node {node_id}: CPU={metrics_data.get('cpu_usage', 0):.1f}%, Memory={metrics_data.get('memory_usage', 0):.1f}%")
+            self.logger.debug(f"Received metrics from node {node_id}: CPU={request_data.get('cpu_usage', 0):.1f}%, Memory={request_data.get('memory_usage', 0):.1f}%")
             
             return {
                 "success": True,
-                "migration_suggested": migration_suggested,
-                "migration_reason": migration_reason.value if migration_reason else None
+                "message": f"Metrics for node {node_id} updated successfully"
             }
             
         except Exception as e:
@@ -179,23 +141,19 @@ class CentralCoreController:
         """Get overall cluster status including central node metrics"""
         try:
             scheduler_status = self.scheduler.get_cluster_status()
-            health_summary = self.metrics_collector.get_cluster_health_summary()
-            migration_stats = self.migration_manager.get_migration_stats()
-            
-            # Get real-time central node metrics
-            central_metrics = self.get_current_central_metrics()
-            
+            central_node_status = self.central_node_api_controller.get_central_node_status()
+            central_node_status["location"] = self.scheduler.get_central_node_info().get("location", {"x": 0.0, "y": 0.0})
+            central_node_status["coverage"] = self.scheduler.get_central_node_info().get("coverage", 0)
             return {
                 "success": True,
+                "central_node": central_node_status,
                 "cluster_info": scheduler_status,
-                "central_node": central_metrics,
-                "health": health_summary,
-                "migrations": migration_stats,
                 "timestamp": time.time()
             }
             
         except Exception as e:
-            self.logger.error(f"Cluster status failed: {e}")
+            
+            self.logger.error(f"Cluster status failed: {e}", exc_info=True)
             return {
                 "success": False,
                 "error": str(e),
@@ -232,39 +190,134 @@ class CentralCoreController:
                 "code": "PREDICTION_ERROR"
             }
 
-    def cleanup_dead_nodes(self) -> Dict[str, Any]:
-        """Manually trigger cleanup of dead nodes"""
+    def update_edge_node(self, data):
+        new_location = data.get("location", None)
+        
+        if not new_location:
+            return None
+
+        # Update the node's location
+        edge_node = self.scheduler.edge_nodes.get(data.get("node_id", None))
+        print(edge_node)
+        if not edge_node:
+            return None
+
+        edge_node.location = new_location
+        self.scheduler.update_edge_node_info(edge_node)
+
+        return edge_node
+    
+    def create_user_node(self, data):
+        user_location = data.get("location", {"x": 0.0, "y": 0.0})
+        
+        # Find nearest node (edge or central) using scheduler method
+        nearest_node_id = self.scheduler._find_nearest_node(user_location)
+        
+        user_node = UserNodeInfo(
+            user_id=data.get("user_id"),
+            assigned_node_id=nearest_node_id,
+            location=user_location,
+            size=data.get("size", 10),
+            speed=data.get("speed", 5)
+        )
+        self.scheduler.create_user_node(user_node)
+        return user_node
+    
+    def update_user_node(self, data):
+        """Update user node location and recalculate assigned node"""
         try:
-            # Get status before cleanup
-            status_before = self.scheduler.get_cluster_status()
-            nodes_before = status_before["total_nodes"]
+            user_id = data.get("user_id")
+            new_location = data.get("location", {})
             
-            # Trigger cleanup in scheduler
-            self.scheduler._cleanup_dead_nodes()
+            if not user_id:
+                self.logger.error("User ID is required for user node update")
+                return {
+                    "success": False,
+                    "error": "User ID is required"
+                }
             
-            # Trigger cleanup in metrics collector
-            metrics_nodes_removed = self.metrics_collector.cleanup_dead_nodes()
+            if not new_location or "x" not in new_location or "y" not in new_location:
+                self.logger.error("Valid location (x, y) is required for user node update")
+                return {
+                    "success": False,
+                    "error": "Valid location (x, y) is required"
+                }
             
-            # Get status after cleanup
-            status_after = self.scheduler.get_cluster_status()
-            nodes_after = status_after["total_nodes"]
+            # Update user node in scheduler
+            success = self.scheduler.update_user_node(user_id, new_location)
             
-            removed_count = nodes_before - nodes_after
+            if success:
+                # Get updated user info
+                updated_user = self.scheduler.user_nodes.get(user_id)
+                if updated_user:
+                    return {
+                        "success": True,
+                        "message": f"User {user_id} updated successfully",
+                        "user": {
+                            "user_id": updated_user.user_id,
+                            "location": updated_user.location,
+                            "assigned_node_id": updated_user.assigned_node_id,
+                            "size": updated_user.size,
+                            "speed": updated_user.speed
+                        }
+                    }
             
             return {
-                "success": True,
-                "scheduler_nodes_removed": removed_count,
-                "metrics_nodes_removed": metrics_nodes_removed,
-                "total_nodes_before": nodes_before,
-                "total_nodes_after": nodes_after,
-                "healthy_nodes": status_after["healthy_nodes"],
-                "unhealthy_nodes": status_after["unhealthy_nodes"]
+                "success": False,
+                "error": f"Failed to update user {user_id}"
             }
             
         except Exception as e:
-            self.logger.error(f"Dead node cleanup failed: {e}")
+            self.logger.error(f"Error updating user node: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def get_all_users(self):
+        """Get all user nodes"""
+        try:
+            users = []
+            for user_id, user_node in self.scheduler.user_nodes.items():
+                # Determine if assigned to edge or central node
+                assigned_edge = None
+                assigned_central = None
+                
+                if user_node.assigned_node_id == "central_node":
+                    assigned_central = "central_node"
+                elif user_node.assigned_node_id in self.scheduler.edge_nodes:
+                    assigned_edge = user_node.assigned_node_id
+                
+                users.append({
+                    "user_id": user_id,
+                    "location": user_node.location,
+                    "size": user_node.size,
+                    "speed": user_node.speed,
+                    "assigned_node_id": user_node.assigned_node_id,
+                    "assigned_edge": assigned_edge,
+                    "assigned_central": assigned_central,
+                    "latency": 0  # Can be calculated if needed
+                })
+            
+            return {
+                "success": True,
+                "users": users,
+                "total_count": len(users)
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting all users: {e}")
             return {
                 "success": False,
                 "error": str(e),
-                "code": "CLEANUP_ERROR"
+                "users": []
+            }
+            
+    def execute_function(self, data):
+        try:
+            return self.central_node_api_controller.execute_function(data)
+        except Exception as e:
+            self.logger.error(f"Error executing function: {e}")
+            return {
+                "success": False,
+                "error": str(e)
             }

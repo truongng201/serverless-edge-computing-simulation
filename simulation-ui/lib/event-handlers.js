@@ -131,6 +131,42 @@ export const useEventHandlers = (state, actions) => {
         constrainedToRoad: roadMode && assignedRoad !== null
       };
       setUsers((prev) => [...prev, newUser]);
+
+      // Call API to create user node
+      try {
+        const payload = {
+          user_id: newUser.id,
+          location: {
+            x: userX,
+            y: userY
+          },
+          speed: userSpeed[0],
+          size: userSize[0]
+        };
+
+        // Only make API call if NEXT_PUBLIC_API_URL is available
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/create_user_node`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          })
+          .then(response => {
+            if (!response.ok) {
+              console.error('Failed to create user node:', response.statusText);
+            } else {
+              console.log('User node created successfully:', payload);
+            }
+          })
+          .catch(error => {
+            console.error('Error creating user node:', error);
+          });
+        }
+      } catch (error) {
+        console.error('Error preparing user node creation:', error);
+      }
     }
   }, [
     isDragging,
@@ -277,6 +313,9 @@ export const useEventHandlers = (state, actions) => {
         )
       );
 
+      // Update draggedUser with current position for API call
+      setDraggedUser(prev => ({ ...prev, x: newX, y: newY }));
+
       // Update selected user if it's the one being dragged
       if (selectedUser && selectedUser.id === draggedUser.id) {
         setSelectedUser((prev) => ({ ...prev, x: newX, y: newY }));
@@ -302,6 +341,11 @@ export const useEventHandlers = (state, actions) => {
               : edge
           )
         );
+        // Update draggedNode with current position for API call
+        setDraggedNode(prev => ({
+          ...prev,
+          node: { ...prev.node, x: newX, y: newY }
+        }));
       } else if (draggedNode.type === "central") {
         setCentralNodes((prev) =>
           prev.map((central) =>
@@ -310,6 +354,11 @@ export const useEventHandlers = (state, actions) => {
               : central
           )
         );
+        // Update draggedNode with current position
+        setDraggedNode(prev => ({
+          ...prev,
+          node: { ...prev.node, x: newX, y: newY }
+        }));
       }
     } else {
       setIsDragging(true);
@@ -332,10 +381,77 @@ export const useEventHandlers = (state, actions) => {
     setSelectedUser,
     setEdgeNodes,
     setCentralNodes,
-    setIsDragging
+    setIsDragging,
+    setDraggedNode
   ]);
 
-  const handleMouseUp = useCallback(() => {
+  const handleMouseUp = useCallback(async () => {
+    // Handle API call for edge node position update
+    if (isDraggingNode && draggedNode && draggedNode.type === "edge") {
+      try {
+        const payload = {
+          node_id: draggedNode.node.id,
+          location: {
+            x: Math.round(draggedNode.node.x),
+            y: Math.round(draggedNode.node.y)
+          }
+        };
+
+        // Only make API call if NEXT_PUBLIC_API_URL is available
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_edge_node`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            console.error('Failed to update edge node position:', response.statusText);
+          } else {
+            console.log('Edge node position updated successfully:', payload);
+          }
+        }
+      } catch (error) {
+        console.error('Error updating edge node position:', error);
+      }
+    }
+
+    // Handle API call for user position update
+    if (isDraggingUser && draggedUser) {
+      try {
+        const payload = {
+          user_id: draggedUser.id,
+          location: {
+            x: draggedUser.x,
+            y: draggedUser.y
+          }
+        };
+        console.log(payload)
+        // Only make API call if NEXT_PUBLIC_API_URL is available
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_user_node`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            console.error('Failed to update user position:', response.statusText);
+          } else {
+            const result = await response.json();
+            console.log('User position updated successfully:', result);
+            
+          }
+        }
+      } catch (error) {
+        console.error('Error updating user position:', error);
+      }
+    }
+
     setIsPanning(false);
     setIsDraggingNode(false);
     setIsDraggingUser(false);
@@ -343,12 +459,16 @@ export const useEventHandlers = (state, actions) => {
     setDraggedUser(null);
     setTimeout(() => setIsDragging(false), 100);
   }, [
+    isDraggingNode,
+    draggedNode,
+    isDraggingUser,
+    draggedUser,
     setIsPanning,
     setIsDraggingNode,
     setIsDraggingUser,
     setDraggedNode,
     setDraggedUser,
-    setIsDragging
+    setIsDragging,
   ]);
 
   // Zoom functions
