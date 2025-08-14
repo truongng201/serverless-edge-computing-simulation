@@ -70,7 +70,6 @@ export default function ControlPanelContent({
   realModeData,
   setRealModeData
 }) {
-  const [dataType, setDataType] = useState("none")
   const [loadingData, setLoadingData] = useState(false)
   const [dataError, setDataError] = useState("")
   const intervalRef = useRef(null)
@@ -143,190 +142,11 @@ export default function ControlPanelContent({
     }
   }
 
-  // Generic function to fetch sample data with step
-  const fetchSampleData = async (endpoint, step) => {
-    try {
-      // Start transition effect
-      setIsTransitioning(true);
-      setStepProgress(0);
-      
-      // First, immediately clear all users to prevent mixing old and new
-      setUsers([]);
-      
-      const params = { step_id: step };
-      
-      // Simulate progress for better UX
-      setStepProgress(25);
-      
-      const res = await axios.get(`${process.env.NEXT_PUBLIC_API_URL}${endpoint}`, { params });
-      
-      setStepProgress(50);
-      
-      if (!res.data || res.data.status !== "success") {
-        throw new Error(`Failed to fetch data from ${endpoint}`);
-      }
-      
-      console.log(`Data from ${endpoint} at step ${step}:`, res.data);
-      
-      setStepProgress(75);
-      
-      // Extract user data and ensure it's an array
-      let userData = res.data.data;
-      if (userData && userData.items) {
-        userData = userData.items;
-      }
-      
-      if (!Array.isArray(userData)) {
-        console.warn("Expected array but got:", typeof userData, userData);
-        userData = [];
-      }
-      
-      // Always process the data, even if empty - this ensures complete replacement
-      const processedUsers = userData.map((user, index) => ({
-        id: user.id || `user_${step}_${index}`,
-        x: Number(user.x) || 0, // Use actual coordinates from backend, default to 0
-        y: Number(user.y) || 0, // Use actual coordinates from backend, default to 0
-        ...user,
-        // Add default properties if missing
-        vx: 0, // Set to 0 to prevent frontend movement
-        vy: 0, // Set to 0 to prevent frontend movement
-        manualConnection: user.manualConnection || false,
-        latency: user.latency || 0,
-        assignedRoad: user.assignedRoad || null,
-        roadDirection: user.roadDirection || 1,
-        constrainedToRoad: user.constrainedToRoad || false,
-        isBackendControlled: true, // Flag to indicate this user is controlled by backend
-        // Add transition properties for smooth animation
-        opacity: 0,
-        scale: 0.8
-      }));
-      
-      console.log(`Setting ${processedUsers.length} new users from ${endpoint} at step ${step}`);
-      
-      setStepProgress(100);
-      
-      // Use setTimeout to ensure the clear operation completes before setting new users
-      setTimeout(() => {
-        setUsers(processedUsers);
-        
-        // Animate users in smoothly
-        setTimeout(() => {
-          setUsers(prev => prev.map(user => ({
-            ...user,
-            opacity: 1,
-            scale: 1
-          })));
-        }, 50);
-        
-        // End transition after animation
-        if (transitionTimeoutRef.current) {
-          clearTimeout(transitionTimeoutRef.current);
-        }
-        transitionTimeoutRef.current = setTimeout(() => {
-          setIsTransitioning(false);
-          setStepProgress(0);
-        }, 300);
-      }, 10);
-      
-    } catch (err) {
-      console.error(`Error fetching from ${endpoint}:`, err);
-      setDataError(err.message);
-      setIsTransitioning(false);
-      setStepProgress(0);
-    }
-  };
-  // API call for DACT sample
-  const fetchDACTSample = async () => {
-    setLoadingData(true)
-    setDataError("")
-    try {
-      await fetchSampleData("/get_dact_sample", 659);
-    } finally {
-      setLoadingData(false);
-    }
-  }
+  
 
-  // API call for Vehicle sample
-  const fetchVehicleSample = async () => {
-    setLoadingData(true)
-    setDataError("")
-    try {
-      await fetchSampleData("/get_sample", 28800);
-    } finally {
-      setLoadingData(false);
-    }
-  }
 
-  // Handle data type change
-  const handleDataTypeChange = async (value) => {
-    setDataType(value)
-    
-    // Always clear users first to prevent mixing
-    setUsers([]);
-    
-    // If switching to "none", restore normal user movement
-    if (value === "none") {
-      // Don't restore any users - let user manually add them
-      console.log("Switched to none mode - users cleared");
-    } else if (value === "dact") {
-      // Clear all existing users first, then load DACT data
-      console.log("Loading DACT data...");
-      setCurrentStep(659); // Set initial step for DACT
-      await fetchDACTSample()
-    } else if (value === "vehicle") {
-      // Clear all existing users first, then load vehicle data
-      console.log("Loading Vehicle data...");
-      setCurrentStep(28800); // Set initial step for Vehicle
-      await fetchVehicleSample()
-    }
-    
-    // If real mode was active, maintain it after data type change
-    if (simulationMode === "real") {
-      // Re-initialize real mode to ensure it continues working
-      await handleSimulationModeChange("real")
-    }
-  }
-
-  // Effect to handle simulation intervals
   useEffect(() => {
-    if (isSimulating && dataType !== "none") {
-      console.log(`Starting simulation for ${dataType} at step ${currentStep}`);
-      
-      // Clear any existing interval
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      
-      // Set up interval to fetch data every 1 second with smooth transitions
-      intervalRef.current = setInterval(() => {
-        setCurrentStep(prevStep => {
-          const nextStep = prevStep + 1;
-          console.log(`Fetching next step: ${nextStep} (previous was ${prevStep})`);
-          
-          // Determine endpoint based on dataType
-          const endpoint = dataType === "dact" ? "/get_dact_sample" : "/get_sample";
-          
-          // Use the nextStep directly in the async call to avoid closure issues
-          (async () => {
-            try {
-              await fetchSampleData(endpoint, nextStep);
-            } catch (error) {
-              console.error(`Error fetching step ${nextStep}:`, error);
-            }
-          })();
-          
-          return nextStep;
-        });
-      }, Math.max(500, 2000 / simulationSpeed[0])); // Adjust interval based on simulation speed, minimum 500ms
-
-    } else {
-      console.log("Stopping simulation");
-      // Clear interval when simulation stops
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-    }
+    
 
     // Cleanup on unmount
     return () => {
@@ -336,11 +156,8 @@ export default function ControlPanelContent({
       if (realModeIntervalRef.current) {
         clearInterval(realModeIntervalRef.current);
       }
-      if (transitionTimeoutRef.current) {
-        clearTimeout(transitionTimeoutRef.current);
-      }
     };
-  }, [isSimulating, dataType, simulationSpeed]);
+  }, [isSimulating, simulationSpeed]);
 
   // Override resetSimulation to stop intervals
   const handleResetSimulation = () => {
@@ -359,7 +176,6 @@ export default function ControlPanelContent({
     setIsSimulating(false);
     setSimulationMode("demo");
     setRealModeData(null);
-    setIsTransitioning(false);
     setStepProgress(0);
     resetSimulation();
   };
@@ -596,11 +412,6 @@ export default function ControlPanelContent({
             <div className="space-y-2">
               <Label className="text-xs">
                 Speed: {simulationSpeed[0]}x 
-                {isSimulating && dataType !== "none" && (
-                  <span className="text-blue-600 ml-1">
-                    ({Math.max(500, 2000 / simulationSpeed[0])}ms intervals)
-                  </span>
-                )}
               </Label>
               <Slider value={simulationSpeed} onValueChange={setSimulationSpeed} max={5} min={0.1} step={0.1} />
               <div className="text-xs text-gray-500">
