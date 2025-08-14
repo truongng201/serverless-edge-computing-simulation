@@ -12,8 +12,8 @@ from flask import Flask
 from flask_cors import CORS
 
 
-from central_node.control_layer.routes.central_route import register_central_route, initialize_central_route
-from central_node.control_layer.routes.ui_routes import register_ui_route, initialize_ui_route
+from central_node.control_layer.routes_module.central_route import register_central_route, initialize_central_route
+from central_node.control_layer.routes_module.ui_route import register_ui_route, initialize_ui_route
 from config import Config
 
 # Add the parent directory to sys.path for imports
