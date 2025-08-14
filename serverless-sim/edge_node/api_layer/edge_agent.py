@@ -62,7 +62,7 @@ class EdgeNodeAPIAgent:
             registration_data = {
                 "node_id": self.node_id,
                 "endpoint": f"{self.edge_node_url}:{self.node_port}",
-                "location": {"x": 0.0, "y": 0.0},
+                "location": {"x": 300, "y": 200},
                 "system_info": self.metrics_collector.get_system_info()
             }
             

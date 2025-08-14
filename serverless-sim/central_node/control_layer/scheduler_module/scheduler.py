@@ -27,7 +27,7 @@ class EdgeNodeInfo:
     system_info: Dict[str, Any]
     last_heartbeat: float
     metrics_info: NodeMetrics
-
+    
 @dataclass
 class SchedulingDecision:
     target_node_id: str
@@ -39,9 +39,18 @@ class Scheduler:
     def __init__(self, strategy: SchedulingStrategy = SchedulingStrategy.ROUND_ROBIN):
         self.strategy = strategy
         self.edge_nodes: Dict[str, EdgeNodeInfo] = {}
+        self.central_node = {
+            "node_id": "central_node",
+            "endpoint": "http://central-node:8000",
+            "location": {"x": 600, "y": 400}, # default location
+            "coverage": 500 # default coverage
+        }
         self.round_robin_index = 0
         self.logger = logging.getLogger(__name__)
-        
+
+    def get_central_node_info(self) -> Dict[str, Any]:
+        return self.central_node
+
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:
             raise Exception(f"Node {node_info.node_id} is already registered")
