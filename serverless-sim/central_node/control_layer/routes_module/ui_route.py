@@ -81,15 +81,6 @@ def delete_user():
     else:
         return jsonify({"status": "error", "message": "User deletion failed"}), 400
 
-@ui_route.route("/update_node", methods=["POST"])
-def update_node():
-    node_data = request.get_json()
-    result = None
-    if result:
-        return jsonify({"status": "success", "data": result}), 200
-    else:
-        return jsonify({"status": "error", "message": "Node update failed"}), 400
-
 @ui_route.route("/get_node_user_assignment", methods=["GET"])
 def get_node_user_assignment():
     node_id = request.args.get("node_id")

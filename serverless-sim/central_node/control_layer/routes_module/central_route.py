@@ -68,16 +68,14 @@ def predict_workload(node_id):
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
-@central_route.route('/metrics/export', methods=['GET'])
-def export_metrics():
-    duration = request.args.get('duration_hours', default=1, type=int)
-    format_type = request.args.get('format', default='json', type=str)
-    
-    try:
-        exported_data = central_core_controller.metrics_collector.export_metrics(format_type, duration)
-        return exported_data, 200, {'Content-Type': 'application/json'}
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
+@central_route.route("/update_edge_node", methods=["POST"])
+def update_edge_node():
+    node_data = request.get_json()
+    result = central_core_controller.update_edge_node(node_data)
+    if result:
+        return jsonify({"status": "success", "message": "Update edge node success"}), 200
+    else:
+        return jsonify({"status": "error", "message": "Edge node update failed"}), 400
 
 @central_route.route('/health', methods=['GET'])
 def health_check():

@@ -193,3 +193,8 @@ class Scheduler:
             "warning_node_count": len(classified_nodes["warning"]),
             "warning_node_list": list(classified_nodes["warning"]),
         }
+
+    def update_edge_node_info(self, new_edge_node: EdgeNodeInfo):
+        if new_edge_node.node_id not in self.edge_nodes:
+            return
+        self.edge_nodes[new_edge_node.node_id] = new_edge_node

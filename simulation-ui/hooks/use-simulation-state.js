@@ -22,17 +22,15 @@ export function useSimulationState() {
   const [selectedCentral, setSelectedCentral] = useState(null);
 
   // User settings
-  const [userSpeed, setUserSpeed] = useState([2]);
-  const [userSize, setUserSize] = useState([8]);
+  const [userSpeed, setUserSpeed] = useState([5]);
+  const [userSize, setUserSize] = useState([10]);
   const [predictionSteps, setPredictionSteps] = useState([10]);
 
   // Edge settings
-  const [edgeCapacity, setEdgeCapacity] = useState([100]);
-  const [edgeCoverage, setEdgeCoverage] = useState([80]);
+  const [edgeCoverage, setEdgeCoverage] = useState([500]);
 
   // Central node settings
-  const [centralCapacity, setCentralCapacity] = useState([500]);
-  const [centralCoverage, setCentralCoverage] = useState([150]);
+  const [centralCoverage, setCentralCoverage] = useState([500]);
 
   // Zoom and Pan state
   const [zoomLevel, setZoomLevel] = useState(1);
@@ -59,11 +57,6 @@ export function useSimulationState() {
   // Auto Placement state
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
   const [maxCoverageDistance, setMaxCoverageDistance] = useState([100]);
-
-  // Simulation data management using REST API
-  // Disabled to prevent conflicts with ControlPanelContent direct API calls
-  // const simulationData = useSimulation('http://localhost:5001', isSimulating, simulationSpeed[0], setUsers);
-  const simulationData = null; // Temporarily disabled
 
   // Update coverage for existing nodes when slider changes
   useEffect(() => {
@@ -144,12 +137,8 @@ export function useSimulationState() {
     setUserSize,
     predictionSteps,
     setPredictionSteps,
-    edgeCapacity,
-    setEdgeCapacity,
     edgeCoverage,
     setEdgeCoverage,
-    centralCapacity,
-    setCentralCapacity,
     centralCoverage,
     setCentralCoverage,
     zoomLevel,

@@ -1,18 +1,12 @@
 // Node Management Functions
 
-export const addEdgeNode = (edgeNodes, edgeCapacity, edgeCoverage, setEdgeNodes) => {
+export const addEdgeNode = (edgeNodes, edgeCoverage, setEdgeNodes) => {
   const newEdge = {
     id: `edge-${edgeNodes.length + 1}`,
     x: Math.random() * (window.innerWidth - 200) + 100,
     y: Math.random() * (window.innerHeight - 200) + 100,
-    capacity: edgeCapacity[0],
     currentLoad: 0,
-    replicas: [],
     coverage: edgeCoverage[0],
-    isWarm: false,
-    lastAccessTime: null,
-    lastMetrics: null,
-    type: "cloudlet"
   };
   setEdgeNodes((prev) => [...prev, newEdge]);
 };
@@ -27,19 +21,13 @@ export const removeEdgeNode = (edgeNodes, selectedEdge, setEdgeNodes, setSelecte
   }
 };
 
-export const addCentralNode = (centralNodes, centralCapacity, centralCoverage, setCentralNodes) => {
+export const addCentralNode = (centralNodes, centralCoverage, setCentralNodes) => {
   const newCentral = {
     id: `central-${centralNodes.length + 1}`,
     x: Math.random() * (window.innerWidth - 400) + 200,
     y: Math.random() * (window.innerHeight - 400) + 200,
-    capacity: centralCapacity[0],
     currentLoad: 0,
     coverage: centralCoverage[0],
-    type: "main",
-    isWarm: false,
-    lastAccessTime: null,
-    lastMetrics: null,
-    nodeType: "cloud"
   };
   setCentralNodes((prev) => [...prev, newCentral]);
 };

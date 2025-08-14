@@ -41,7 +41,6 @@ export default function Component() {
   const nodeActions = {
     addEdgeNode: () => NodeManagement.addEdgeNode(
       state.edgeNodes, 
-      state.edgeCapacity, 
       state.edgeCoverage, 
       state.setEdgeNodes
     ),
@@ -53,7 +52,6 @@ export default function Component() {
     ),
     addCentralNode: () => NodeManagement.addCentralNode(
       state.centralNodes, 
-      state.centralCapacity, 
       state.centralCoverage, 
       state.setCentralNodes
     ),
@@ -224,12 +222,8 @@ export default function Component() {
           resetZoom={eventHandlers.resetZoom}
           predictionSteps={state.predictionSteps}
           setPredictionSteps={state.setPredictionSteps}
-          edgeCapacity={state.edgeCapacity}
-          setEdgeCapacity={state.setEdgeCapacity}
           edgeCoverage={state.edgeCoverage}
           setEdgeCoverage={state.setEdgeCoverage}
-          centralCapacity={state.centralCapacity}
-          setCentralCapacity={state.setCentralCapacity}
           centralCoverage={state.centralCoverage}
           setCentralCoverage={state.setCentralCoverage}
           zoomLevel={state.zoomLevel}

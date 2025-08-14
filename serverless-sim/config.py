@@ -22,7 +22,7 @@ class Config:
     
     # Cleanup
     CLEANUP_WARM_CONTAINERS_INTERVAL = 5  # seconds
-    CLEANUP_DEAD_NODES_INTERVAL = 5  # seconds
+    CLEANUP_DEAD_NODES_INTERVAL = 10  # seconds
 
     # Metrics Collection
     METRICS_COLLECTION_INTERVAL = 5  # seconds
@@ -30,7 +30,7 @@ class Config:
     # Node Configuration
     CENTRAL_NODE_PORT = 8000
     EDGE_NODE_PORT_RANGE = (8001, 8100)
-    EDGE_NODE_HEARTBEAT_TIMEOUT = 5  # seconds
+    EDGE_NODE_HEARTBEAT_TIMEOUT = 10  # seconds
     EDGE_NODE_UNHEALTHY_CPU_THRESHOLD = 90  # 90% CPU usage
     EDGE_NODE_UNHEALTHY_MEMORY_THRESHOLD = 90  # 90% memory usage
     EDGE_NODE_WARNING_CPU_THRESHOLD = 70  # 70% CPU usage

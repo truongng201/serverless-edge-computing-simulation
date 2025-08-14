@@ -188,4 +188,19 @@ class CentralCoreController:
                 "code": "PREDICTION_ERROR"
             }
 
-    
+    def update_edge_node(self, data):
+        new_location = data.get("location", None)
+        
+        if not new_location:
+            return None
+
+        # Update the node's location
+        edge_node = self.scheduler.edge_nodes.get(data.get("node_id", None))
+        print(edge_node)
+        if not edge_node:
+            return None
+
+        edge_node.location = new_location
+        self.scheduler.update_edge_node_info(edge_node)
+
+        return edge_node

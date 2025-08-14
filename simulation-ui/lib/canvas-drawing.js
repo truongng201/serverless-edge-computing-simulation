@@ -331,6 +331,7 @@ const drawEdgeNodes = (ctx, edgeNodes, selectedEdge, editMode, visibleLeft, visi
     ctx.fillText(edge.id, edge.x, edge.y - 35);
     
     // Handle both decimal (0-1) and percentage (0-100) formats
+    console.log(edge.currentLoad)
     const displayLoad = edge.currentLoad <= 1 ? edge.currentLoad * 100 : edge.currentLoad;
     ctx.fillText(`${Math.round(displayLoad)}%`, edge.x, edge.y + 45);
   });

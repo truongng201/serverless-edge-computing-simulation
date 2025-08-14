@@ -8,7 +8,6 @@ export const useSimulationLogic = (state, actions) => {
     roadMode,
     roads,
     userSpeed,
-    users
   } = state;
 
   const { setUsers } = actions;
