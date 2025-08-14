@@ -5,6 +5,7 @@ import time
 from central_node.api_layer.central_controller import CentralNodeAPIController
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo
+from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 
@@ -17,6 +18,7 @@ class CentralCoreController:
         self.scheduler = Scheduler()
         self.predictor = WorkloadPredictor()
         self.central_node_api_controller = CentralNodeAPIController()
+        SchedulerAgent(self.scheduler).start_all_tasks()
 
 
     def schedule_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:

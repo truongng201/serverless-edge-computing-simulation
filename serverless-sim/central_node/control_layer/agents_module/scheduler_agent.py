@@ -55,3 +55,9 @@ class SchedulerAgent:
         if self.cleanup_thread:
             self.cleanup_thread.join()
         self.logger.info("Cleanup dead nodes thread stopped")
+        
+    def start_all_tasks(self):
+        self.start_cleanup_dead_nodes_containers()
+        
+    def stop_all_tasks(self):
+        self.stop_cleanup_dead_nodes_containers()

@@ -183,3 +183,11 @@ class EdgeNodeAPIAgent:
         if self.cleanup_thread:
             self.cleanup_thread.join()
         self.logger.info("Cleanup thread stopped")
+
+    def start_all_tasks(self):
+        self.start_metrics_reporting()
+        self.start_cleanup_containers()
+
+    def end_all_tasks(self):
+        self.stop_metrics_reporting()
+        self.stop_cleanup_containers()

@@ -133,7 +133,6 @@ class Scheduler:
         }
 
         for node in self.edge_nodes.values():
-            print(node.metrics_info.cpu_usage, node.metrics_info.memory_usage)
             if node.metrics_info.cpu_usage < Config.EDGE_NODE_WARNING_CPU_THRESHOLD and \
                node.metrics_info.memory_usage < Config.EDGE_NODE_WARNING_CPU_THRESHOLD:
                 classified_nodes["healthy"].add(node.node_id)
