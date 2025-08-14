@@ -4,17 +4,20 @@ from typing import Optional
 from flask import Flask, request, jsonify, Blueprint
 
 from edge_node.api_layer.edge_controller import EdgeNodeAPIController
+from edge_node.api_layer.edge_agent import EdgeNodeAPIAgent
 from config import Config
 
 edge_route = Blueprint('edge_route', __name__, url_prefix=Config.EDGE_ROUTE_PREFIX)
 
 # Global instance (will be initialized by the edge node app)
 edge_node_api_controller: Optional[EdgeNodeAPIController] = None
+edge_node_api_agent: Optional[EdgeNodeAPIAgent] = None    
 
-def initialize_edge_route(node_id: str, central_node_url: str):
+def initialize_edge_route(node_id: str, central_node_url: str, node_port: int, edge_node_url: str):
     """Initialize the edge node API"""
-    global edge_node_api_controller
+    global edge_node_api_controller, edge_node_api_agent
     edge_node_api_controller = EdgeNodeAPIController(node_id, central_node_url)
+    edge_node_api_agent = EdgeNodeAPIAgent(node_id, central_node_url, node_port, edge_node_url, edge_node_api_controller)
     return edge_node_api_controller
 
 def register_edge_route(app: Flask):
