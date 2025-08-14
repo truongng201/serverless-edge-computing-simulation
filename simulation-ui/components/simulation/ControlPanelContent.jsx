@@ -129,7 +129,6 @@ export default function ControlPanelContent({
             size: user.size || userSize[0] || 10,
             
           }))
-          console.log(realUsers)
           setUsers(realUsers)
         }
       }
