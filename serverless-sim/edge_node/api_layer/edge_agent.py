@@ -24,7 +24,6 @@ class EdgeNodeAPIAgent:
         # Initialize managers
         self.container_manager = self.controller.container_manager
         self.metrics_collector = self.controller.metrics_collector
-
         
         # Metrics reporting
         self.metrics_thread = None
@@ -64,7 +63,7 @@ class EdgeNodeAPIAgent:
                 "node_id": self.node_id,
                 "endpoint": f"{self.edge_node_url}:{self.node_port}",
                 "location": {"x": 0.0, "y": 0.0},
-                "resources": self._get_node_resources()
+                "system_info": self.metrics_collector.get_system_info()
             }
             
             response = requests.post(
@@ -81,13 +80,6 @@ class EdgeNodeAPIAgent:
         except Exception as e:
             self.logger.error(f"Registration failed: {e}")
             
-    def _get_node_resources(self):
-        docker_info = self.container_manager.get_docker_info()
-        return {
-            "memory_total": docker_info.get("memory_total", 0) if docker_info else 0,
-            "cpus": docker_info.get("cpus", 1) if docker_info else 1,
-        }
-    
     def _metrics_reporting_loop(self):
         """Main metrics reporting loop"""
         while self.is_reporting:
@@ -126,6 +118,7 @@ class EdgeNodeAPIAgent:
             return {
                 "cpu_usage": system_metrics["cpu_usage"],
                 "memory_usage": system_metrics["memory_usage"],
+                "memory_total": system_metrics["memory_total"],
                 "running_container": running_containers,
                 "warm_container": warm_containers,
                 "active_requests": active_requests,
@@ -134,7 +127,9 @@ class EdgeNodeAPIAgent:
                 "energy_consumption": system_metrics["cpu_energy_kwh"],
                 "load_average": system_metrics["load_average"],
                 "uptime": system_metrics["uptime"],
-                "timestamp": system_metrics["timestamp"]
+                "timestamp": system_metrics["timestamp"],
+                "system_info": self.metrics_collector.get_system_info(),
+                "endpoint": f"{self.edge_node_url}:{self.node_port}",
             }
             
         except Exception as e:

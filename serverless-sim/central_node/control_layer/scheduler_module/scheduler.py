@@ -9,7 +9,9 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass
 from enum import Enum
 
-from config import Config, NodeType
+from config import Config
+
+from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 
 class SchedulingStrategy(Enum):
     ROUND_ROBIN = "round_robin"
@@ -22,9 +24,9 @@ class EdgeNodeInfo:
     node_id: str
     endpoint: str
     location: Dict[str, float]  # {"x": ..., "y": ...}
-    current_load: float
-    available_resources: Dict[str, Any]
+    system_info: Dict[str, Any]
     last_heartbeat: float
+    metrics_info: NodeMetrics
 
 @dataclass
 class SchedulingDecision:
@@ -41,43 +43,34 @@ class Scheduler:
         self.logger = logging.getLogger(__name__)
         
     def register_edge_node(self, node_info: EdgeNodeInfo):
-        """Register a new edge node"""
+        if node_info.node_id in self.edge_nodes:
+            raise Exception(f"Node {node_info.node_id} is already registered")
         self.edge_nodes[node_info.node_id] = node_info
         self.logger.info(f"Registered edge node: {node_info.node_id}")
         
     def unregister_edge_node(self, node_id: str):
-        """Unregister an edge node"""
         if node_id in self.edge_nodes:
             del self.edge_nodes[node_id]
             self.logger.info(f"Unregistered edge node: {node_id}")
-            
-    def update_node_metrics(self, node_id: str, metrics: Dict[str, Any]):
-        """Update node metrics from heartbeat"""
-        print(metrics)
+
+    def update_node_metrics(self, node_id: str, new_metrics: NodeMetrics, system_info: Dict[str, Any], endpoint: str):
         if node_id in self.edge_nodes:
-            self.edge_nodes[node_id].current_load = metrics.get('cpu_usage', 0.0)
-            self.edge_nodes[node_id].available_resources = metrics.get('resources', {})
+            self.edge_nodes[node_id].metrics_info = new_metrics
+            self.edge_nodes[node_id].system_info = system_info
             self.edge_nodes[node_id].last_heartbeat = time.time()
-            
-        # Clean up dead nodes after each update
-        self._cleanup_dead_nodes()
-            
-    def _cleanup_dead_nodes(self):
-        """Remove nodes that haven't sent heartbeat for too long"""
-        current_time = time.time()
-        dead_nodes = []
-        
-        for node_id, node in self.edge_nodes.items():
-            if current_time - node.last_heartbeat > 10: # 10 seconds time out
-                dead_nodes.append(node_id)
-                
-        for node_id in dead_nodes:
-            self.logger.warning(f"Removing dead node: {node_id} (last seen: {current_time - self.edge_nodes[node_id].last_heartbeat:.1f}s ago)")
-            del self.edge_nodes[node_id]
-            
+        else:
+            self.register_edge_node(EdgeNodeInfo(
+                node_id=node_id,
+                endpoint=endpoint,
+                location={"x": 0.0, "y": 0.0},
+                system_info=system_info,
+                last_heartbeat=time.time(),
+                metrics_info=new_metrics
+            ))
+
     def schedule_request(self, request_data: Dict[str, Any]) -> Optional[SchedulingDecision]:
         """Schedule a request to the best available edge node"""
-        available_nodes = self._get_healthy_nodes()
+        available_nodes = []
         
         if not available_nodes:
             self.logger.warning("No healthy edge nodes available")
@@ -93,18 +86,7 @@ class Scheduler:
             return self._schedule_predictive(available_nodes, request_data)
         else:
             return self._schedule_round_robin(available_nodes, request_data)
-            
-    def _get_healthy_nodes(self) -> List[EdgeNodeInfo]:
-        """Get list of healthy edge nodes"""
-        current_time = time.time()
-        healthy_nodes = []
-        
-        for node in self.edge_nodes.values():
-            if current_time - node.last_heartbeat < 60:  # 1 minute timeout (consistent with cleanup)
-                healthy_nodes.append(node)
-                
-        return healthy_nodes
-        
+
     def _schedule_round_robin(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
         """Round robin scheduling"""
         if self.round_robin_index >= len(nodes):
@@ -142,40 +124,64 @@ class Scheduler:
         # For now, just use least loaded
         # TODO: Integrate with prediction module
         return self._schedule_least_loaded(nodes, request_data)
+    
+    def _classify_nodes(self):
+        classified_nodes = {
+            "healthy": set(),
+            "warning": set(),
+            "unhealthy": set()
+        }
+
+        for node in self.edge_nodes.values():
+            print(node.metrics_info.cpu_usage, node.metrics_info.memory_usage)
+            if node.metrics_info.cpu_usage < Config.EDGE_NODE_WARNING_CPU_THRESHOLD and \
+               node.metrics_info.memory_usage < Config.EDGE_NODE_WARNING_CPU_THRESHOLD:
+                classified_nodes["healthy"].add(node.node_id)
+            elif node.metrics_info.cpu_usage < Config.EDGE_NODE_UNHEALTHY_CPU_THRESHOLD and \
+                 node.metrics_info.memory_usage < Config.EDGE_NODE_UNHEALTHY_MEMORY_THRESHOLD:
+                classified_nodes["warning"].add(node.node_id)
+            else:
+                classified_nodes["unhealthy"].add(node.node_id)
+
+        return classified_nodes
         
     def get_cluster_status(self) -> Dict[str, Any]:
-        """Get overall cluster status"""
-        healthy_nodes = self._get_healthy_nodes()
-        total_load = sum(node.current_load for node in healthy_nodes)
-        avg_load = total_load / len(healthy_nodes) if healthy_nodes else 0
-        
         current_time = time.time()
+        total_load = sum(node.metrics_info.cpu_usage for node in self.edge_nodes.values())
+        average_load = total_load / len(self.edge_nodes) if self.edge_nodes else 0
         all_nodes_info = []
-        unhealthy_nodes = []
         
+        classified_nodes = self._classify_nodes()
+
         for node in self.edge_nodes.values():
             last_seen = current_time - node.last_heartbeat
-            is_healthy = last_seen < 60
-            
+            node_status = "unidentified"
+            if node.node_id in classified_nodes["healthy"]:
+                node_status = "healthy"
+            elif node.node_id in classified_nodes["warning"]:
+                node_status = "warning"
+            else:
+                node_status = "unhealthy"
             node_info = {
                 "node_id": node.node_id,
-                "load": node.current_load,
+                "system_info": node.system_info,
                 "location": node.location,
                 "last_seen": last_seen,
-                "status": "healthy" if is_healthy else "unhealthy",
-                "endpoint": node.endpoint
+                "endpoint": node.endpoint,
+                "metrics": node.metrics_info,
+                "status": node_status   
             }
             
             all_nodes_info.append(node_info)
-            if not is_healthy:
-                unhealthy_nodes.append(node_info)
-        
+            
         return {
             "total_nodes": len(self.edge_nodes),
-            "healthy_nodes": len(healthy_nodes),
-            "unhealthy_nodes": len(unhealthy_nodes),
-            "average_load": avg_load,
-            "nodes": all_nodes_info,
-            "healthy_nodes_list": [node.node_id for node in healthy_nodes],
-            "unhealthy_nodes_list": [node["node_id"] for node in unhealthy_nodes]
+            "average_load": average_load,
+            "edge_nodes_info": all_nodes_info,
+            "healthy_node_count": len(classified_nodes["healthy"]),
+            "healthy_node_list": list(classified_nodes["healthy"]),
+            "unhealthy_node_count": len(classified_nodes["unhealthy"]),
+            "unhealthy_node_list": list(classified_nodes["unhealthy"]),
+            "warning_node_count": len(classified_nodes["warning"]),
+            "warning_node_list": list(classified_nodes["warning"]),
         }

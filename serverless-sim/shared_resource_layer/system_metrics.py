@@ -9,6 +9,7 @@ import os
 from typing import Dict, Any, Optional
 from dataclasses import dataclass
 import psutil
+import platform
 
 @dataclass
 class SystemMetrics:
@@ -184,3 +185,30 @@ class SystemMetricsCollector:
             # 'network_io': network_io,
             # 'disk_io': disk_io
         }
+
+    def get_system_info(self) -> Dict[str, Any]:
+        """Get basic system information"""
+        try:
+            system_info = {
+                "platform": platform.system(),
+                "node_name": platform.node(),
+                "release": platform.release(),
+                "version": platform.version(),
+                "machine": platform.machine(),
+                "processor": platform.processor(),
+                "cpu_cores_logical": psutil.cpu_count(logical=True),
+                "cpu_cores_physical": psutil.cpu_count(logical=False),
+                "memory_total": round(psutil.virtual_memory().total / (1024**3), 2),
+                "disk_size_total": 0,
+            }
+
+            # Get disk information
+            for part in psutil.disk_partitions():
+                usage = psutil.disk_usage(part.mountpoint)
+                system_info["disk_size_total"] += round(usage.total / (1024**3), 2)
+
+            return system_info
+
+        except Exception as e:
+            self.logger.error(f"Failed to get system info: {e}")
+            return {}
