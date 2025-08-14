@@ -29,6 +29,14 @@ class EdgeNodeInfo:
     metrics_info: NodeMetrics
     
 @dataclass
+class UserNodeInfo:
+    user_id: str
+    assigned_node_id: str
+    location: Dict[str, float]  # {"x": ..., "y": ...}
+    size: int
+    speed: int
+    
+@dataclass
 class SchedulingDecision:
     target_node_id: str
     execution_time_estimate: float
@@ -45,11 +53,15 @@ class Scheduler:
             "location": {"x": 600, "y": 400}, # default location
             "coverage": 500 # default coverage
         }
+        self.user_nodes: Dict[str, UserNodeInfo] = {}
         self.round_robin_index = 0
         self.logger = logging.getLogger(__name__)
 
     def get_central_node_info(self) -> Dict[str, Any]:
         return self.central_node
+    
+    def create_user_node(self, user_node: UserNodeInfo):
+        self.user_nodes[user_node.user_id] = user_node
 
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:

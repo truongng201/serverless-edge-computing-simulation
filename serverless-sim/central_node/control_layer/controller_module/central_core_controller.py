@@ -4,7 +4,7 @@ import time
 
 from central_node.api_layer.central_controller import CentralNodeAPIController
 
-from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo
+from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
@@ -204,3 +204,14 @@ class CentralCoreController:
         self.scheduler.update_edge_node_info(edge_node)
 
         return edge_node
+    
+    def create_user_node(self, data):
+        user_node = UserNodeInfo(
+            user_id=data.get("user_id"),
+            assigned_node_id=data.get("assigned_node_id", ""),
+            location=data.get("location", {"x": 0.0, "y": 0.0}),
+            size=data.get("size", 0),
+            speed=data.get("speed", 0)
+        )
+        self.scheduler.create_user_node(user_node)
+        return user_node

@@ -76,6 +76,15 @@ def update_edge_node():
         return jsonify({"status": "success", "message": "Update edge node success"}), 200
     else:
         return jsonify({"status": "error", "message": "Edge node update failed"}), 400
+    
+@central_route.route("/create_user_node", methods=["POST"])
+def create_user_node():
+    user_data = request.get_json()
+    result = central_core_controller.create_user_node(user_data)
+    if result:
+        return jsonify({"status": "success", "message": "Node user creation success"}), 201
+    else:
+        return jsonify({"status": "error", "message": "Node User creation failed"}), 400
 
 @central_route.route('/health', methods=['GET'])
 def health_check():
