@@ -6,6 +6,7 @@ from typing import Dict, Any, Optional
 
 
 from shared_resource_layer.container_manager import ContainerManager
+from shared_resource_layer.system_metrics import SystemMetricsCollector
 
 from config import Config, ContainerState
 
@@ -15,6 +16,7 @@ class CentralNodeAPIController:
         
         # Initialize control layer components
         self.container_manager = ContainerManager()
+        self.metrics_collector = SystemMetricsCollector()
         
         # Request tracking
         self.active_requests = 0
@@ -101,3 +103,26 @@ class CentralNodeAPIController:
             self.logger.info(f"Cold start for function {function_name}")
             return container_id
         return None
+    
+    def get_central_node_status(self) -> Dict[str, Any]:
+        system_metrics = self.metrics_collector.collect_metrics()
+        containers = self.container_manager.list_containers()
+        running_container = len([c for c in containers if c.state == ContainerState.RUNNING])
+        warm_container = len([c for c in containers if c.state == ContainerState.WARM])
+        return {
+            "node_id": "central_node",
+            "cpu_usage": system_metrics.cpu_usage if system_metrics else 0,
+            "memory_usage": system_metrics.memory_usage if system_metrics else 0,
+            "memory_total": system_metrics.memory_total if system_metrics else 0,
+            "running_container": running_container,
+            "warm_container": warm_container,
+            "active_requests": self.active_requests,
+            "total_requests": self.total_requests,
+            "response_time_avg": sum(self.response_times) / len(self.response_times) if self.response_times else 0,
+            "energy_consumption": system_metrics.cpu_energy_kwh if system_metrics else 0,
+            "load_average": system_metrics.load_average if system_metrics else [],
+            "network_io": {},
+            "disk_io": {},
+            "timestamp": time.time(),
+            "uptime": system_metrics.uptime if system_metrics else 0
+        }
