@@ -210,3 +210,43 @@ class Scheduler:
         if new_edge_node.node_id not in self.edge_nodes:
             return
         self.edge_nodes[new_edge_node.node_id] = new_edge_node
+    
+    def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
+        """Update user node location and reassign to nearest node"""
+        if user_id not in self.user_nodes:
+            return False
+        
+        # Update location
+        self.user_nodes[user_id].location = new_location
+        
+        # Recalculate nearest node
+        nearest_node_id = self._find_nearest_node(new_location)
+        self.user_nodes[user_id].assigned_node_id = nearest_node_id
+        
+        self.logger.info(f"Updated user {user_id} location to {new_location}, assigned to {nearest_node_id}")
+        return True
+    
+    def _find_nearest_node(self, user_location: Dict[str, float]) -> str:
+        """Find the nearest node (edge or central) to the user location"""
+        min_distance = float('inf')
+        nearest_node_id = "central_node"  # default to central node
+        
+        # Check all edge nodes
+        for node_id, edge_node in self.edge_nodes.items():
+            distance = self._calculate_distance(user_location, edge_node.location)
+            if distance < min_distance:
+                min_distance = distance
+                nearest_node_id = node_id
+        
+        # Check central node
+        central_distance = self._calculate_distance(user_location, self.central_node["location"])
+        if central_distance < min_distance:
+            nearest_node_id = "central_node"
+        
+        return nearest_node_id
+    
+    def _calculate_distance(self, location1: Dict[str, float], location2: Dict[str, float]) -> float:
+        """Calculate Euclidean distance between two locations"""
+        dx = location1["x"] - location2["x"]
+        dy = location1["y"] - location2["y"]
+        return (dx ** 2 + dy ** 2) ** 0.5

@@ -86,6 +86,17 @@ def create_user_node():
     else:
         return jsonify({"status": "error", "message": "Node User creation failed"}), 400
 
+@central_route.route("/update_user_node", methods=["POST"])
+def update_user_node():
+    """Update user node location and recalculate assigned node"""
+    user_data = request.get_json()
+    if not user_data:
+        return jsonify({"status": "error", "message": "No user data provided"}), 400
+    
+    result = central_core_controller.update_user_node(user_data)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
 @central_route.route("/get_all_users", methods=["GET"])
 def get_all_users():
     """Get all user nodes"""

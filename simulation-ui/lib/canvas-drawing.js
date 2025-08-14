@@ -195,13 +195,6 @@ const drawConnections = (ctx, centralNodes, edgeNodes, zoomLevel) => {
 
 const drawUserConnections = (ctx, users, centralNodes, edgeNodes, zoomLevel) => {
   users.forEach((user, index) => {
-    console.log(`User ${index}:`, {
-      id: user.id,
-      assignedCentral: user.assignedCentral,
-      assignedEdge: user.assignedEdge,
-      x: user.x,
-      y: user.y
-    });
     let targetNode = null;
     
     // Find the assigned node
@@ -213,7 +206,6 @@ const drawUserConnections = (ctx, users, centralNodes, edgeNodes, zoomLevel) => 
     
     // Draw connection line if target node is found
     if (targetNode) {
-      console.log(`Drawing connection from user ${user.id} to node ${targetNode.id}`);
       
       // Set line style based on connection type
       if (user.assignedCentral) {
@@ -385,7 +377,6 @@ const drawEdgeNodes = (ctx, edgeNodes, selectedEdge, editMode, visibleLeft, visi
     ctx.fillText(edge.id, edge.x, edge.y - 35);
     
     // Handle both decimal (0-1) and percentage (0-100) formats
-    console.log(edge.currentLoad)
     const displayLoad = edge.currentLoad <= 1 ? edge.currentLoad * 100 : edge.currentLoad;
     ctx.fillText(`${Math.round(displayLoad)}%`, edge.x, edge.y + 45);
   });
@@ -393,9 +384,6 @@ const drawEdgeNodes = (ctx, edgeNodes, selectedEdge, editMode, visibleLeft, visi
 
 const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visibleTop, visibleRight, visibleBottom, zoomLevel) => {
   // Reduced logging to avoid console spam
-  if (users.length > 0 && Math.random() < 0.1) { // Log only occasionally
-    console.log(`Rendering ${users.length} users`);
-  }
   users.forEach((user) => {
     if (
       user.x < visibleLeft - 50 ||

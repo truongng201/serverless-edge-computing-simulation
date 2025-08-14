@@ -313,6 +313,9 @@ export const useEventHandlers = (state, actions) => {
         )
       );
 
+      // Update draggedUser with current position for API call
+      setDraggedUser(prev => ({ ...prev, x: newX, y: newY }));
+
       // Update selected user if it's the one being dragged
       if (selectedUser && selectedUser.id === draggedUser.id) {
         setSelectedUser((prev) => ({ ...prev, x: newX, y: newY }));
@@ -415,6 +418,40 @@ export const useEventHandlers = (state, actions) => {
       }
     }
 
+    // Handle API call for user position update
+    if (isDraggingUser && draggedUser) {
+      try {
+        const payload = {
+          user_id: draggedUser.id,
+          location: {
+            x: draggedUser.x,
+            y: draggedUser.y
+          }
+        };
+        console.log(payload)
+        // Only make API call if NEXT_PUBLIC_API_URL is available
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_user_node`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (!response.ok) {
+            console.error('Failed to update user position:', response.statusText);
+          } else {
+            const result = await response.json();
+            console.log('User position updated successfully:', result);
+            
+          }
+        }
+      } catch (error) {
+        console.error('Error updating user position:', error);
+      }
+    }
+
     setIsPanning(false);
     setIsDraggingNode(false);
     setIsDraggingUser(false);
@@ -424,12 +461,14 @@ export const useEventHandlers = (state, actions) => {
   }, [
     isDraggingNode,
     draggedNode,
+    isDraggingUser,
+    draggedUser,
     setIsPanning,
     setIsDraggingNode,
     setIsDraggingUser,
     setDraggedNode,
     setDraggedUser,
-    setIsDragging
+    setIsDragging,
   ]);
 
   // Zoom functions
