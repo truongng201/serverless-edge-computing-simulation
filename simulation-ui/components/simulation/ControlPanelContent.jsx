@@ -198,7 +198,6 @@ export default function ControlPanelContent({
     setIsSimulating(false);
     setSimulationMode("demo");
     setRealModeData(null);
-    setStepProgress(0);
     resetSimulation();
   };
   return (
