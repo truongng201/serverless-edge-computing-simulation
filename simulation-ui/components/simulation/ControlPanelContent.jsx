@@ -122,11 +122,14 @@ export default function ControlPanelContent({
             y: user.location.y || 0,
             vx: 0,
             vy: 0,
-            assignedNode: user.assigned_node_id || null,
+            assignedEdge: user.assigned_edge || null,
+            assignedCentral: user.assigned_central || null,
+            assignedNodeID: user.assigned_node_id || null,
             latency: user.latency || 0,
             size: user.size || userSize[0] || 10,
+            
           }))
-          
+          console.log(realUsers)
           setUsers(realUsers)
         }
       }
