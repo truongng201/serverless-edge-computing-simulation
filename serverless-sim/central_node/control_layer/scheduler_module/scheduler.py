@@ -49,7 +49,7 @@ class Scheduler:
         self.edge_nodes: Dict[str, EdgeNodeInfo] = {}
         self.central_node = {
             "node_id": "central_node",
-            "endpoint": "http://central-node:8000",
+            "endpoint": "localhost:8000",
             "location": {"x": 600, "y": 400}, # default location
             "coverage": 500 # default coverage
         }

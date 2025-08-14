@@ -104,6 +104,16 @@ def get_all_users():
     status_code = 200 if result["success"] else 500
     return jsonify(result), status_code
 
+@central_route.route('/execute', methods=['POST'])
+def execute_function():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+        
+    data = request.get_json()
+    result = central_core_controller.execute_function(data)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
 @central_route.route('/health', methods=['GET'])
 def health_check():
     return jsonify({

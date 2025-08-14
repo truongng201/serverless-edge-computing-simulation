@@ -48,3 +48,5 @@ class Config:
     DOCKER_SOCKET = "unix://Users/truongnguyen/.docker/run/docker.sock"
     CONTAINER_NETWORK = "serverless-network"
     
+    # User Configuration
+    DEFAULT_EXECUTION_TIME_INTERVAL = 3 # seconds: every 3 seconds all user in simulation call it assigned node

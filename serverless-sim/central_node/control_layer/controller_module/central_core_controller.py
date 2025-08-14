@@ -6,6 +6,7 @@ from central_node.api_layer.central_controller import CentralNodeAPIController
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
+from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 
@@ -19,6 +20,7 @@ class CentralCoreController:
         self.predictor = WorkloadPredictor()
         self.central_node_api_controller = CentralNodeAPIController()
         SchedulerAgent(self.scheduler).start_all_tasks()
+        UsersAgent(self.scheduler).start_all_tasks()
 
 
     def schedule_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -308,4 +310,14 @@ class CentralCoreController:
                 "success": False,
                 "error": str(e),
                 "users": []
+            }
+            
+    def execute_function(self, data):
+        try:
+            return self.central_node_api_controller.execute_function(data)
+        except Exception as e:
+            self.logger.error(f"Error executing function: {e}")
+            return {
+                "success": False,
+                "error": str(e)
             }
