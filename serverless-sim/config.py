@@ -1,4 +1,6 @@
 from enum import Enum
+import os
+import platform
 
 class ContainerState(Enum):
     INIT = "init"   # docker create [container] - cold start
@@ -45,6 +47,11 @@ class Config:
     MIGRATION_THRESHOLD = 0.8  # CPU usage threshold for migration
     
     # Docker Configuration
-    DOCKER_SOCKET = "unix://Users/truongnguyen/.docker/run/docker.sock"
+    # Prefer environment variable if provided; otherwise choose OS-appropriate default
+    # - Windows (Docker Desktop): use Named Pipe
+    # - Others (Linux/macOS): use default Unix socket
+    DOCKER_SOCKET = os.getenv("DOCKER_HOST") or (
+        "npipe:////./pipe/docker_engine" if platform.system() == "Windows" else "unix:///var/run/docker.sock"
+    )
     CONTAINER_NETWORK = "serverless-network"
     
