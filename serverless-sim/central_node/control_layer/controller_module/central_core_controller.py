@@ -4,8 +4,9 @@ import time
 
 from central_node.api_layer.central_controller import CentralNodeAPIController
 
-from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo
+from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
+from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 
@@ -19,6 +20,7 @@ class CentralCoreController:
         self.predictor = WorkloadPredictor()
         self.central_node_api_controller = CentralNodeAPIController()
         SchedulerAgent(self.scheduler).start_all_tasks()
+        UsersAgent(self.scheduler).start_all_tasks()
 
 
     def schedule_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
@@ -204,3 +206,118 @@ class CentralCoreController:
         self.scheduler.update_edge_node_info(edge_node)
 
         return edge_node
+    
+    def create_user_node(self, data):
+        user_location = data.get("location", {"x": 0.0, "y": 0.0})
+        
+        # Find nearest node (edge or central) using scheduler method
+        nearest_node_id = self.scheduler._find_nearest_node(user_location)
+        
+        user_node = UserNodeInfo(
+            user_id=data.get("user_id"),
+            assigned_node_id=nearest_node_id,
+            location=user_location,
+            size=data.get("size", 10),
+            speed=data.get("speed", 5)
+        )
+        self.scheduler.create_user_node(user_node)
+        return user_node
+    
+    def update_user_node(self, data):
+        """Update user node location and recalculate assigned node"""
+        try:
+            user_id = data.get("user_id")
+            new_location = data.get("location", {})
+            
+            if not user_id:
+                self.logger.error("User ID is required for user node update")
+                return {
+                    "success": False,
+                    "error": "User ID is required"
+                }
+            
+            if not new_location or "x" not in new_location or "y" not in new_location:
+                self.logger.error("Valid location (x, y) is required for user node update")
+                return {
+                    "success": False,
+                    "error": "Valid location (x, y) is required"
+                }
+            
+            # Update user node in scheduler
+            success = self.scheduler.update_user_node(user_id, new_location)
+            
+            if success:
+                # Get updated user info
+                updated_user = self.scheduler.user_nodes.get(user_id)
+                if updated_user:
+                    return {
+                        "success": True,
+                        "message": f"User {user_id} updated successfully",
+                        "user": {
+                            "user_id": updated_user.user_id,
+                            "location": updated_user.location,
+                            "assigned_node_id": updated_user.assigned_node_id,
+                            "size": updated_user.size,
+                            "speed": updated_user.speed
+                        }
+                    }
+            
+            return {
+                "success": False,
+                "error": f"Failed to update user {user_id}"
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error updating user node: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def get_all_users(self):
+        """Get all user nodes"""
+        try:
+            users = []
+            for user_id, user_node in self.scheduler.user_nodes.items():
+                # Determine if assigned to edge or central node
+                assigned_edge = None
+                assigned_central = None
+                
+                if user_node.assigned_node_id == "central_node":
+                    assigned_central = "central_node"
+                elif user_node.assigned_node_id in self.scheduler.edge_nodes:
+                    assigned_edge = user_node.assigned_node_id
+                
+                users.append({
+                    "user_id": user_id,
+                    "location": user_node.location,
+                    "size": user_node.size,
+                    "speed": user_node.speed,
+                    "assigned_node_id": user_node.assigned_node_id,
+                    "assigned_edge": assigned_edge,
+                    "assigned_central": assigned_central,
+                    "latency": 0  # Can be calculated if needed
+                })
+            
+            return {
+                "success": True,
+                "users": users,
+                "total_count": len(users)
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting all users: {e}")
+            return {
+                "success": False,
+                "error": str(e),
+                "users": []
+            }
+            
+    def execute_function(self, data):
+        try:
+            return self.central_node_api_controller.execute_function(data)
+        except Exception as e:
+            self.logger.error(f"Error executing function: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }

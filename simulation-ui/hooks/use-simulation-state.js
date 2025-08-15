@@ -1,5 +1,4 @@
 import { useState, useRef, useEffect } from "react";
-import { useSimulation } from "@/hooks/use-simulation";
 
 export function useSimulationState() {
   const canvasRef = useRef(null);

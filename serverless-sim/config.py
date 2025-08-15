@@ -55,3 +55,5 @@ class Config:
     )
     CONTAINER_NETWORK = "serverless-network"
     
+    # User Configuration
+    DEFAULT_EXECUTION_TIME_INTERVAL = 3 # seconds: every 3 seconds all user in simulation call it assigned node
