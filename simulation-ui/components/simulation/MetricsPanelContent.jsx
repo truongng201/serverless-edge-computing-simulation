@@ -246,7 +246,7 @@ export default function MetricsPanelContent({
             <CardTitle className="text-sm">Connection Status</CardTitle>
           </CardHeader>
           <CardContent className="space-y-2">
-            {users.slice(0, 8).map((user) => (
+            {users.map((user) => (
               <div
                 key={user.id}
                 className={`p-2 rounded cursor-pointer transition-colors text-xs ${
@@ -268,16 +268,12 @@ export default function MetricsPanelContent({
                 <div className="text-gray-600">→ {user.assignedEdge || user.assignedCentral || "Disconnected"}</div>
               </div>
             ))}
-            {users.length > 8 && (
-              <div className="text-xs text-gray-500 text-center">... and {users.length - 8} more users</div>
-            )}
           </CardContent>
         </Card>
 
         
 
         {/* Latency Breakdown - Show detailed metrics for selected node */}
-        {((selectedEdge && selectedEdge.lastMetrics) || (selectedCentral && selectedCentral.lastMetrics)) && (
           <Card className="mb-4">
             <CardHeader className="pb-2">
               <CardTitle className="text-sm flex items-center gap-2">
@@ -288,35 +284,35 @@ export default function MetricsPanelContent({
             <CardContent className="space-y-3">
               {(() => {
                 const node = selectedEdge || selectedCentral;
-                const metrics = node.lastMetrics;
+                const metrics = node?.lastMetrics;
                 const nodeType = selectedEdge ? "Cloudlet" : "Cloud";
                 
                 return (
                   <div className="space-y-2">
-                    <div className="text-xs font-medium text-gray-700">{node.id} ({nodeType})</div>
+                    <div className="text-xs font-medium text-gray-700">{node?.id} ({nodeType})</div>
                     
                     {/* Service Status */}
                     <div className="flex justify-between text-xs">
                       <span>Service Status:</span>
-                      <Badge variant={metrics.isWarmStart ? "default" : "secondary"} className="text-xs">
-                        {metrics.isWarmStart ? "Warm Start" : "Cold Start"}
+                      <Badge variant={metrics?.isWarmStart ? "default" : "secondary"} className="text-xs">
+                        {metrics?.isWarmStart ? "Warm Start" : "Cold Start"}
                       </Badge>
                     </div>
                     
                     {/* Data Size */}
                     <div className="flex justify-between text-xs">
                       <span>Data Size s(u,t):</span>
-                      <span className="font-mono">{metrics.dataSize} MB</span>
+                      <span className="font-mono">{metrics?.dataSize} MB</span>
                     </div>
                     
                     {/* Communication Delay */}
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span>Communication d_com:</span>
-                        <span className="font-mono">{metrics.communicationDelay} ms</span>
+                        <span className="font-mono">{metrics?.communicationDelay} ms</span>
                       </div>
                       <div className="ml-2 text-xs text-gray-500">
-                        τ = {metrics.unitTransmissionDelay} ms/MB
+                        τ = {metrics?.unitTransmissionDelay} ms/MB
                       </div>
                     </div>
                     
@@ -324,10 +320,10 @@ export default function MetricsPanelContent({
                     <div className="space-y-1">
                       <div className="flex justify-between text-xs">
                         <span>Processing d_proc:</span>
-                        <span className="font-mono">{metrics.processingDelay} ms</span>
+                        <span className="font-mono">{metrics?.processingDelay} ms</span>
                       </div>
                       <div className="ml-2 text-xs text-gray-500">
-                        ρ = {metrics.unitProcessingTime} ms/MB
+                        ρ = {metrics?.unitProcessingTime} ms/MB
                       </div>
                     </div>
                     
@@ -335,22 +331,21 @@ export default function MetricsPanelContent({
                     <div className="border-t pt-2">
                       <div className="flex justify-between text-xs font-medium">
                         <span>Total D(u,v,t):</span>
-                        <span className="font-mono">{metrics.communicationDelay + metrics.processingDelay} ms</span>
+                        <span className="font-mono">{(metrics?.communicationDelay || 0) + (metrics?.processingDelay || 0)} ms</span>
                       </div>
                     </div>
                     
                     {/* Formula Display */}
                     <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded">
                       <div>D(u,v,t) = d_com + d_proc</div>
-                      <div>d_com = {metrics.dataSize} × {metrics.unitTransmissionDelay}</div>
-                      <div>d_proc = {metrics.isWarmStart ? '0' : 'cold_delay'} + {metrics.dataSize} × {metrics.unitProcessingTime}</div>
+                      <div>d_com = {metrics?.dataSize} × {metrics?.unitTransmissionDelay}</div>
+                      <div>d_proc = {metrics?.isWarmStart ? '0' : 'cold_delay'} + {metrics?.dataSize} × {metrics?.unitProcessingTime}</div>
                     </div>
                   </div>
                 );
               })()}
             </CardContent>
           </Card>
-        )}
 
         {/* Algorithm Info */}
         <Card>
