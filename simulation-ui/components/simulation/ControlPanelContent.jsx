@@ -231,6 +231,7 @@ export default function ControlPanelContent({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None - Add Users</SelectItem>
+                  <SelectItem value="drag">Drag - Pan View</SelectItem>
                   <SelectItem value="nodes">Nodes Only</SelectItem>
                   <SelectItem value="users">Users Only</SelectItem>
                   <SelectItem value="both">Nodes & Users</SelectItem>
@@ -239,9 +240,19 @@ export default function ControlPanelContent({
             </div>
             {editMode !== "none" && (
               <div className="text-xs text-gray-600 space-y-1">
-                <div>• Drag to move elements</div>
-                <div>• Click to select elements</div>
-                <div>• Dashed rings show editable items</div>
+                {editMode === "drag" ? (
+                  <>
+                    <div>• Drag to pan the view</div>
+                    <div>• Mouse wheel to zoom</div>
+                    <div>• Click to select elements</div>
+                  </>
+                ) : (
+                  <>
+                    <div>• Drag to move elements</div>
+                    <div>• Click to select elements</div>
+                    <div>• Dashed rings show editable items</div>
+                  </>
+                )}
               </div>
             )}
             {(selectedEdge || selectedCentral) && (
