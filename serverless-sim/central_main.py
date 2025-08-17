@@ -13,7 +13,6 @@ from flask_cors import CORS
 
 
 from central_node.control_layer.routes_module.central_route import register_central_route, initialize_central_route
-from central_node.control_layer.routes_module.ui_route import register_ui_route, initialize_ui_route
 from config import Config
 
 # Add the parent directory to sys.path for imports
@@ -28,10 +27,6 @@ def create_central_node_app():
     initialize_central_route()
     register_central_route(app)
     
-    # Initialize and register ui endpoint
-    initialize_ui_route()
-    register_ui_route(app)
-
     return app
 
 def setup_logging(log_level: str = "INFO"):
