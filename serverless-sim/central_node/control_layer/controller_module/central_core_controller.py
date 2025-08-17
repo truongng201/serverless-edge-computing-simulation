@@ -198,7 +198,6 @@ class CentralCoreController:
 
         # Update the node's location
         edge_node = self.scheduler.edge_nodes.get(data.get("node_id", None))
-        print(edge_node)
         if not edge_node:
             return None
 
