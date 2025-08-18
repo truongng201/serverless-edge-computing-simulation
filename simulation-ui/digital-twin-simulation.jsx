@@ -108,7 +108,7 @@ export default function Component() {
       state.setUsers, 
       state.setSelectedUser
     ),
-    deleteSelectedUser: () => UserManagement.deleteSelectedUser(
+    deleteSelectedUser: async () => await UserManagement.deleteSelectedUser(
       state.selectedUser, 
       state.setUsers, 
       state.setSelectedUser

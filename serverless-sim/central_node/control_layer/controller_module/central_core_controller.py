@@ -333,3 +333,23 @@ class CentralCoreController:
                 "success": False,
                 "error": str(e)
             }
+            
+    def delete_user(self, user_id: str):
+        try:
+            if user_id not in self.scheduler.user_nodes:
+                return {
+                    "success": False,
+                    "error": f"User {user_id} not found"
+                }
+
+            del self.scheduler.user_nodes[user_id]
+            return {
+                "success": True,
+                "message": f"User {user_id} deleted successfully"
+            }
+        except Exception as e:
+            self.logger.error(f"Error deleting user {user_id}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
