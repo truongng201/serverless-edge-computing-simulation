@@ -184,12 +184,15 @@ export default function ControlPanelContent({
       // Fetch initial real data
       await fetchRealClusterStatus();
 
-      // Start real-time polling every 5 seconds
+      // Start real-time polling with interval based on simulation speed
       if (realModeIntervalRef.current) {
         clearInterval(realModeIntervalRef.current);
       }
 
-      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, 5000);
+      // Calculate interval: 1x = 5000ms, 5x = 1000ms
+      // Formula: 5000 / simulationSpeed[0]
+      const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
+      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, intervalMs);
     } else {
       // Stop real-time polling
       if (realModeIntervalRef.current) {
@@ -211,6 +214,18 @@ export default function ControlPanelContent({
       }
     };
   }, [isSimulating, simulationSpeed]);
+
+  // Handle simulation speed changes in real mode
+  useEffect(() => {
+    if (simulationMode === "real" && realModeIntervalRef.current) {
+      // Clear existing interval
+      clearInterval(realModeIntervalRef.current);
+      
+      // Calculate new interval based on simulation speed
+      const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
+      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, intervalMs);
+    }
+  }, [simulationSpeed, simulationMode]);
 
   // Override resetSimulation to stop intervals
   const handleResetSimulation = () => {
