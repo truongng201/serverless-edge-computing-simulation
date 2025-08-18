@@ -4,6 +4,7 @@ import time
 import random
 
 from central_node.api_layer.central_controller import CentralNodeAPIController
+from central_node.api_layer.central_agent import CentralNodeAPIAgent
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo, Latency
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
@@ -22,6 +23,7 @@ class CentralCoreController:
         self.scheduler = Scheduler()
         self.predictor = WorkloadPredictor()
         self.central_node_api_controller = CentralNodeAPIController()
+        CentralNodeAPIAgent(self.central_node_api_controller).start_all_tasks()
         SchedulerAgent(self.scheduler).start_all_tasks()
         UsersAgent(self.scheduler).start_all_tasks()
 

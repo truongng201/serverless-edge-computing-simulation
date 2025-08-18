@@ -55,3 +55,6 @@ class CentralNodeAPIAgent:
         if self.cleanup_thread:
             self.cleanup_thread.join()
         self.logger.info("Cleanup thread stopped")
+
+    def start_all_tasks(self):
+        self.start_cleanup_containers()
