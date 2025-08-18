@@ -69,7 +69,7 @@ export default function Component() {
       state.setSelectedEdge,
       state.setSelectedCentral
     ),
-    clearAllUsers: () => NodeManagement.clearAllUsers(state.setUsers, state.setSelectedUser),
+    clearAllUsers: async () => await NodeManagement.clearAllUsers(state.setUsers, state.setSelectedUser),
     clearAllEdgeNodes: () => NodeManagement.clearAllEdgeNodes(state.setEdgeNodes, state.setSelectedEdge),
     clearAllCentralNodes: () => NodeManagement.clearAllCentralNodes(state.setCentralNodes, state.setSelectedCentral),
     clearEverything: () => NodeManagement.clearEverything(

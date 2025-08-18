@@ -319,3 +319,17 @@ class CentralCoreController:
                 "success": False,
                 "error": str(e)
             }
+            
+    def delete_all_users(self):
+        try:
+            self.scheduler.user_nodes.clear()
+            return {
+                "success": True,
+                "message": "All user nodes deleted successfully"
+            }
+        except Exception as e:
+            self.logger.error(f"Error deleting all user nodes: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
