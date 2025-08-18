@@ -211,7 +211,6 @@ class CentralCoreController:
         
         # Find nearest node (edge or central) using scheduler method
         nearest_node_id = self.scheduler._find_nearest_node(user_location)
-        
         user_node = UserNodeInfo(
             user_id=data.get("user_id"),
             assigned_node_id=nearest_node_id,
