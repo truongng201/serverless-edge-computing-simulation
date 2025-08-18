@@ -104,6 +104,18 @@ def get_all_users():
     status_code = 200 if result["success"] else 500
     return jsonify(result), status_code
 
+@central_route.route("/delete_all_users", methods=["DELETE"])
+def delete_all_users():
+    result = central_core_controller.delete_all_users()
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
+
+@central_route.route('/delete_user/<user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    result = central_core_controller.delete_user(user_id)
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
+
 @central_route.route('/execute', methods=['POST'])
 def execute_function():
     if not central_core_controller:

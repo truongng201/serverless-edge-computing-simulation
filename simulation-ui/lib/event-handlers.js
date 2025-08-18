@@ -93,7 +93,7 @@ export const useEventHandlers = (state, actions) => {
       return;
     }
 
-    // Clear selections and add user if not in edit mode
+    // Clear selections and add user if not in edit mode or drag mode
     setSelectedUser(null);
     setSelectedEdge(null);
     setSelectedCentral(null);
@@ -194,7 +194,8 @@ export const useEventHandlers = (state, actions) => {
   const handleMouseDown = useCallback((event) => {
     if (
       event.button === 1 ||
-      (event.button === 0 && event.ctrlKey && editMode === "none")
+      (event.button === 0 && event.ctrlKey && editMode === "none") ||
+      (event.button === 0 && editMode === "drag")
     ) {
       setIsPanning(true);
       setLastPanPoint({ x: event.clientX, y: event.clientY });
@@ -202,7 +203,7 @@ export const useEventHandlers = (state, actions) => {
       return;
     }
 
-    if (editMode !== "none") {
+    if (editMode !== "none" && editMode !== "drag") {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -502,6 +503,7 @@ export const useEventHandlers = (state, actions) => {
   const getCursorStyle = useCallback(() => {
     if (isPanning) return "grabbing";
     if (isDraggingNode || isDraggingUser) return "grabbing";
+    if (editMode === "drag") return "grab";
     if (editMode !== "none") return "move";
     return "crosshair";
   }, [isPanning, isDraggingNode, isDraggingUser, editMode]);

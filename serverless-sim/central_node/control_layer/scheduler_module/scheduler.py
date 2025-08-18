@@ -51,7 +51,7 @@ class Scheduler:
             "node_id": "central_node",
             "endpoint": "localhost:8000",
             "location": {"x": 600, "y": 400}, # default location
-            "coverage": 500 # default coverage
+            "coverage": 0 # default coverage
         }
         self.user_nodes: Dict[str, UserNodeInfo] = {}
         self.round_robin_index = 0
@@ -228,7 +228,7 @@ class Scheduler:
     
     def _find_nearest_node(self, user_location: Dict[str, float]) -> str:
         """Find the nearest node (edge or central) to the user location"""
-        min_distance = float('inf')
+        min_distance = self._calculate_distance(user_location, self.central_node["location"])
         nearest_node_id = "central_node"  # default to central node
         
         # Check all edge nodes
@@ -237,12 +237,7 @@ class Scheduler:
             if distance < min_distance:
                 min_distance = distance
                 nearest_node_id = node_id
-        
-        # Check central node
-        central_distance = self._calculate_distance(user_location, self.central_node["location"])
-        if central_distance < min_distance:
-            nearest_node_id = "central_node"
-        
+                
         return nearest_node_id
     
     def _calculate_distance(self, location1: Dict[str, float], location2: Dict[str, float]) -> float:

@@ -211,7 +211,6 @@ class CentralCoreController:
         
         # Find nearest node (edge or central) using scheduler method
         nearest_node_id = self.scheduler._find_nearest_node(user_location)
-        
         user_node = UserNodeInfo(
             user_id=data.get("user_id"),
             assigned_node_id=nearest_node_id,
@@ -316,6 +315,40 @@ class CentralCoreController:
             return self.central_node_api_controller.execute_function(data)
         except Exception as e:
             self.logger.error(f"Error executing function: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    def delete_all_users(self):
+        try:
+            self.scheduler.user_nodes.clear()
+            return {
+                "success": True,
+                "message": "All user nodes deleted successfully"
+            }
+        except Exception as e:
+            self.logger.error(f"Error deleting all user nodes: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    def delete_user(self, user_id: str):
+        try:
+            if user_id not in self.scheduler.user_nodes:
+                return {
+                    "success": False,
+                    "error": f"User {user_id} not found"
+                }
+
+            del self.scheduler.user_nodes[user_id]
+            return {
+                "success": True,
+                "message": f"User {user_id} deleted successfully"
+            }
+        except Exception as e:
+            self.logger.error(f"Error deleting user {user_id}: {e}")
             return {
                 "success": False,
                 "error": str(e)

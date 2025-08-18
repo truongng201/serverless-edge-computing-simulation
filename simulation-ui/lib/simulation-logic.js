@@ -56,7 +56,9 @@ export const getEditModeDescription = (editMode) => {
       return "User Edit: Drag users to move • Click to select";
     case "both":
       return "Full Edit: Drag nodes and users • Click to select";
+    case "drag":
+      return "Drag Mode: Drag to pan the map • Mouse wheel to zoom";
     default:
-      return "Click to add users • Mouse wheel to zoom • Ctrl+drag to pan the map";
+      return "Click to add users • Mouse wheel to zoom";
   }
 };

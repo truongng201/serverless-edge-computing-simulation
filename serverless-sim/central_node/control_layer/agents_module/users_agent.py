@@ -25,30 +25,33 @@ class UsersAgent:
     def _excute_function(self):
         for user_node in self.user_nodes.values():
             # Execute the function for each user node
-            self.logger.info(f"Executing function for user node: {user_node.user_id}")
-            if user_node.assigned_node_id:
-                # Forward the request to the assigned edge node
-                edge_node = self.scheduler.edge_nodes.get(user_node.assigned_node_id)
-                if edge_node:
-                    try:
-                        result = requests.post(f"http://{edge_node.endpoint}/api/v1/edge/execute", json={"user_id": user_node.user_id})
-                        if result.status_code == 200:
-                            self.logger.info(f"Function executed successfully for user node: {user_node.user_id}")
-                        else:
-                            self.logger.warning(f"Function execution failed for user node: {user_node.user_id}, status code: {result.status_code}")
-                    except Exception as e:
-                        self.logger.error(f"Error executing function for user node: {user_node.user_id}, error: {e}")
+            self.logger.info(f"Executing function for user node: {user_node.user_id} with assigned node: {user_node.assigned_node_id}")
+            assigned_node = user_node.assigned_node_id
+            if not assigned_node:
+                continue  # Skip if the assigned node is not valid
 
-                central_node = self.scheduler.central_node
-                if central_node:
-                    try:
-                        result = requests.post(f"http://{central_node['endpoint']}/api/v1/central/execute", json={"user_id": user_node.user_id})
-                        if result.status_code == 200:
-                            self.logger.info(f"Function executed successfully for user node: {user_node.user_id} (central node)")
-                        else:
-                            self.logger.warning(f"Function execution failed for user node: {user_node.user_id} (central node), status code: {result.status_code}")
-                    except Exception as e:
-                        self.logger.error(f"Error executing function for user node: {user_node.user_id} (central node), error: {e}")
+            if assigned_node == self.central_node['node_id']:
+                try:
+                    result = requests.post(f"http://{self.central_node['endpoint']}/api/v1/central/execute", json={"user_id": user_node.user_id})
+                    if result.status_code == 200:
+                        self.logger.info(f"Function executed successfully for user node: {user_node.user_id} (central node)")
+                    else:
+                        self.logger.warning(f"Function execution failed for user node: {user_node.user_id} (central node), status code: {result.status_code}")
+                except Exception as e:
+                    self.logger.error(f"Error executing function for user node: {user_node.user_id} (central node), error: {e}")
+                finally:
+                    continue  # Skip to the next user node if assigned to central node
+
+            edge_node = self.edge_nodes.get(user_node.assigned_node_id)
+            if edge_node:
+                try:
+                    result = requests.post(f"http://{edge_node.endpoint}/api/v1/edge/execute", json={"user_id": user_node.user_id})
+                    if result.status_code == 200:
+                        self.logger.info(f"Function executed successfully for user node: {user_node.user_id}")
+                    else:
+                        self.logger.warning(f"Function execution failed for user node: {user_node.user_id}, status code: {result.status_code}")
+                except Exception as e:
+                    self.logger.error(f"Error executing function for user node: {user_node.user_id}, error: {e}")
 
     def excute_function_loop(self):
         while True:
