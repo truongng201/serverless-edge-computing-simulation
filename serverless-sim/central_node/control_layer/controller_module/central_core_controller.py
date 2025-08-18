@@ -22,6 +22,7 @@ class CentralCoreController:
         # Initialize control layer components
         self.scheduler = Scheduler()
         self.predictor = WorkloadPredictor()
+        self.simulation = False
         self.central_node_api_controller = CentralNodeAPIController()
         CentralNodeAPIAgent(self.central_node_api_controller).start_all_tasks()
         SchedulerAgent(self.scheduler).start_all_tasks()
@@ -373,6 +374,61 @@ class CentralCoreController:
             }
         except Exception as e:
             self.logger.error(f"Error deleting user {user_id}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    def get_dact_sample(self):
+        try:
+            
+            return {
+                "success": True,
+                "sample": ""
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting DACT sample: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def get_vehicles_sample(self):
+        try:
+            return {
+                "success": True,
+                "sample": ""
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting vehicles sample: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def start_simulation(self):
+        try:
+            self.simulation = True
+            return {
+                "success": True,
+                "message": "Simulation started successfully"
+            }
+        except Exception as e:
+            self.logger.error(f"Error starting simulation: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    def stop_simulation(self):
+        try:
+            self.simulation = False
+            return {
+                "success": True,
+                "message": "Simulation stopped successfully"
+            }
+        except Exception as e:
+            self.logger.error(f"Error stopping simulation: {e}")
             return {
                 "success": False,
                 "error": str(e)
