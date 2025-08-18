@@ -163,6 +163,7 @@ export default function ControlPanelContent({
             assignedNodeID: user.assigned_node_id || null,
             latency: user.latency || 0,
             size: user.size || userSize[0] || 10,
+            last_executed_period: user.last_executed_period || null,
           }));
           setUsers(realUsers);
         }

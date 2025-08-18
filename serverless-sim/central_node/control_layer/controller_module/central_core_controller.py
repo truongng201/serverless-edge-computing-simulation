@@ -1,14 +1,17 @@
 import logging
 from typing import Dict, Any
 import time
+import random
 
 from central_node.api_layer.central_controller import CentralNodeAPIController
 
-from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo
+from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo, Latency
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
 from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
+
+from config import Config
 
 
 class CentralCoreController:
@@ -210,13 +213,30 @@ class CentralCoreController:
         user_location = data.get("location", {"x": 0.0, "y": 0.0})
         
         # Find nearest node (edge or central) using scheduler method
-        nearest_node_id = self.scheduler._find_nearest_node(user_location)
+        nearest_node_id, nearest_distance = self.scheduler._find_nearest_node(user_location)
+        data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
+        bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
+        propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
+        transmission_delay = data_size / bandwidth
+        total_turnaround_time = propagation_delay + transmission_delay
+        latency = Latency(
+            distance=nearest_distance,
+            data_size=data_size,
+            bandwidth=bandwidth,
+            propagation_delay=propagation_delay,
+            transmission_delay=transmission_delay,
+            computation_delay=0.0,
+            container_status="unknown",
+            total_turnaround_time=total_turnaround_time
+        )
         user_node = UserNodeInfo(
             user_id=data.get("user_id"),
             assigned_node_id=nearest_node_id,
             location=user_location,
+            last_executed=0,
             size=data.get("size", 10),
-            speed=data.get("speed", 5)
+            speed=data.get("speed", 5),
+            latency=latency
         )
         self.scheduler.create_user_node(user_node)
         return user_node
@@ -256,7 +276,8 @@ class CentralCoreController:
                             "location": updated_user.location,
                             "assigned_node_id": updated_user.assigned_node_id,
                             "size": updated_user.size,
-                            "speed": updated_user.speed
+                            "speed": updated_user.speed,
+                            "latency": updated_user.latency
                         }
                     }
             
@@ -285,7 +306,7 @@ class CentralCoreController:
                     assigned_central = "central_node"
                 elif user_node.assigned_node_id in self.scheduler.edge_nodes:
                     assigned_edge = user_node.assigned_node_id
-                
+                user_node.latency.total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
                 users.append({
                     "user_id": user_id,
                     "location": user_node.location,
@@ -294,7 +315,8 @@ class CentralCoreController:
                     "assigned_node_id": user_node.assigned_node_id,
                     "assigned_edge": assigned_edge,
                     "assigned_central": assigned_central,
-                    "latency": 0  # Can be calculated if needed
+                    "last_executed_period": time.time() - user_node.last_executed,
+                    "latency": user_node.latency
                 })
             
             return {

@@ -50,3 +50,7 @@ class Config:
     
     # User Configuration
     DEFAULT_EXECUTION_TIME_INTERVAL = 15 # seconds: every 3 seconds all user in simulation call it assigned node
+    DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES = (1024, 10240)  # 1 KB to 10 KB
+    DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (100, 1000)  # 100 B/ms to 1 KB/ms
+    DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s)
+    DEFAULT_PIXEL_TO_METERS = 10 # 1 pixel = 10 m
