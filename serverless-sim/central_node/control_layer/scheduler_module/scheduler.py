@@ -5,7 +5,7 @@ Handles scheduling decisions, load balancing, and request routing
 
 import logging
 import time
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
 from enum import Enum
 
@@ -18,6 +18,17 @@ class SchedulingStrategy(Enum):
     LEAST_LOADED = "least_loaded"
     GEOGRAPHIC = "geographic"
     PREDICTIVE = "predictive"
+
+@dataclass
+class Latency:
+    distance: float
+    data_size: float
+    bandwidth: float
+    propagation_delay: float
+    transmission_delay: float
+    computation_delay: float
+    container_status: str
+    total_turnaround_time: float
 
 @dataclass
 class EdgeNodeInfo:
@@ -35,7 +46,9 @@ class UserNodeInfo:
     location: Dict[str, float]  # {"x": ..., "y": ...}
     size: int
     speed: int
-    
+    last_executed: float
+    latency: Latency
+
 @dataclass
 class SchedulingDecision:
     target_node_id: str
@@ -51,7 +64,7 @@ class Scheduler:
             "node_id": "central_node",
             "endpoint": "localhost:8000",
             "location": {"x": 600, "y": 400}, # default location
-            "coverage": 500 # default coverage
+            "coverage": 0 # default coverage
         }
         self.user_nodes: Dict[str, UserNodeInfo] = {}
         self.round_robin_index = 0
@@ -220,15 +233,16 @@ class Scheduler:
         self.user_nodes[user_id].location = new_location
         
         # Recalculate nearest node
-        nearest_node_id = self._find_nearest_node(new_location)
+        nearest_node_id, nearest_distance = self._find_nearest_node(new_location)
         self.user_nodes[user_id].assigned_node_id = nearest_node_id
+        self.user_nodes[user_id].latency.distance = nearest_distance
         
         self.logger.info(f"Updated user {user_id} location to {new_location}, assigned to {nearest_node_id}")
         return True
     
-    def _find_nearest_node(self, user_location: Dict[str, float]) -> str:
+    def _find_nearest_node(self, user_location: Dict[str, float]) -> Tuple[str, float]:
         """Find the nearest node (edge or central) to the user location"""
-        min_distance = float('inf')
+        min_distance = self._calculate_distance(user_location, self.central_node["location"])
         nearest_node_id = "central_node"  # default to central node
         
         # Check all edge nodes
@@ -237,14 +251,9 @@ class Scheduler:
             if distance < min_distance:
                 min_distance = distance
                 nearest_node_id = node_id
-        
-        # Check central node
-        central_distance = self._calculate_distance(user_location, self.central_node["location"])
-        if central_distance < min_distance:
-            nearest_node_id = "central_node"
-        
-        return nearest_node_id
-    
+
+        return nearest_node_id, min_distance * Config.DEFAULT_PIXEL_TO_METERS
+
     def _calculate_distance(self, location1: Dict[str, float], location2: Dict[str, float]) -> float:
         """Calculate Euclidean distance between two locations"""
         dx = location1["x"] - location2["x"]

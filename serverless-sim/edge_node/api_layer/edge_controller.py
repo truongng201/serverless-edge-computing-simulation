@@ -2,7 +2,7 @@ import logging
 import time
 import random
 import string
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Tuple
 
 from shared_resource_layer.container_manager import ContainerManager, ContainerState
 from shared_resource_layer.system_metrics import SystemMetricsCollector
@@ -47,7 +47,7 @@ class EdgeNodeAPIController:
             function_data["image"] = image
 
             # Check if we need to create a new container or reuse existing
-            container_id = self._get_or_create_container(function_data["function_name"], image)
+            container_id, container_status = self._get_or_create_container(function_data["function_name"], image)
 
             if not container_id:
                 return {
@@ -72,6 +72,7 @@ class EdgeNodeAPIController:
                 "result": result,
                 "function_name": function_data["function_name"],
                 "container_id": container_id,
+                "container_status": container_status,
                 "execution_time": execution_time,
                 "node_id": self.node_id
             }
@@ -86,7 +87,7 @@ class EdgeNodeAPIController:
         finally:
             self.active_requests -= 1
             
-    def _get_or_create_container(self, function_name: str, image: str) -> Optional[str]:
+    def _get_or_create_container(self, function_name: str, image: str) -> Tuple[str]:
         """Get existing container or create new one"""
         # Check for existing warm container for this function
         containers = self.container_manager.list_containers(ContainerState.WARM)
@@ -97,7 +98,7 @@ class EdgeNodeAPIController:
 
             if self.container_manager.restart_container(container.container_id, function_name):
                 self.logger.info(f"Warm start for function {function_name}")
-                return container.container_id
+                return container.container_id, "warm"
 
         # Create new container (cold start)
         container_id = self.container_manager.create_container(
@@ -107,8 +108,8 @@ class EdgeNodeAPIController:
 
         if container_id and self.container_manager.start_container(container_id):
             self.logger.info(f"Cold start for function {function_name}")
-            return container_id
-        return None
+            return container_id, "cold"
+        return None, None
 
     def get_node_status(self) -> Dict[str, Any]:
         """Get current node status"""

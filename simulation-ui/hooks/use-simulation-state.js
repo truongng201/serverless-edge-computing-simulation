@@ -31,7 +31,7 @@ export function useSimulationState() {
   const [edgeCoverage, setEdgeCoverage] = useState([500]);
 
   // Central node settings
-  const [centralCoverage, setCentralCoverage] = useState([500]);
+  const [centralCoverage, setCentralCoverage] = useState([0]);
 
   // Zoom and Pan state
   const [zoomLevel, setZoomLevel] = useState(1);

@@ -1,15 +1,42 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import { Slider } from "@/components/ui/slider"
-import { Switch } from "@/components/ui/switch"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Label } from "@/components/ui/label"
-import { Progress } from "@/components/ui/progress"
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Slider } from "@/components/ui/slider";
+import { Switch } from "@/components/ui/switch";
 import {
-  Play, Pause, RotateCcw, Users, Server, Plus, Minus, Database, Trash2, Link, Unlink, Edit3, Move, ChevronLeft, MapPin, Target, Navigation, Eye, EyeOff, ChevronRight, SkipBack, SkipForward
-} from "lucide-react"
-import { useState, useEffect, useRef } from "react"
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
+import { Progress } from "@/components/ui/progress";
+import {
+  Play,
+  Pause,
+  RotateCcw,
+  Users,
+  Server,
+  Plus,
+  Minus,
+  Database,
+  Trash2,
+  Link,
+  Unlink,
+  Edit3,
+  Move,
+  ChevronLeft,
+  MapPin,
+  Target,
+  Navigation,
+  Eye,
+  EyeOff,
+  ChevronRight,
+  SkipBack,
+  SkipForward,
+} from "lucide-react";
+import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 
 export default function ControlPanelContent({
@@ -68,54 +95,134 @@ export default function ControlPanelContent({
   simulationMode,
   setSimulationMode,
   realModeData,
-  setRealModeData
+  setRealModeData,
+  selectedScenario = "none",
+  setSelectedScenario = () => {},
 }) {
-  const [loadingData, setLoadingData] = useState(false)
-  const [dataError, setDataError] = useState("")
-  const intervalRef = useRef(null)
-  const realModeIntervalRef = useRef(null)
-  const transitionTimeoutRef = useRef(null)
+  const [loadingData, setLoadingData] = useState(false);
+  const [dataError, setDataError] = useState("");
+  const [simulationLoading, setSimulationLoading] = useState(false);
+  const intervalRef = useRef(null);
+  const realModeIntervalRef = useRef(null);
+  const transitionTimeoutRef = useRef(null);
 
-    // Function to fetch real cluster status
+  // Function to fetch DACT sample data
+  const fetchDACTSample = async () => {
+    try {
+      setLoadingData(true);
+      setDataError("");
+
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_dact_sample`
+      );
+
+      if (response.data && response.data.success && response.data.users) {
+        const dactUsers = response.data.users.map((user, index) => ({
+          id: user.user_id || `dact_user_${index}`,
+          x: user.location.x || Math.random() * 800,
+          y: user.location.y || Math.random() * 600,
+          vx: 0,
+          vy: 0,
+          assignedEdge: user.assigned_edge || null,
+          assignedCentral: user.assigned_central || null,
+          assignedNodeID: user.assigned_node_id || null,
+          latency: user.latency || 0,
+          size: user.size || userSize[0] || 10,
+          last_executed_period: user.last_executed_period || null,
+        }));
+        setUsers(dactUsers);
+      }
+    } catch (error) {
+      console.error("Error fetching DACT sample data:", error);
+      setDataError(`Failed to fetch DACT sample: ${error.message}`);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  // Function to fetch Vehicle sample data
+  const fetchVehicleSample = async () => {
+    try {
+      setLoadingData(true);
+      setDataError("");
+
+      const response = await axios.get(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_vehicle_sample`
+      );
+
+      if (response.data && response.data.success && response.data.users) {
+        const vehicleUsers = response.data.users.map((user, index) => ({
+          id: user.user_id || `vehicle_user_${index}`,
+          x: user.location.x || Math.random() * 800,
+          y: user.location.y || Math.random() * 600,
+          vx: 0,
+          vy: 0,
+          assignedEdge: user.assigned_edge || null,
+          assignedCentral: user.assigned_central || null,
+          assignedNodeID: user.assigned_node_id || null,
+          latency: user.latency || 0,
+          size: user.size || userSize[0] || 10,
+          last_executed_period: user.last_executed_period || null,
+        }));
+        setUsers(vehicleUsers);
+      }
+    } catch (error) {
+      console.error("Error fetching Vehicle sample data:", error);
+      setDataError(`Failed to fetch Vehicle sample: ${error.message}`);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  // Function to fetch real cluster status
   const fetchRealClusterStatus = async () => {
     try {
-      setLoadingData(true)
-      setDataError("")
+      setLoadingData(true);
+      setDataError("");
 
       // Fetch cluster status and all users in parallel
       const [clusterResponse, usersResponse] = await Promise.all([
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/cluster/status`),
-        axios.get(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_all_users`)
-      ])
+        axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/cluster/status`
+        ),
+        axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_all_users`
+        ),
+      ]);
 
       if (clusterResponse.data && clusterResponse.data.success) {
-        setRealModeData(clusterResponse.data)
-        
-        
+        setRealModeData(clusterResponse.data);
+
         const realCentralNode = {
           id: clusterResponse.data.central_node.id || "central_node",
           x: clusterResponse.data.central_node.location.x || 600,
           y: clusterResponse.data.central_node.location.y || 400,
-          coverage: clusterResponse.data.central_node.coverage || centralCoverage[0] || 500,
+          coverage:
+            clusterResponse.data.central_node.coverage || centralCoverage[0],
           currentLoad: clusterResponse.data.central_node.cpu_usage || 0,
-        }
+        };
 
-        setCentralNodes([realCentralNode])
-        
-        const realEdgeNodes = (clusterResponse.data.cluster_info.edge_nodes_info || []).map((node, index) => ({
+        setCentralNodes([realCentralNode]);
+
+        const realEdgeNodes = (
+          clusterResponse.data.cluster_info.edge_nodes_info || []
+        ).map((node, index) => ({
           id: node.node_id || `edge_${index}`,
           x: node.location.x || 100 + index * 100,
           y: node.location.y || 200 + index * 100,
-          coverage: node.coverage || edgeCoverage[0] || 500,
+          coverage: node.coverage || edgeCoverage[0],
           currentLoad: node.metrics.cpu_usage || 0,
-          
-        }))
-        
+        }));
+
         // Always update edge nodes array
-        setEdgeNodes(realEdgeNodes)
+        setEdgeNodes(realEdgeNodes);
 
         // Update users from API response
-        if (usersResponse.data && usersResponse.data.success && usersResponse.data.users) {
+        if (
+          usersResponse.data &&
+          usersResponse.data.success &&
+          usersResponse.data.users
+        ) {
           const realUsers = usersResponse.data.users.map((user, index) => ({
             id: user.user_id || `user_${index}`,
             x: user.location.x || 0,
@@ -127,49 +234,63 @@ export default function ControlPanelContent({
             assignedNodeID: user.assigned_node_id || null,
             latency: user.latency || 0,
             size: user.size || userSize[0] || 10,
-            
-          }))
-          setUsers(realUsers)
+            last_executed_period: user.last_executed_period || null,
+          }));
+          setUsers(realUsers);
         }
       }
     } catch (error) {
-      console.error('Error fetching real cluster status:', error)
-      setDataError(`Failed to fetch real data: ${error.message}`)
+      console.error("Error fetching real cluster status:", error);
+      setDataError(`Failed to fetch real data: ${error.message}`);
     } finally {
-      setLoadingData(false)
+      setLoadingData(false);
     }
-  }
+  };
+
+  // Handle scenario selection change
+  const handleScenarioChange = async (scenario) => {
+    setSelectedScenario(scenario);
+    
+    if (scenario === "scenario2") {
+      // Load DACT sample data
+      await fetchDACTSample();
+    } else if (scenario === "scenario3") {
+      // Load Vehicle sample data
+      await fetchVehicleSample();
+    } else if (scenario === "none") {
+      // Clear users for manual adding
+      clearAllUsers();
+    }
+  };
 
   // Handle simulation mode change
   const handleSimulationModeChange = async (mode) => {
-    setSimulationMode(mode)
-    
+    setSimulationMode(mode);
+
     if (mode === "real") {
       // Fetch initial real data
-      await fetchRealClusterStatus()
-      
-      // Start real-time polling every 5 seconds
+      await fetchRealClusterStatus();
+
+      // Start real-time polling with interval based on simulation speed
       if (realModeIntervalRef.current) {
-        clearInterval(realModeIntervalRef.current)
+        clearInterval(realModeIntervalRef.current);
       }
-      
-      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, 5000)
+
+      // Calculate interval: 1x = 5000ms, 5x = 1000ms
+      // Formula: 5000 / simulationSpeed[0]
+      const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
+      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, intervalMs);
     } else {
       // Stop real-time polling
       if (realModeIntervalRef.current) {
-        clearInterval(realModeIntervalRef.current)
-        realModeIntervalRef.current = null
+        clearInterval(realModeIntervalRef.current);
+        realModeIntervalRef.current = null;
       }
-      setRealModeData(null)
+      setRealModeData(null);
     }
-  }
-
-  
-
+  };
 
   useEffect(() => {
-    
-
     // Cleanup on unmount
     return () => {
       if (intervalRef.current) {
@@ -181,8 +302,80 @@ export default function ControlPanelContent({
     };
   }, [isSimulating, simulationSpeed]);
 
-  // Override resetSimulation to stop intervals
-  const handleResetSimulation = () => {
+  // Handle simulation speed changes in real mode
+  useEffect(() => {
+    if (simulationMode === "real" && realModeIntervalRef.current) {
+      // Clear existing interval
+      clearInterval(realModeIntervalRef.current);
+      
+      // Calculate new interval based on simulation speed
+      const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
+      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, intervalMs);
+    }
+  }, [simulationSpeed, simulationMode]);
+
+  // Function to start simulation via API
+  const handleStartSimulation = async () => {
+    try {
+      setDataError(""); // Clear any previous errors
+      setSimulationLoading(true);
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_simulation`
+      );
+      if (response.data && response.data.success) {
+        setIsSimulating(true);
+        console.log("Simulation started successfully");
+      }
+    } catch (error) {
+      console.error("Error starting simulation:", error);
+      setDataError(`Failed to start simulation: ${error.message}`);
+    } finally {
+      setSimulationLoading(false);
+    }
+  };
+
+  // Function to stop simulation via API
+  const handleStopSimulation = async () => {
+    try {
+      setDataError(""); // Clear any previous errors
+      setSimulationLoading(true);
+      const response = await axios.post(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/stop_simulation`
+      );
+      if (response.data && response.data.success) {
+        setIsSimulating(false);
+        console.log("Simulation stopped successfully");
+      }
+    } catch (error) {
+      console.error("Error stopping simulation:", error);
+      setDataError(`Failed to stop simulation: ${error.message}`);
+    } finally {
+      setSimulationLoading(false);
+    }
+  };
+
+  // Function to handle start/stop simulation button click
+  const handleToggleSimulation = async () => {
+    if (isSimulating) {
+      await handleStopSimulation();
+    } else {
+      await handleStartSimulation();
+    }
+  };
+
+  // Override resetSimulation to stop intervals and API simulation
+  const handleResetSimulation = async () => {
+    // First, stop any running simulation via API
+    if (isSimulating) {
+      try {
+        await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/stop_simulation`);
+        console.log("Simulation stopped during reset");
+      } catch (error) {
+        console.error("Error stopping simulation during reset:", error);
+      }
+    }
+
+    // Clean up intervals
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
@@ -195,9 +388,13 @@ export default function ControlPanelContent({
       clearTimeout(transitionTimeoutRef.current);
       transitionTimeoutRef.current = null;
     }
+    
+    // Reset states
     setIsSimulating(false);
     setSimulationMode("demo");
     setRealModeData(null);
+    setDataError("");
+    setSimulationLoading(false);
     resetSimulation();
   };
   return (
@@ -231,6 +428,7 @@ export default function ControlPanelContent({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None - Add Users</SelectItem>
+                  <SelectItem value="drag">Drag - Pan View</SelectItem>
                   <SelectItem value="nodes">Nodes Only</SelectItem>
                   <SelectItem value="users">Users Only</SelectItem>
                   <SelectItem value="both">Nodes & Users</SelectItem>
@@ -239,19 +437,39 @@ export default function ControlPanelContent({
             </div>
             {editMode !== "none" && (
               <div className="text-xs text-gray-600 space-y-1">
-                <div>• Drag to move elements</div>
-                <div>• Click to select elements</div>
-                <div>• Dashed rings show editable items</div>
+                {editMode === "drag" ? (
+                  <>
+                    <div>• Drag to pan the view</div>
+                    <div>• Mouse wheel to zoom</div>
+                    <div>• Click to select elements</div>
+                  </>
+                ) : (
+                  <>
+                    <div>• Drag to move elements</div>
+                    <div>• Click to select elements</div>
+                    <div>• Dashed rings show editable items</div>
+                  </>
+                )}
               </div>
             )}
             {(selectedEdge || selectedCentral) && (
-              <Button onClick={deleteSelectedNode} size="sm" variant="destructive" className="w-full">
+              <Button
+                onClick={deleteSelectedNode}
+                size="sm"
+                variant="destructive"
+                className="w-full"
+              >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Selected Node
               </Button>
             )}
             {selectedUser && (
-              <Button onClick={deleteSelectedUser} size="sm" variant="destructive" className="w-full">
+              <Button
+                onClick={deleteSelectedUser}
+                size="sm"
+                variant="destructive"
+                className="w-full"
+              >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Delete Selected User
               </Button>
@@ -264,28 +482,48 @@ export default function ControlPanelContent({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Clear Controls</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <Button onClick={clearAllUsers} size="sm" variant="outline">
-                <Users className="w-4 h-4 mr-1" />
-                Users
-              </Button>
-              <Button onClick={clearAllEdgeNodes} size="sm" variant="outline">
-                <Server className="w-4 h-4 mr-1" />
-                Edges
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button onClick={clearAllCentralNodes} size="sm" variant="outline">
-                <Database className="w-4 h-4 mr-1" />
-                Central
-              </Button>
-              <Button onClick={clearEverything} size="sm" variant="destructive">
-                <Trash2 className="w-4 h-4 mr-1" />
-                All
-              </Button>
-            </div>
-          </CardContent>
+          {simulationMode === "real" && (
+            <CardContent className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={clearAllUsers} size="sm" variant="outline">
+                  <Users className="w-4 h-4 mr-1" />
+                  Users
+                </Button>
+              </div>
+            </CardContent>
+          )}
+          {simulationMode === "demo" && (
+            <CardContent className="space-y-2">
+              <div className="grid grid-cols-2 gap-2">
+                <Button onClick={clearAllUsers} size="sm" variant="outline">
+                  <Users className="w-4 h-4 mr-1" />
+                  Users
+                </Button>
+                <Button onClick={clearAllEdgeNodes} size="sm" variant="outline">
+                  <Server className="w-4 h-4 mr-1" />
+                  Edges
+                </Button>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={clearAllCentralNodes}
+                  size="sm"
+                  variant="outline"
+                >
+                  <Database className="w-4 h-4 mr-1" />
+                  Central
+                </Button>
+                <Button
+                  onClick={clearEverything}
+                  size="sm"
+                  variant="destructive"
+                >
+                  <Trash2 className="w-4 h-4 mr-1" />
+                  All
+                </Button>
+              </div>
+            </CardContent>
+          )}
         </Card>
 
         {/* Auto Placement Controls */}
@@ -299,7 +537,10 @@ export default function ControlPanelContent({
           <CardContent className="space-y-3">
             <div className="space-y-2">
               <Label className="text-xs">Algorithm</Label>
-              <Select value={placementAlgorithm} onValueChange={setPlacementAlgorithm}>
+              <Select
+                value={placementAlgorithm}
+                onValueChange={setPlacementAlgorithm}
+              >
                 <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
@@ -311,28 +552,30 @@ export default function ControlPanelContent({
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
-              <Label className="text-xs">Max Coverage Distance: {maxCoverageDistance[0]}px</Label>
-              <Slider 
-                value={maxCoverageDistance} 
-                onValueChange={setMaxCoverageDistance} 
-                max={200} 
-                min={50} 
-                step={10} 
-                className="h-4" 
+              <Label className="text-xs">
+                Max Coverage Distance: {maxCoverageDistance[0]}px
+              </Label>
+              <Slider
+                value={maxCoverageDistance}
+                onValueChange={setMaxCoverageDistance}
+                max={200}
+                min={50}
+                step={10}
+                className="h-4"
               />
             </div>
-            
+
             <div className="text-xs text-gray-600 mb-2">
               <div>Edge Servers: {edgeNodes.length}</div>
               <div>Users: {users?.length || 0}</div>
             </div>
-            
-            <Button 
-              onClick={runPlacementAlgorithm} 
-              size="sm" 
-              variant="default" 
+
+            <Button
+              onClick={runPlacementAlgorithm}
+              size="sm"
+              variant="default"
               className="w-full"
               disabled={!users?.length || !edgeNodes.length}
             >
@@ -342,7 +585,6 @@ export default function ControlPanelContent({
           </CardContent>
         </Card>
 
-                
         {/* Simulation Mode Selector */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -354,7 +596,10 @@ export default function ControlPanelContent({
           <CardContent className="space-y-3">
             <div className="space-y-2">
               <Label className="text-xs">Mode</Label>
-              <Select value={simulationMode} onValueChange={handleSimulationModeChange}>
+              <Select
+                value={simulationMode}
+                onValueChange={handleSimulationModeChange}
+              >
                 <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
@@ -364,13 +609,13 @@ export default function ControlPanelContent({
                 </SelectContent>
               </Select>
             </div>
-            
+
             {simulationMode === "real" && (
               <div className="space-y-2">
                 <div className="text-xs text-green-600 font-medium">
                   Real Mode Active - Live data from API
                 </div>
-                
+
                 <div className="bg-green-50 p-2 rounded text-xs">
                   <div className="flex items-center justify-between">
                     <span>Status:</span>
@@ -390,20 +635,53 @@ export default function ControlPanelContent({
                   </div>
                   {realModeData && (
                     <div className="mt-2 text-gray-700">
-                      <div>Central CPU: {realModeData.central_node?.cpu_usage?.toFixed(1)}%</div>
+                      <div>
+                        Central CPU:{" "}
+                        {realModeData.central_node?.cpu_usage?.toFixed(1)}%
+                      </div>
                     </div>
                   )}
                 </div>
               </div>
             )}
-            
+
             {simulationMode === "demo" && (
               <div className="text-xs text-gray-600">
                 Demo mode - manual control of nodes and users
               </div>
             )}
-            
-            {dataError && <div className="text-xs text-red-600">{dataError}</div>}
+
+            {dataError && (
+              <div className="text-xs text-red-600">{dataError}</div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Scenario Selection */}
+        <Card className="mb-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Navigation className="w-4 h-4" />
+              Scenario Selection
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <Label className="text-xs">Scenario</Label>
+              <Select value={selectedScenario} onValueChange={handleScenarioChange}>
+                <SelectTrigger className="h-8">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Self adding user)</SelectItem>
+                  <SelectItem value="scenario2">Scenario 2: DACT Sample</SelectItem>
+                  <SelectItem value="scenario3">Scenario 3: Vehicle Sample</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="text-xs text-gray-600">
+              Select a predefined scenario to load sample data, or choose "None" to manually add users.
+            </div>
           </CardContent>
         </Card>
 
@@ -412,40 +690,58 @@ export default function ControlPanelContent({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Simulation</CardTitle>
           </CardHeader>
-          
+
           <CardContent className="space-y-3">
-            
             <div className="flex gap-2">
-              <Button 
-                onClick={() => setIsSimulating(!isSimulating)} 
-                variant={isSimulating ? "destructive" : "default"} 
-                size="sm" 
+              <Button
+                onClick={handleToggleSimulation}
+                variant={isSimulating ? "destructive" : "default"}
+                size="sm"
                 className="flex-1"
-                disabled={users?.length === 0} // Disable if no users
+                disabled={users?.length === 0 || simulationLoading} // Disable if no users or loading
               >
-                {isSimulating ? <Pause className="w-4 h-4" /> : <Play className="w-4 h-4" />}
-                {isSimulating ? "Pause" : "Start"}
+                {isSimulating ? (
+                  <Pause className="w-4 h-4" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+                {simulationLoading ? "Loading..." : (isSimulating ? "Stop" : "Start")}
               </Button>
-              <Button onClick={handleResetSimulation} variant="outline" size="sm">
+              <Button
+                onClick={handleResetSimulation}
+                variant="outline"
+                size="sm"
+                disabled={simulationLoading}
+              >
                 <RotateCcw className="w-4 h-4" />
               </Button>
             </div>
-            <div className="space-y-2">
-              <Label className="text-xs">
-                Speed: {simulationSpeed[0]}x 
-              </Label>
-              <Slider value={simulationSpeed} onValueChange={setSimulationSpeed} max={5} min={0.1} step={0.1} />
-              <div className="text-xs text-gray-500">
-                Higher speed = faster step transitions
+            {isSimulating && (
+              <div className="text-xs text-green-600 font-medium flex items-center gap-1">
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                API Simulation Active
               </div>
+            )}
+            <div className="space-y-2">
+              <Label className="text-xs">Speed: {simulationSpeed[0]}x</Label>
+              <Slider
+                value={simulationSpeed}
+                onValueChange={setSimulationSpeed}
+                max={5}
+                min={0.1}
+                step={0.1}
+              />
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-xs">Prediction</Label>
-              <Switch checked={predictionEnabled} onCheckedChange={setPredictionEnabled} />
+              <Switch
+                checked={predictionEnabled}
+                onCheckedChange={setPredictionEnabled}
+              />
             </div>
           </CardContent>
         </Card>
-      
+
         {/* Zoom Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -453,16 +749,31 @@ export default function ControlPanelContent({
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex gap-2">
-              <Button onClick={zoomIn} size="sm" variant="outline" className="flex-1">
+              <Button
+                onClick={zoomIn}
+                size="sm"
+                variant="outline"
+                className="flex-1"
+              >
                 <Plus className="w-4 h-4" />
                 Zoom In
               </Button>
-              <Button onClick={zoomOut} size="sm" variant="outline" className="flex-1">
+              <Button
+                onClick={zoomOut}
+                size="sm"
+                variant="outline"
+                className="flex-1"
+              >
                 <Minus className="w-4 h-4" />
                 Zoom Out
               </Button>
             </div>
-            <Button onClick={resetZoom} size="sm" variant="outline" className="w-full">
+            <Button
+              onClick={resetZoom}
+              size="sm"
+              variant="outline"
+              className="w-full"
+            >
               <RotateCcw className="w-4 h-4 mr-2" />
               Reset View
             </Button>
@@ -471,7 +782,10 @@ export default function ControlPanelContent({
                 <span>Zoom Level</span>
                 <span>{(zoomLevel * 100).toFixed(0)}%</span>
               </div>
-              <Progress value={((zoomLevel - 0.2) / (5 - 0.2)) * 100} className="h-2" />
+              <Progress
+                value={((zoomLevel - 0.2) / (5 - 0.2)) * 100}
+                className="h-2"
+              />
             </div>
           </CardContent>
         </Card>
@@ -498,8 +812,16 @@ export default function ControlPanelContent({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label className="text-xs">Prediction Steps: {predictionSteps[0]}</Label>
-              <Slider value={predictionSteps} onValueChange={setPredictionSteps} max={20} min={5} step={1} />
+              <Label className="text-xs">
+                Prediction Steps: {predictionSteps[0]}
+              </Label>
+              <Slider
+                value={predictionSteps}
+                onValueChange={setPredictionSteps}
+                max={20}
+                min={5}
+                step={1}
+              />
             </div>
           </CardContent>
         </Card>
@@ -512,11 +834,23 @@ export default function ControlPanelContent({
           <CardContent className="space-y-3">
             <div className="space-y-2">
               <Label className="text-xs">Speed: {userSpeed[0]}</Label>
-              <Slider value={userSpeed} onValueChange={setUserSpeed} max={10} min={0.5} step={0.5} />
+              <Slider
+                value={userSpeed}
+                onValueChange={setUserSpeed}
+                max={10}
+                min={0.5}
+                step={0.5}
+              />
             </div>
             <div className="space-y-2">
               <Label className="text-xs">Size: {userSize[0]}</Label>
-              <Slider value={userSize} onValueChange={setUserSize} max={15} min={5} step={1} />
+              <Slider
+                value={userSize}
+                onValueChange={setUserSize}
+                max={15}
+                min={5}
+                step={1}
+              />
             </div>
           </CardContent>
         </Card>
@@ -532,11 +866,21 @@ export default function ControlPanelContent({
           <CardContent className="space-y-3">
             {simulationMode !== "real" && (
               <div className="flex gap-2">
-                <Button onClick={addCentralNode} size="sm" variant="outline" className="flex-1">
+                <Button
+                  onClick={addCentralNode}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                >
                   <Plus className="w-4 h-4" />
                   Add
                 </Button>
-                <Button onClick={removeCentralNode} size="sm" variant="outline" className="flex-1">
+                <Button
+                  onClick={removeCentralNode}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                >
                   <Minus className="w-4 h-4" />
                   Remove
                 </Button>
@@ -547,10 +891,18 @@ export default function ControlPanelContent({
                 Central Node managed by real system
               </div>
             )}
-           
+
             <div className="space-y-2">
-              <Label className="text-xs">Coverage: {centralCoverage[0]}px</Label>
-              <Slider value={centralCoverage} onValueChange={setCentralCoverage} max={1000} min={0} step={20} />
+              <Label className="text-xs">
+                Coverage: {centralCoverage[0]}px
+              </Label>
+              <Slider
+                value={centralCoverage}
+                onValueChange={setCentralCoverage}
+                max={1000}
+                min={0}
+                step={20}
+              />
             </div>
           </CardContent>
         </Card>
@@ -563,11 +915,21 @@ export default function ControlPanelContent({
           <CardContent className="space-y-3">
             {simulationMode !== "real" && (
               <div className="flex gap-2">
-                <Button onClick={addEdgeNode} size="sm" variant="outline" className="flex-1">
+                <Button
+                  onClick={addEdgeNode}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                >
                   <Plus className="w-4 h-4" />
                   Add
                 </Button>
-                <Button onClick={removeEdgeNode} size="sm" variant="outline" className="flex-1">
+                <Button
+                  onClick={removeEdgeNode}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1"
+                >
                   <Minus className="w-4 h-4" />
                   Remove
                 </Button>
@@ -578,15 +940,20 @@ export default function ControlPanelContent({
                 Edge Nodes managed by real system
               </div>
             )}
-            
+
             <div className="space-y-2">
               <Label className="text-xs">Coverage: {edgeCoverage[0]}px</Label>
-              <Slider value={edgeCoverage} onValueChange={setEdgeCoverage} max={1000} min={0} step={10} />
+              <Slider
+                value={edgeCoverage}
+                onValueChange={setEdgeCoverage}
+                max={1000}
+                min={0}
+                step={10}
+              />
             </div>
-            
           </CardContent>
         </Card>
       </div>
     </>
-  )
+  );
 }

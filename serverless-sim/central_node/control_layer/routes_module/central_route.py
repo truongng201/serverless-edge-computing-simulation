@@ -104,6 +104,18 @@ def get_all_users():
     status_code = 200 if result["success"] else 500
     return jsonify(result), status_code
 
+@central_route.route("/delete_all_users", methods=["DELETE"])
+def delete_all_users():
+    result = central_core_controller.delete_all_users()
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
+
+@central_route.route('/delete_user/<user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    result = central_core_controller.delete_user(user_id)
+    status_code = 200 if result["success"] else 500
+    return jsonify(result), status_code
+
 @central_route.route('/execute', methods=['POST'])
 def execute_function():
     if not central_core_controller:
@@ -111,6 +123,38 @@ def execute_function():
         
     data = request.get_json()
     result = central_core_controller.execute_function(data)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route('/get_dact_sample', methods=['GET'])
+def get_dact_sample():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    result = central_core_controller.get_dact_sample()
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route('/get_vehicles_sample', methods=['GET'])
+def get_vehicles_sample():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    result = central_core_controller.get_vehicles_sample()
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route('/start_simulation', methods=['POST'])
+def start_simulation():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    result = central_core_controller.start_simulation()
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route('/stop_simulation', methods=['POST'])
+def stop_simulation():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    result = central_core_controller.stop_simulation()
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 

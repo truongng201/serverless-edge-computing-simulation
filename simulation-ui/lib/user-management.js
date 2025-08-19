@@ -185,8 +185,24 @@ export const updateSelectedUser = (selectedUser, updates, setUsers, setSelectedU
 };
 
 // Delete selected user
-export const deleteSelectedUser = (selectedUser, setUsers, setSelectedUser) => {
+export const deleteSelectedUser = async (selectedUser, setUsers, setSelectedUser) => {
   if (!selectedUser) return;
+  try {
+    // Call API to delete user if API URL is available
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/delete_user/${selectedUser.id}`, {
+        method: 'DELETE'
+      });
+
+      if (!response.ok) {
+        console.error('Failed to delete user from server:', response.statusText);
+      } else {
+        console.log('User deleted successfully from server');
+      }
+    }
+  } catch (error) {
+    console.error('Error deleting user from server:', error);
+  }
   setUsers((prevUsers) => {
     const newUsers = [];
     for (let i = 0; i < prevUsers.length; i++) {
