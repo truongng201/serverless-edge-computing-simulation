@@ -53,6 +53,14 @@ export default function MetricsPanelContent({
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-2">
                 <Timer className="w-4 h-4" />
+                Total Latency (ms)
+              </span>
+              <Badge variant="outline">{Math.round(totalLatency || 0)}</Badge>
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-2">
+                <Timer className="w-4 h-4" />
                 Average Load
               </span>
               <Badge variant={realModeData?.cluster_info?.average_load > 90 ? "destructive" : realModeData?.cluster_info?.average_load > 70 ? "secondary" : "default"}>

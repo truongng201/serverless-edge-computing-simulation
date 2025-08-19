@@ -1,4 +1,6 @@
 import { useState, useRef, useEffect } from "react";
+import { calculateLatency } from "../lib/placement-algorithms";
+import { calculateDistance } from "../lib/helper";
 
 export function useSimulationState() {
   const canvasRef = useRef(null);
@@ -56,6 +58,56 @@ export function useSimulationState() {
   // Auto Placement state
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
   const [maxCoverageDistance, setMaxCoverageDistance] = useState([100]);
+
+  // Recalculate average latency whenever users update
+  useEffect(() => {
+    if (!users || users.length === 0) {
+      setTotalLatency(0);
+      return;
+    }
+    const sum = users.reduce((acc, u) => acc + (Number(u.latency) || 0), 0);
+    setTotalLatency(Math.round(sum / users.length));
+  }, [users, setTotalLatency]);
+
+  // Periodic auto (re)assignment every 10s: pick min latency among all edges and centrals
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (!autoAssignment) return;
+      if ((edgeNodes?.length || 0) + (centralNodes?.length || 0) === 0) return;
+      if (!users || users.length === 0) return;
+
+      setUsers((prev) => prev.map((u) => {
+        let bestLatency = Number.POSITIVE_INFINITY;
+        let bestType = null;
+        let bestId = null;
+
+        // Evaluate all edges
+        for (let i = 0; i < edgeNodes.length; i++) {
+          const n = edgeNodes[i];
+          const lat = calculateLatency(u, n.id, "edge", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
+          if (lat < bestLatency) { bestLatency = lat; bestType = "edge"; bestId = n.id; }
+        }
+
+        // Evaluate all centrals
+        for (let i = 0; i < centralNodes.length; i++) {
+          const c = centralNodes[i];
+          const lat = calculateLatency(u, c.id, "central", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
+          if (lat < bestLatency) { bestLatency = lat; bestType = "central"; bestId = c.id; }
+        }
+
+        if (!bestType || !bestId || !isFinite(bestLatency)) return u;
+
+        return {
+          ...u,
+          assignedEdge: bestType === "edge" ? bestId : null,
+          assignedCentral: bestType === "central" ? bestId : null,
+          latency: bestLatency,
+        };
+      }));
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [autoAssignment, edgeNodes, centralNodes, users]);
 
   // Update coverage for existing nodes when slider changes
   useEffect(() => {
