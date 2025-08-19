@@ -1,14 +1,19 @@
 import logging
 from typing import Dict, Any
 import time
+import random
 
 from central_node.api_layer.central_controller import CentralNodeAPIController
+from central_node.api_layer.central_agent import CentralNodeAPIAgent
 
-from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo
+from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo, Latency
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
 from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
+from central_node.control_layer.helper_module.data_manager import DataManager
+
+from config import Config
 
 
 class CentralCoreController:
@@ -18,7 +23,12 @@ class CentralCoreController:
         # Initialize control layer components
         self.scheduler = Scheduler()
         self.predictor = WorkloadPredictor()
+        self.data_manager = DataManager()
         self.central_node_api_controller = CentralNodeAPIController()
+        self.simulation = False
+        self.step_id = None
+        
+        CentralNodeAPIAgent(self.central_node_api_controller).start_all_tasks()
         SchedulerAgent(self.scheduler).start_all_tasks()
         UsersAgent(self.scheduler).start_all_tasks()
 
@@ -210,13 +220,30 @@ class CentralCoreController:
         user_location = data.get("location", {"x": 0.0, "y": 0.0})
         
         # Find nearest node (edge or central) using scheduler method
-        nearest_node_id = self.scheduler._find_nearest_node(user_location)
+        nearest_node_id, nearest_distance = self.scheduler._find_nearest_node(user_location)
+        data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
+        bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
+        propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
+        transmission_delay = data_size / bandwidth
+        total_turnaround_time = propagation_delay + transmission_delay
+        latency = Latency(
+            distance=nearest_distance,
+            data_size=data_size,
+            bandwidth=bandwidth,
+            propagation_delay=propagation_delay,
+            transmission_delay=transmission_delay,
+            computation_delay=0.0,
+            container_status="unknown",
+            total_turnaround_time=total_turnaround_time
+        )
         user_node = UserNodeInfo(
             user_id=data.get("user_id"),
             assigned_node_id=nearest_node_id,
             location=user_location,
+            last_executed=0,
             size=data.get("size", 10),
-            speed=data.get("speed", 5)
+            speed=data.get("speed", 5),
+            latency=latency
         )
         self.scheduler.create_user_node(user_node)
         return user_node
@@ -256,7 +283,8 @@ class CentralCoreController:
                             "location": updated_user.location,
                             "assigned_node_id": updated_user.assigned_node_id,
                             "size": updated_user.size,
-                            "speed": updated_user.speed
+                            "speed": updated_user.speed,
+                            "latency": updated_user.latency
                         }
                     }
             
@@ -285,7 +313,7 @@ class CentralCoreController:
                     assigned_central = "central_node"
                 elif user_node.assigned_node_id in self.scheduler.edge_nodes:
                     assigned_edge = user_node.assigned_node_id
-                
+                user_node.latency.total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
                 users.append({
                     "user_id": user_id,
                     "location": user_node.location,
@@ -294,7 +322,8 @@ class CentralCoreController:
                     "assigned_node_id": user_node.assigned_node_id,
                     "assigned_edge": assigned_edge,
                     "assigned_central": assigned_central,
-                    "latency": 0  # Can be calculated if needed
+                    "last_executed_period": time.time() - user_node.last_executed,
+                    "latency": user_node.latency
                 })
             
             return {
@@ -349,6 +378,104 @@ class CentralCoreController:
             }
         except Exception as e:
             self.logger.error(f"Error deleting user {user_id}: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    def get_dact_sample(self):
+        try:
+            sample = self.data_manager.get_dact_data_by_step(659)
+            users = []
+            for item in sample.get("items", []):
+                user_node = None
+                if item.get(f"user_{item.get('id', 0)}") in self.scheduler.user_nodes:
+                    user_node = self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")]
+                else:
+                    location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
+                    nearest_node_id, nearest_distance = self.scheduler._find_nearest_node(location)
+                    data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
+                    bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
+                    propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
+                    transmission_delay = data_size / bandwidth
+                    total_turnaround_time = propagation_delay + transmission_delay
+                    latency = Latency(
+                        distance=nearest_distance,
+                        data_size=data_size,
+                        bandwidth=bandwidth,
+                        propagation_delay=propagation_delay,
+                        transmission_delay=transmission_delay,
+                        computation_delay=0.0,
+                        container_status="unknown",
+                        total_turnaround_time=total_turnaround_time
+                    )
+                    user_node = UserNodeInfo(
+                        user_id=f"user_{item.get('id', 0)}",
+                        assigned_node_id=nearest_node_id,
+                        location=location,
+                        last_executed=0,
+                        size=item.get("size", 10),
+                        speed=item.get("speed", 5),
+                        latency=latency
+                    )
+                    self.scheduler.create_user_node(user_node)
+                users.append({
+                    "user_id": user_node.user_id,
+                    "assigned_node_id": user_node.assigned_node_id,
+                    "location": user_node.location,
+                    "last_executed": time.time() - user_node.last_executed,
+                    "size": user_node.size,
+                    "speed": user_node.speed,
+                    "latency": user_node.latency
+                })
+            return {
+                "success": True,
+                "users": users,
+                "total_count": len(users)
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting DACT sample: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def get_vehicles_sample(self):
+        try:
+            return {
+                "success": True,
+                "sample": ""
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting vehicles sample: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+
+    def start_simulation(self):
+        try:
+            self.simulation = True
+            return {
+                "success": True,
+                "message": "Simulation started successfully"
+            }
+        except Exception as e:
+            self.logger.error(f"Error starting simulation: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+            
+    def stop_simulation(self):
+        try:
+            self.simulation = False
+            return {
+                "success": True,
+                "message": "Simulation stopped successfully"
+            }
+        except Exception as e:
+            self.logger.error(f"Error stopping simulation: {e}")
             return {
                 "success": False,
                 "error": str(e)

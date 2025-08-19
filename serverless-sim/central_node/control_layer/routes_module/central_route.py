@@ -126,6 +126,38 @@ def execute_function():
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
+@central_route.route('/get_dact_sample', methods=['GET'])
+def get_dact_sample():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    result = central_core_controller.get_dact_sample()
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route('/get_vehicles_sample', methods=['GET'])
+def get_vehicles_sample():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    result = central_core_controller.get_vehicles_sample()
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route('/start_simulation', methods=['POST'])
+def start_simulation():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    result = central_core_controller.start_simulation()
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route('/stop_simulation', methods=['POST'])
+def stop_simulation():
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    result = central_core_controller.stop_simulation()
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
 @central_route.route('/health', methods=['GET'])
 def health_check():
     return jsonify({

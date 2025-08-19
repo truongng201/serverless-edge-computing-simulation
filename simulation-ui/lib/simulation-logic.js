@@ -14,33 +14,13 @@ export const useSimulationLogic = (state, actions) => {
 
   // Simulation step
   const simulationStep = useCallback(() => {
+    // When isSimulating is true, the backend manages the simulation
+    // Client-side simulation logic is disabled to avoid conflicts
     if (!isSimulating) return;
 
-    setUsers((prevUsers) =>
-      prevUsers.map((user) => {
-        // Skip movement for backend-controlled users
-        if (user.isBackendControlled) {
-          return user;
-        }
-
-        // Free movement (original logic)
-        let newX = user.x + user.vx * simulationSpeed[0];
-        let newY = user.y + user.vy * simulationSpeed[0];
-        let newVx = user.vx;
-        let newVy = user.vy;
-
-        if (newX <= 10 || newX >= window.innerWidth - 10) {
-          newVx = -newVx;
-          newX = Math.max(10, Math.min(window.innerWidth - 10, newX));
-        }
-        if (newY <= 10 || newY >= window.innerHeight - 10) {
-          newVy = -newVy;
-          newY = Math.max(10, Math.min(window.innerHeight - 10, newY));
-        }
-
-        return { ...user, x: newX, y: newY, vx: newVx, vy: newVy };
-      })
-    );
+    // All simulation logic is now handled by the backend API
+    // This function only continues to exist for drawing/rendering purposes
+    return;
   }, [isSimulating, simulationSpeed, roadMode, roads, userSpeed, setUsers]);
 
   return {
