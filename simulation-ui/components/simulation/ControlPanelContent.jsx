@@ -96,8 +96,8 @@ export default function ControlPanelContent({
   setSimulationMode,
   realModeData,
   setRealModeData,
-  selectedScenario = "none",
-  setSelectedScenario = () => {},
+  selectedScenario,
+  setSelectedScenario
 }) {
   const [loadingData, setLoadingData] = useState(false);
   const [dataError, setDataError] = useState("");
@@ -147,7 +147,7 @@ export default function ControlPanelContent({
       setDataError("");
 
       const response = await axios.get(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_vehicle_sample`
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_vehicles_sample`
       );
 
       if (response.data && response.data.success && response.data.users) {

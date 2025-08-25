@@ -59,6 +59,9 @@ export function useSimulationState() {
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
   const [maxCoverageDistance, setMaxCoverageDistance] = useState([100]);
 
+  // Scenario selection state
+  const [selectedScenario, setSelectedScenario] = useState("none");
+
   // Recalculate average latency whenever users update
   useEffect(() => {
     if (!users || users.length === 0) {
@@ -224,5 +227,7 @@ export function useSimulationState() {
     setPlacementAlgorithm,
     maxCoverageDistance,
     setMaxCoverageDistance,
+    selectedScenario,
+    setSelectedScenario,
   };
 }
