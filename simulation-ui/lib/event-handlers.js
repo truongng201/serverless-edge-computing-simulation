@@ -156,9 +156,7 @@ export const useEventHandlers = (state, actions) => {
           .then(response => {
             if (!response.ok) {
               console.error('Failed to create user node:', response.statusText);
-            } else {
-              console.log('User node created successfully:', payload);
-            }
+            } 
           })
           .catch(error => {
             console.error('Error creating user node:', error);
@@ -420,7 +418,6 @@ export const useEventHandlers = (state, actions) => {
             y: Math.round(draggedNode.node.y)
           },
         };
-        console.log('Edge node update payload:', payload);
         // Only make API call if NEXT_PUBLIC_API_URL is available
         if (process.env.NEXT_PUBLIC_API_URL) {
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_edge_node`, {
@@ -433,9 +430,7 @@ export const useEventHandlers = (state, actions) => {
 
           if (!response.ok) {
             console.error('Failed to update edge node position:', response.statusText);
-          } else {
-            console.log('Edge node position updated successfully:', payload);
-          }
+          } 
         }
       } catch (error) {
         console.error('Error updating edge node position:', error);
@@ -464,10 +459,6 @@ export const useEventHandlers = (state, actions) => {
 
           if (!response.ok) {
             console.error('Failed to update user position:', response.statusText);
-          } else {
-            const result = await response.json();
-            console.log('User position updated successfully:', result);
-            
           }
         }
       } catch (error) {
@@ -539,8 +530,6 @@ export const useEventHandlers = (state, actions) => {
         },
       };
       
-      console.log('Updating edge node coverage via API:', payload);
-      
       // Only make API call if NEXT_PUBLIC_API_URL is available
       if (process.env.NEXT_PUBLIC_API_URL) {
         const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_edge_node`, {
@@ -555,11 +544,7 @@ export const useEventHandlers = (state, actions) => {
           console.error('Failed to update edge node coverage:', response.statusText);
           const errorText = await response.text();
           console.error('Error response:', errorText);
-        } else {
-          console.log('Edge node coverage updated successfully');
         }
-      } else {
-        console.log('No API URL configured - skipping API call');
       }
     } catch (error) {
       console.error('Error updating edge node coverage:', error);
