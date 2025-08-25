@@ -308,6 +308,75 @@ export default function ControlPanelContent({
     }
   };
 
+  // Function to refresh users and cluster data - can be used regardless of simulation mode
+  const refreshClusterAndUsersData = async () => {
+    try {
+      // Fetch both cluster status and all users
+      const [clusterResponse, usersResponse] = await Promise.all([
+        axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/cluster/status`
+        ),
+        axios.get(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_all_users`
+        ),
+      ]);
+
+      // Update cluster info if available
+      if (clusterResponse.data && clusterResponse.data.success) {
+        // Update real mode data for metrics display
+        setRealModeData(clusterResponse.data);
+
+        // Update central nodes
+        const realCentralNode = {
+          id: clusterResponse.data.central_node.id || "central_node",
+          x: clusterResponse.data.central_node.location.x || 600,
+          y: clusterResponse.data.central_node.location.y || 400,
+          coverage:
+            clusterResponse.data.central_node.coverage || centralCoverage[0],
+          currentLoad: clusterResponse.data.central_node.cpu_usage || 0,
+        };
+        setCentralNodes([realCentralNode]);
+
+        // Update edge nodes
+        const realEdgeNodes = (
+          clusterResponse.data.cluster_info.edge_nodes_info || []
+        ).map((node, index) => ({
+          id: node.node_id || `edge_${index}`,
+          x: node.location.x || 100 + index * 100,
+          y: node.location.y || 200 + index * 100,
+          coverage: node.coverage || edgeCoverage[0],
+          currentLoad: node.metrics.cpu_usage || 0,
+        }));
+        setEdgeNodes(realEdgeNodes);
+      }
+
+      // Update users if available
+      if (
+        usersResponse.data &&
+        usersResponse.data.success &&
+        usersResponse.data.users
+      ) {
+        const realUsers = usersResponse.data.users.map((user, index) => ({
+          id: user.user_id || `user_${index}`,
+          x: user.location.x || 0,
+          y: user.location.y || 0,
+          vx: 0,
+          vy: 0,
+          assignedEdge: user.assigned_edge || null,
+          assignedCentral: user.assigned_central || null,
+          assignedNodeID: user.assigned_node_id || null,
+          latency: user.latency || 0,
+          size: user.size || userSize[0] || 10,
+          last_executed_period: user.last_executed_period || null,
+        }));
+        setUsers(realUsers);
+      }
+    } catch (error) {
+      console.error("Error refreshing cluster and users data:", error);
+      // Don't throw error to avoid breaking the calling function
+    }
+  };
+
   // Handle scenario selection change
   const handleScenarioChange = async (scenario) => {
     setSelectedScenario(scenario);
@@ -364,33 +433,73 @@ export default function ControlPanelContent({
         clearInterval(realModeIntervalRef.current);
       }
     };
-  }, [isSimulating, simulationSpeed]);
+  }, []);
 
-  // Handle simulation speed changes in real mode
+  // Handle simulation speed changes in real mode - this should run continuously when in real mode
   useEffect(() => {
-    if (simulationMode === "real" && realModeIntervalRef.current) {
-      // Clear existing interval
-      clearInterval(realModeIntervalRef.current);
+    if (simulationMode === "real") {
+      // Clear any existing interval first
+      if (realModeIntervalRef.current) {
+        clearInterval(realModeIntervalRef.current);
+      }
 
-      // Calculate new interval based on simulation speed
+      // Set up new interval for real mode - this runs regardless of simulation state
       const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
       realModeIntervalRef.current = setInterval(
         fetchRealClusterStatus,
         intervalMs
       );
+    } else if (realModeIntervalRef.current) {
+      // Only clear interval if we're switching away from real mode
+      clearInterval(realModeIntervalRef.current);
+      realModeIntervalRef.current = null;
     }
   }, [simulationSpeed, simulationMode]);
+
+  // Handle simulation state changes - start/stop data polling when simulation starts/stops
+  useEffect(() => {
+    if (isSimulating && simulationMode !== "real") {
+      // Start polling for simulation updates when simulation is running (but not in real mode)
+      // Real mode has its own polling mechanism above
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
+      
+      // Calculate interval based on simulation speed
+      const intervalMs = Math.max(1000, 3000 / simulationSpeed[0]);
+      intervalRef.current = setInterval(
+        refreshClusterAndUsersData,
+        intervalMs
+      );
+    } else if (!isSimulating && intervalRef.current) {
+      // Stop polling when simulation stops
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  }, [isSimulating, simulationSpeed, simulationMode]);
 
   // Function to start simulation via API
   const handleStartSimulation = async () => {
     try {
       setDataError(""); // Clear any previous errors
       setSimulationLoading(true);
+      
+      // Start the simulation via API
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_simulation`
       );
+      
       if (response.data && response.data.success) {
         setIsSimulating(true);
+        
+        // After starting simulation, refresh the cluster status and users data
+        // This ensures the UI shows the latest user assignments and cluster info
+        try {
+          await refreshClusterAndUsersData();
+        } catch (fetchError) {
+          console.error("Error fetching updated data after starting simulation:", fetchError);
+          // Don't fail the entire operation if data fetch fails
+        }
       }
     } catch (error) {
       console.error("Error starting simulation:", error);
@@ -410,6 +519,15 @@ export default function ControlPanelContent({
       );
       if (response.data && response.data.success) {
         setIsSimulating(false);
+        
+        // After stopping simulation, refresh the cluster status and users data
+        // This ensures the UI shows the latest state after stopping
+        try {
+          await refreshClusterAndUsersData();
+        } catch (fetchError) {
+          console.error("Error fetching updated data after stopping simulation:", fetchError);
+          // Don't fail the entire operation if data fetch fails
+        }
       }
     } catch (error) {
       console.error("Error stopping simulation:", error);

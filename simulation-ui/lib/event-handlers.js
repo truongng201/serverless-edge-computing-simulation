@@ -351,7 +351,7 @@ export const useEventHandlers = (state, actions) => {
         // Update draggedNode with current position for API call
         setDraggedNode(prev => ({
           ...prev,
-          node: { ...prev.node, x: newX, y: newY }
+          node: { ...prev?.node, x: newX, y: newY }
         }));
 
         // Update selected edge if it's the one being dragged
@@ -369,7 +369,7 @@ export const useEventHandlers = (state, actions) => {
         // Update draggedNode with current position
         setDraggedNode(prev => ({
           ...prev,
-          node: { ...prev.node, x: newX, y: newY }
+          node: { ...prev?.node, x: newX, y: newY }
         }));
 
         // Update selected central if it's the one being dragged
