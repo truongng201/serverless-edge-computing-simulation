@@ -1,4 +1,6 @@
-import { useCallback } from "react";
+import { useCallback, useRef } from "react";
+import { calculateDistance } from "./helper";
+import { calculateLatency } from "./placement-algorithms";
 
 // Simulation Functions
 export const useSimulationLogic = (state, actions) => {
@@ -8,9 +10,15 @@ export const useSimulationLogic = (state, actions) => {
     roadMode,
     roads,
     userSpeed,
+    simulationMode,
+    edgeNodes,
+    centralNodes,
   } = state;
 
-  const { setUsers } = actions;
+  const { setUsers, setTotalLatency } = actions;
+
+  // Step counter for periodic operations in demo mode
+  const stepCounterRef = useRef(0);
 
   // Simulation step
   const simulationStep = useCallback(() => {

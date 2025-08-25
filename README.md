@@ -32,8 +32,8 @@ This project implements a hierarchical distributed system with two main componen
 │  └─────────────────┘  └─────────────────┘  └─────────────┘  │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │              Resource Layer                           │  │
-│  │              • Docker Management                     │  │
-│  │              • System Metrics                        │  │
+│  │              • Docker Management                      │  │
+│  │              • System Metrics                         │  │
 │  └───────────────────────────────────────────────────────┘  │
 └─────────────────────────────────────────────────────────────┘
                               │
@@ -41,14 +41,14 @@ This project implements a hierarchical distributed system with two main componen
                               │
 ┌─────────────────────────────────────────────────────────────┐
 │                     EDGE NODES                              │
-│  ┌─────────────────┐  ┌─────────────────┐                  │
-│  │   API Layer     │  │ Resource Layer  │                  │
-│  │                 │  │                 │                  │
-│  │ • Request Handle│  │ • Docker API    │                  │
-│  │ • Container Mgmt│  │ • System Metrics│                  │
-│  │ • Cold/Warm     │  │ • Energy Calc   │                  │
-│  │ • Lifecycle     │  │                 │                  │
-│  └─────────────────┘  └─────────────────┘                  │
+│  ┌─────────────────┐  ┌─────────────────┐                   │
+│  │   API Layer     │  │ Resource Layer  │                   │
+│  │                 │  │                 │                   │
+│  │ • Request Handle│  │ • Docker API    │                   │
+│  │ • Container Mgmt│  │ • System Metrics│                   │
+│  │ • Cold/Warm     │  │ • Energy Calc   │                   │
+│  │ • Lifecycle     │  │                 │                   │
+│  └─────────────────┘  └─────────────────┘                   │
 └─────────────────────────────────────────────────────────────┘
 ```
 
