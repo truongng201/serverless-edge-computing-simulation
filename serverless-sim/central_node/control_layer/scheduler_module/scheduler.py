@@ -38,7 +38,8 @@ class EdgeNodeInfo:
     system_info: Dict[str, Any]
     last_heartbeat: float
     metrics_info: NodeMetrics
-    
+    coverage: float
+
 @dataclass
 class UserNodeInfo:
     user_id: str
@@ -99,7 +100,8 @@ class Scheduler:
                 location={"x": 0.0, "y": 0.0},
                 system_info=system_info,
                 last_heartbeat=time.time(),
-                metrics_info=new_metrics
+                metrics_info=new_metrics,
+                coverage=300.0
             ))
 
     def schedule_request(self, request_data: Dict[str, Any]) -> Optional[SchedulingDecision]:
@@ -202,7 +204,8 @@ class Scheduler:
                 "last_seen": last_seen,
                 "endpoint": node.endpoint,
                 "metrics": node.metrics_info,
-                "status": node_status   
+                "coverage": node.coverage,
+                "status": node_status
             }
             
             all_nodes_info.append(node_info)
@@ -233,14 +236,14 @@ class Scheduler:
         self.user_nodes[user_id].location = new_location
         
         # Recalculate nearest node
-        nearest_node_id, nearest_distance = self._find_nearest_node(new_location)
+        nearest_node_id, nearest_distance = self._node_assignment(new_location)
         self.user_nodes[user_id].assigned_node_id = nearest_node_id
         self.user_nodes[user_id].latency.distance = nearest_distance
         
         self.logger.info(f"Updated user {user_id} location to {new_location}, assigned to {nearest_node_id}")
         return True
     
-    def _find_nearest_node(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+    def _node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
         """Find the nearest node (edge or central) to the user location"""
         min_distance = self._calculate_distance(user_location, self.central_node["location"])
         nearest_node_id = "central_node"  # default to central node
@@ -248,7 +251,7 @@ class Scheduler:
         # Check all edge nodes
         for node_id, edge_node in self.edge_nodes.items():
             distance = self._calculate_distance(user_location, edge_node.location)
-            if distance < min_distance:
+            if distance < min_distance and distance <= edge_node.coverage:
                 min_distance = distance
                 nearest_node_id = node_id
 

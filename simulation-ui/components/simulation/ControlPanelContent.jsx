@@ -22,19 +22,12 @@ import {
   Minus,
   Database,
   Trash2,
-  Link,
-  Unlink,
   Edit3,
-  Move,
   ChevronLeft,
   MapPin,
   Target,
   Navigation,
-  Eye,
-  EyeOff,
-  ChevronRight,
-  SkipBack,
-  SkipForward,
+  
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
@@ -56,6 +49,7 @@ export default function ControlPanelContent({
   setSelectedModel,
   selectedUser,
   selectedEdge,
+  setSelectedEdge,
   selectedCentral,
   userSpeed,
   setUserSpeed,
@@ -97,7 +91,8 @@ export default function ControlPanelContent({
   realModeData,
   setRealModeData,
   selectedScenario,
-  setSelectedScenario
+  setSelectedScenario,
+  updateEdgeCoverage,
 }) {
   const [loadingData, setLoadingData] = useState(false);
   const [dataError, setDataError] = useState("");
@@ -105,6 +100,72 @@ export default function ControlPanelContent({
   const intervalRef = useRef(null);
   const realModeIntervalRef = useRef(null);
   const transitionTimeoutRef = useRef(null);
+
+  // Update coverage slider when selected edge changes
+  useEffect(() => {
+    if (selectedEdge && selectedEdge.coverage !== undefined) {
+      setEdgeCoverage([selectedEdge.coverage]);
+    }
+  }, [selectedEdge, setEdgeCoverage]);
+
+  // Update coverage slider when selected central changes
+  useEffect(() => {
+    if (selectedCentral && selectedCentral.coverage !== undefined) {
+      setCentralCoverage([selectedCentral.coverage]);
+    }
+  }, [selectedCentral, setCentralCoverage]);
+
+  // Handle edge coverage change
+  const handleEdgeCoverageChange = async (newCoverage) => {
+    // Update the slider state
+    setEdgeCoverage(newCoverage);
+    
+    // If an edge is selected, update the local edge node coverage and call the API
+    if (selectedEdge) {
+      
+      // Update the local edge node coverage
+      const updatedEdgeNodes = edgeNodes.map(node => 
+        node.id === selectedEdge.id 
+          ? { ...node, coverage: newCoverage[0] }
+          : node
+      );
+      setEdgeNodes(updatedEdgeNodes);
+      
+      // Update the selected edge with new coverage
+      setSelectedEdge({ ...selectedEdge, coverage: newCoverage[0] });
+      
+      // Call the API to update the backend if the function is available
+      if (updateEdgeCoverage) {
+        await updateEdgeCoverage(selectedEdge.id, newCoverage[0]);
+      }
+    }
+  };
+
+  // Handle central coverage change
+  const handleCentralCoverageChange = async (newCoverage) => {
+    // Update the slider state
+    setCentralCoverage(newCoverage);
+    
+    // If a central node is selected, update the local central node coverage
+    if (selectedCentral) {
+      
+      // Update the local central node coverage
+      const updatedCentralNodes = centralNodes.map(node => 
+        node.id === selectedCentral.id 
+          ? { ...node, coverage: newCoverage[0] }
+          : node
+      );
+      setCentralNodes(updatedCentralNodes);
+      
+      // Update the selected central with new coverage
+      setSelectedCentral({ ...selectedCentral, coverage: newCoverage[0] });
+      
+      // Note: Add API call here when central node coverage update API is available
+      // if (updateCentralCoverage) {
+      //   await updateCentralCoverage(selectedCentral.id, newCoverage[0]);
+      // }
+    }
+  };
 
   // Function to fetch DACT sample data
   const fetchDACTSample = async () => {
@@ -250,7 +311,7 @@ export default function ControlPanelContent({
   // Handle scenario selection change
   const handleScenarioChange = async (scenario) => {
     setSelectedScenario(scenario);
-    
+
     if (scenario === "scenario2") {
       // Load DACT sample data
       await fetchDACTSample();
@@ -279,7 +340,10 @@ export default function ControlPanelContent({
       // Calculate interval: 1x = 5000ms, 5x = 1000ms
       // Formula: 5000 / simulationSpeed[0]
       const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
-      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, intervalMs);
+      realModeIntervalRef.current = setInterval(
+        fetchRealClusterStatus,
+        intervalMs
+      );
     } else {
       // Stop real-time polling
       if (realModeIntervalRef.current) {
@@ -307,10 +371,13 @@ export default function ControlPanelContent({
     if (simulationMode === "real" && realModeIntervalRef.current) {
       // Clear existing interval
       clearInterval(realModeIntervalRef.current);
-      
+
       // Calculate new interval based on simulation speed
       const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
-      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, intervalMs);
+      realModeIntervalRef.current = setInterval(
+        fetchRealClusterStatus,
+        intervalMs
+      );
     }
   }, [simulationSpeed, simulationMode]);
 
@@ -324,7 +391,6 @@ export default function ControlPanelContent({
       );
       if (response.data && response.data.success) {
         setIsSimulating(true);
-        console.log("Simulation started successfully");
       }
     } catch (error) {
       console.error("Error starting simulation:", error);
@@ -344,7 +410,6 @@ export default function ControlPanelContent({
       );
       if (response.data && response.data.success) {
         setIsSimulating(false);
-        console.log("Simulation stopped successfully");
       }
     } catch (error) {
       console.error("Error stopping simulation:", error);
@@ -369,7 +434,6 @@ export default function ControlPanelContent({
     if (isSimulating) {
       try {
         await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/stop_simulation`);
-        console.log("Simulation stopped during reset");
       } catch (error) {
         console.error("Error stopping simulation during reset:", error);
       }
@@ -388,7 +452,7 @@ export default function ControlPanelContent({
       clearTimeout(transitionTimeoutRef.current);
       transitionTimeoutRef.current = null;
     }
-    
+
     // Reset states
     setIsSimulating(false);
     setSimulationMode("demo");
@@ -668,19 +732,27 @@ export default function ControlPanelContent({
           <CardContent className="space-y-3">
             <div className="space-y-2">
               <Label className="text-xs">Scenario</Label>
-              <Select value={selectedScenario} onValueChange={handleScenarioChange}>
+              <Select
+                value={selectedScenario}
+                onValueChange={handleScenarioChange}
+              >
                 <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None (Self adding user)</SelectItem>
-                  <SelectItem value="scenario2">Scenario 2: DACT Sample</SelectItem>
-                  <SelectItem value="scenario3">Scenario 3: Vehicle Sample</SelectItem>
+                  <SelectItem value="scenario2">
+                    Scenario 2: DACT Sample
+                  </SelectItem>
+                  <SelectItem value="scenario3">
+                    Scenario 3: Vehicle Sample
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="text-xs text-gray-600">
-              Select a predefined scenario to load sample data, or choose "None" to manually add users.
+              Select a predefined scenario to load sample data, or choose "None"
+              to manually add users.
             </div>
           </CardContent>
         </Card>
@@ -705,7 +777,11 @@ export default function ControlPanelContent({
                 ) : (
                   <Play className="w-4 h-4" />
                 )}
-                {simulationLoading ? "Loading..." : (isSimulating ? "Stop" : "Start")}
+                {simulationLoading
+                  ? "Loading..."
+                  : isSimulating
+                  ? "Stop"
+                  : "Start"}
               </Button>
               <Button
                 onClick={handleResetSimulation}
@@ -865,45 +941,48 @@ export default function ControlPanelContent({
           </CardHeader>
           <CardContent className="space-y-3">
             {simulationMode !== "real" && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={addCentralNode}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add
-                </Button>
-                <Button
-                  onClick={removeCentralNode}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Minus className="w-4 h-4" />
-                  Remove
-                </Button>
-              </div>
+              <>
+                <div className="flex gap-2">
+                  <Button
+                    onClick={addCentralNode}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Plus className="w-4 h-4" />
+                    Add
+                  </Button>
+                  <Button
+                    onClick={removeCentralNode}
+                    size="sm"
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Minus className="w-4 h-4" />
+                    Remove
+                  </Button>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-xs">
+                    Coverage: {centralCoverage[0]}px
+                  </Label>
+                  <Slider
+                    value={centralCoverage}
+                    onValueChange={handleCentralCoverageChange}
+                    max={1000}
+                    min={0}
+                    step={20}
+                  />
+                </div>
+              </>
             )}
             {simulationMode === "real" && (
-              <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
-                Central Node managed by real system
-              </div>
+              <>
+                <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
+                  Central Node managed by real system
+                </div>
+              </>
             )}
-
-            <div className="space-y-2">
-              <Label className="text-xs">
-                Coverage: {centralCoverage[0]}px
-              </Label>
-              <Slider
-                value={centralCoverage}
-                onValueChange={setCentralCoverage}
-                max={1000}
-                min={0}
-                step={20}
-              />
-            </div>
           </CardContent>
         </Card>
 
@@ -945,7 +1024,7 @@ export default function ControlPanelContent({
               <Label className="text-xs">Coverage: {edgeCoverage[0]}px</Label>
               <Slider
                 value={edgeCoverage}
-                onValueChange={setEdgeCoverage}
+                onValueChange={handleEdgeCoverageChange}
                 max={1000}
                 min={0}
                 step={10}

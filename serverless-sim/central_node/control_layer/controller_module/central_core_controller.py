@@ -88,7 +88,8 @@ class CentralCoreController:
                 location=node_data.get("location", {"x": 0.0, "y": 0.0}),
                 system_info=node_data.get("system_info", {}),
                 last_heartbeat=time.time(),
-                metrics_info=node_metrics
+                metrics_info=node_metrics,
+                coverage=node_data.get("coverage", 300.0)
             )
             
             self.scheduler.register_edge_node(node_info)
@@ -202,7 +203,8 @@ class CentralCoreController:
 
     def update_edge_node(self, data):
         new_location = data.get("location", None)
-        
+        coverage = data.get("coverage", None)
+
         if not new_location:
             return None
 
@@ -212,6 +214,7 @@ class CentralCoreController:
             return None
 
         edge_node.location = new_location
+        edge_node.coverage = coverage
         self.scheduler.update_edge_node_info(edge_node)
 
         return edge_node
@@ -220,7 +223,7 @@ class CentralCoreController:
         user_location = data.get("location", {"x": 0.0, "y": 0.0})
         
         # Find nearest node (edge or central) using scheduler method
-        nearest_node_id, nearest_distance = self.scheduler._find_nearest_node(user_location)
+        nearest_node_id, nearest_distance = self.scheduler._node_assignment(user_location)
         data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
         bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
         propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
@@ -394,7 +397,7 @@ class CentralCoreController:
                     user_node = self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")]
                 else:
                     location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                    nearest_node_id, nearest_distance = self.scheduler._find_nearest_node(location)
+                    nearest_node_id, nearest_distance = self.scheduler._node_assignment(location)
                     data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
                     bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
                     propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
@@ -451,7 +454,7 @@ class CentralCoreController:
                     user_node = self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")]
                 else:
                     location =  {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                    nearest_node_id, nearest_distance = self.scheduler._find_nearest_node(location)
+                    nearest_node_id, nearest_distance = self.scheduler._node_assignment(location)
                     data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
                     bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
                     propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms

@@ -248,6 +248,10 @@ export const useEventHandlers = (state, actions) => {
             x: worldX - clickedEdge.x,
             y: worldY - clickedEdge.y,
           });
+          // Set the edge as selected to show the purple circle
+          setSelectedEdge(clickedEdge);
+          setSelectedCentral(null);
+          setSelectedUser(null);
           event.preventDefault();
           return;
         }
@@ -259,6 +263,10 @@ export const useEventHandlers = (state, actions) => {
             x: worldX - clickedCentral.x,
             y: worldY - clickedCentral.y,
           });
+          // Set the central as selected to show the purple circle
+          setSelectedCentral(clickedCentral);
+          setSelectedEdge(null);
+          setSelectedUser(null);
           event.preventDefault();
           return;
         }
@@ -347,6 +355,11 @@ export const useEventHandlers = (state, actions) => {
           ...prev,
           node: { ...prev.node, x: newX, y: newY }
         }));
+
+        // Update selected edge if it's the one being dragged
+        if (selectedEdge && selectedEdge.id === draggedNode.node.id) {
+          setSelectedEdge((prev) => ({ ...prev, x: newX, y: newY }));
+        }
       } else if (draggedNode.type === "central") {
         setCentralNodes((prev) =>
           prev.map((central) =>
@@ -360,6 +373,11 @@ export const useEventHandlers = (state, actions) => {
           ...prev,
           node: { ...prev.node, x: newX, y: newY }
         }));
+
+        // Update selected central if it's the one being dragged
+        if (selectedCentral && selectedCentral.id === draggedNode.node.id) {
+          setSelectedCentral((prev) => ({ ...prev, x: newX, y: newY }));
+        }
       }
     } else {
       setIsDragging(true);
@@ -376,10 +394,14 @@ export const useEventHandlers = (state, actions) => {
     zoomLevel,
     dragOffset,
     selectedUser,
+    selectedEdge,
+    selectedCentral,
     setPanOffset,
     setLastPanPoint,
     setUsers,
     setSelectedUser,
+    setSelectedEdge,
+    setSelectedCentral,
     setEdgeNodes,
     setCentralNodes,
     setIsDragging,
@@ -392,12 +414,13 @@ export const useEventHandlers = (state, actions) => {
       try {
         const payload = {
           node_id: draggedNode.node.id,
+          coverage: draggedNode.node.coverage || 300.0,
           location: {
             x: Math.round(draggedNode.node.x),
             y: Math.round(draggedNode.node.y)
-          }
+          },
         };
-
+        console.log('Edge node update payload:', payload);
         // Only make API call if NEXT_PUBLIC_API_URL is available
         if (process.env.NEXT_PUBLIC_API_URL) {
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_edge_node`, {
@@ -429,7 +452,6 @@ export const useEventHandlers = (state, actions) => {
             y: draggedUser.y
           }
         };
-        console.log(payload)
         // Only make API call if NEXT_PUBLIC_API_URL is available
         if (process.env.NEXT_PUBLIC_API_URL) {
           const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_user_node`, {
@@ -500,6 +522,50 @@ export const useEventHandlers = (state, actions) => {
     setPanOffset({ x: newPanX, y: newPanY });
   }, [canvasRef, zoomLevel, panOffset, setZoomLevel, setPanOffset]);
 
+  const updateEdgeCoverage = useCallback(async (nodeId, newCoverage) => {
+    try {
+      const edgeNode = edgeNodes.find(node => node.id === nodeId);
+      if (!edgeNode) {
+        console.error('Edge node not found:', nodeId);
+        return;
+      }
+
+      const payload = {
+        node_id: nodeId,
+        coverage: parseFloat(newCoverage),
+        location: {
+          x: Math.round(edgeNode.x),
+          y: Math.round(edgeNode.y)
+        },
+      };
+      
+      console.log('Updating edge node coverage via API:', payload);
+      
+      // Only make API call if NEXT_PUBLIC_API_URL is available
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_edge_node`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          console.error('Failed to update edge node coverage:', response.statusText);
+          const errorText = await response.text();
+          console.error('Error response:', errorText);
+        } else {
+          console.log('Edge node coverage updated successfully');
+        }
+      } else {
+        console.log('No API URL configured - skipping API call');
+      }
+    } catch (error) {
+      console.error('Error updating edge node coverage:', error);
+    }
+  }, [edgeNodes]);
+
   const getCursorStyle = useCallback(() => {
     if (isPanning) return "grabbing";
     if (isDraggingNode || isDraggingUser) return "grabbing";
@@ -517,6 +583,7 @@ export const useEventHandlers = (state, actions) => {
     zoomIn,
     zoomOut,
     resetZoom,
-    getCursorStyle
+    getCursorStyle,
+    updateEdgeCoverage
   };
 };

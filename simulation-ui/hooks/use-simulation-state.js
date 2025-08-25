@@ -112,20 +112,8 @@ export function useSimulationState() {
     return () => clearInterval(interval);
   }, [autoAssignment, edgeNodes, centralNodes, users]);
 
-  // Update coverage for existing nodes when slider changes
-  useEffect(() => {
-    setEdgeNodes(prev => prev.map(edge => ({
-      ...edge,
-      coverage: edgeCoverage[0]
-    })));
-  }, [edgeCoverage]);
-
-  useEffect(() => {
-    setCentralNodes(prev => prev.map(central => ({
-      ...central,
-      coverage: centralCoverage[0]
-    })));
-  }, [centralCoverage]);
+  // Note: Coverage updates are now handled individually per selected node in ControlPanelContent
+  // This prevents the slider from affecting all nodes when only the selected one should change
 
   // Container timeout management - reset warm state after 30 seconds of inactivity
   useEffect(() => {

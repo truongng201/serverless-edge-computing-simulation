@@ -276,6 +276,7 @@ export default function Component() {
           clearEverything={nodeActions.clearEverything}
           getEditModeDescription={() => getEditModeDescription(state.editMode)}
           getCursorStyle={eventHandlers.getCursorStyle}
+          updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
           placementAlgorithm={state.placementAlgorithm}
           setPlacementAlgorithm={state.setPlacementAlgorithm}
           maxCoverageDistance={state.maxCoverageDistance}
