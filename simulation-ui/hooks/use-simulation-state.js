@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { calculateLatency } from "../lib/placement-algorithms";
-import { calculateDistance } from "../lib/helper";
 
 export function useSimulationState() {
-  const canvasRef = useRef(null);
   const [users, setUsers] = useState([]);
   const [edgeNodes, setEdgeNodes] = useState([]);
   const [centralNodes, setCentralNodes] = useState([]);
@@ -149,7 +147,6 @@ export function useSimulationState() {
   }, []);
 
   return {
-    canvasRef,
     users,
     setUsers,
     edgeNodes,

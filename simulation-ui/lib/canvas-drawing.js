@@ -13,7 +13,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 
 export const useCanvasDrawing = (state) => {
   const {
-    canvasRef,
     panOffset,
     zoomLevel,
     roads,
@@ -26,7 +25,7 @@ export const useCanvasDrawing = (state) => {
     selectedUser,
     roadNetwork,
   } = state;
-  const { editMode } = useSimulationStore();
+  const { canvasRef, editMode } = useSimulationStore();
 
   // Drawing function with zoom and pan support
   const draw = useCallback(() => {

@@ -2,7 +2,7 @@ import { create } from 'zustand';
 
 const useSimulationStore = create((set) => ({
   // Canvas ref
-  canvasRef: null,
+  canvasRef: { current: null },
   setCanvasRef: (ref) => set({ canvasRef: ref }),
 
   // Core simulation data

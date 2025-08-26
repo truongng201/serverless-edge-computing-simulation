@@ -158,7 +158,6 @@ export default function Component() {
     <div className="relative w-full h-screen overflow-hidden bg-gray-50">
       {/* Full Screen Canvas */}
       <SimulationCanvas
-        canvasRef={state.canvasRef}
         handleCanvasClick={eventHandlers.handleCanvasClick}
         handleMouseDown={eventHandlers.handleMouseDown}
         handleMouseMove={eventHandlers.handleMouseMove}

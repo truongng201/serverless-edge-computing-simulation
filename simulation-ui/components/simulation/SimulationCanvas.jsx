@@ -1,8 +1,8 @@
-import React from "react"
+import { React, useEffect } from "react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 // SimulationCanvas: Handles the canvas drawing and interaction
 export default function SimulationCanvas({
-  canvasRef,
   handleCanvasClick,
   handleMouseDown,
   handleMouseMove,
@@ -10,9 +10,14 @@ export default function SimulationCanvas({
   handleWheel,
   getCursorStyle,
 }) {
+  const { canvasRef, setCanvasRef } = useSimulationStore();
+  useEffect(() => {
+    const ref = { current: null };
+    setCanvasRef(ref);
+  }, [setCanvasRef]);
   return (
     <canvas
-      ref={canvasRef}
+      ref={(el) => (canvasRef.current = el)}
       className="absolute inset-0 bg-white"
       onClick={handleCanvasClick}
       onMouseDown={handleMouseDown}
@@ -21,5 +26,5 @@ export default function SimulationCanvas({
       onWheel={handleWheel}
       style={{ cursor: getCursorStyle() }}
     />
-  )
+  );
 }

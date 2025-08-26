@@ -5,7 +5,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 // Event Handlers
 export const useEventHandlers = (state, actions) => {
   const {
-    canvasRef,
     zoomLevel,
     panOffset,
     isDragging,
@@ -28,7 +27,7 @@ export const useEventHandlers = (state, actions) => {
     lastPanPoint
   } = state;
 
-  const {editMode} = useSimulationStore();
+  const {canvasRef, editMode} = useSimulationStore();
 
   const {
     setIsDragging,
