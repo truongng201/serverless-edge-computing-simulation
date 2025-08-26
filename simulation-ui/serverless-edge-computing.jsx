@@ -206,12 +206,6 @@ export default function Component() {
           setCentralCoverage={state.setCentralCoverage}
           lastPanPoint={state.lastPanPoint}
           setLastPanPoint={state.setLastPanPoint}
-          draggedNode={state.draggedNode}
-          setDraggedNode={state.setDraggedNode}
-          draggedUser={state.draggedUser}
-          setDraggedUser={state.setDraggedUser}
-          dragOffset={state.dragOffset}
-          setDragOffset={state.setDragOffset}
           manualConnectionMode={state.manualConnectionMode}
           setManualConnectionMode={state.setManualConnectionMode}
           autoAssignment={state.autoAssignment}

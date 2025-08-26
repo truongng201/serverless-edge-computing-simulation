@@ -32,10 +32,6 @@ export function useSimulationState() {
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
 
   // Edit mode states
-  const [editMode, setEditMode] = useState("none"); // "none", "nodes", "users", "both"
-  const [draggedNode, setDraggedNode] = useState(null);
-  const [draggedUser, setDraggedUser] = useState(null);
-  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
 
   // Manual connection state
   const [manualConnectionMode, setManualConnectionMode] = useState(false);
@@ -173,14 +169,6 @@ export function useSimulationState() {
     setCentralCoverage,
     lastPanPoint,
     setLastPanPoint,
-    editMode,
-    setEditMode,
-    draggedNode,
-    setDraggedNode,
-    draggedUser,
-    setDraggedUser,
-    dragOffset,
-    setDragOffset,
     manualConnectionMode,
     setManualConnectionMode,
     autoAssignment,

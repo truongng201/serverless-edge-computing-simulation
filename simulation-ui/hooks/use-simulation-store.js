@@ -98,9 +98,24 @@ const useSimulationStore = create((set) => ({
         ? updater(state.isDraggingUser)
         : updater
     })),
-  setDraggedNode: (draggedNode) => set({ draggedNode }),
-  setDraggedUser: (draggedUser) => set({ draggedUser }),
-  setDragOffset: (dragOffset) => set({ dragOffset }),
+  setDraggedNode: (updater) =>
+    set((state) => ({
+      draggedNode: typeof updater === "function"
+        ? updater(state.draggedNode)
+        : updater
+    })),
+  setDraggedUser: (updater) =>
+    set((state) => ({
+      draggedUser: typeof updater === "function"
+        ? updater(state.draggedUser)
+        : updater
+    })),
+  setDragOffset: (updater) =>
+    set((state) => ({
+      dragOffset: typeof updater === "function"
+        ? updater(state.dragOffset)
+        : updater
+    })),
 
   // Manual connection state
   manualConnectionMode: false,

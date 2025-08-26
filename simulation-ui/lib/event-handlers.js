@@ -13,9 +13,6 @@ export const useEventHandlers = (state, actions) => {
     selectedCentral,
     roadMode,
     roads,
-    dragOffset,
-    draggedNode,
-    draggedUser,
     lastPanPoint,
   } = state;
 
@@ -35,14 +32,17 @@ export const useEventHandlers = (state, actions) => {
     zoomLevel,
     setZoomLevel,
     userSpeed,
-    userSize
+    userSize,
+    dragOffset,
+    setDragOffset,
+    draggedNode,
+    setDraggedNode,
+    draggedUser,
+    setDraggedUser
   } = useSimulationStore();
 
   const {
     setLastPanPoint,
-    setDraggedNode,
-    setDraggedUser,
-    setDragOffset,
     setSelectedUser,
     setSelectedEdge,
     setSelectedCentral,
