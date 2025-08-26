@@ -14,25 +14,7 @@ export default function ClearControlsCard({ clearAllUsers }) {
             <Users className="w-4 h-4 mr-1" />
             Users
           </Button>
-          {/* <Button onClick={clearAllEdgeNodes} size="sm" variant="outline">
-            <Server className="w-4 h-4 mr-1" />
-            Edges
-          </Button> */}
         </div>
-        {/* <div className="grid grid-cols-2 gap-2">
-          <Button
-            onClick={clearAllCentralNodes}
-            size="sm"
-            variant="outline"
-          >
-            <Database className="w-4 h-4 mr-1" />
-            Central
-          </Button>
-          <Button onClick={clearEverything} size="sm" variant="destructive">
-            <Trash2 className="w-4 h-4 mr-1" />
-            All
-          </Button>
-        </div> */}
       </CardContent>
     </Card>
   );
