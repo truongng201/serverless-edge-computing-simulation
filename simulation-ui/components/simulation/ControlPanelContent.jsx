@@ -27,12 +27,14 @@ import {
   MapPin,
   Target,
   Navigation,
-  
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { generateSaigonRoadNetwork } from "../../lib/road-network";
-import { generateStreetMapUsers, convertToStreetMapUsers } from "../../lib/street-map-users";
+import {
+  generateStreetMapUsers,
+  convertToStreetMapUsers,
+} from "../../lib/street-map-users";
 
 export default function ControlPanelContent({
   users,
@@ -108,15 +110,19 @@ export default function ControlPanelContent({
   const [dataError, setDataError] = useState("");
   const [simulationLoading, setSimulationLoading] = useState(false);
   const intervalRef = useRef(null);
+  const realModeIntervalRef = useRef(null);
 
   // Helper function to clear all users from backend
   const clearAllUsersFromBackend = async () => {
     try {
       if (process.env.NEXT_PUBLIC_API_URL) {
-        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/delete_all_users`, {
-          method: 'DELETE'
-        });
-        
+        const response = await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/delete_all_users`,
+          {
+            method: "DELETE",
+          }
+        );
+
         if (response.ok) {
           console.log("All users cleared from backend");
         } else {
@@ -130,15 +136,17 @@ export default function ControlPanelContent({
 
   // Function to run GAP batch assignment
   const runGAPBatch = () => {
-    if (typeof runGAPAssignment === 'function') {
+    if (typeof runGAPAssignment === "function") {
       runGAPAssignment(users, edgeNodes, centralNodes, setUsers, {
-        method: 'greedy',
+        method: "greedy",
         enableMemoryConstraints: false,
-        debug: true
+        debug: true,
       });
     } else {
       console.error("runGAPAssignment not available");
-      alert("GAP batch assignment not available. Please use regular assignment.");
+      alert(
+        "GAP batch assignment not available. Please use regular assignment."
+      );
     }
   };
 
@@ -160,21 +168,20 @@ export default function ControlPanelContent({
   const handleEdgeCoverageChange = async (newCoverage) => {
     // Update the slider state
     setEdgeCoverage(newCoverage);
-    
+
     // If an edge is selected, update the local edge node coverage and call the API
     if (selectedEdge) {
-      
       // Update the local edge node coverage
-      const updatedEdgeNodes = edgeNodes.map(node => 
-        node.id === selectedEdge.id 
+      const updatedEdgeNodes = edgeNodes.map((node) =>
+        node.id === selectedEdge.id
           ? { ...node, coverage: newCoverage[0] }
           : node
       );
       setEdgeNodes(updatedEdgeNodes);
-      
+
       // Update the selected edge with new coverage
       setSelectedEdge({ ...selectedEdge, coverage: newCoverage[0] });
-      
+
       // Call the API to update the backend if the function is available
       if (updateEdgeCoverage) {
         await updateEdgeCoverage(selectedEdge.id, newCoverage[0]);
@@ -186,21 +193,20 @@ export default function ControlPanelContent({
   const handleCentralCoverageChange = async (newCoverage) => {
     // Update the slider state
     setCentralCoverage(newCoverage);
-    
+
     // If a central node is selected, update the local central node coverage
     if (selectedCentral) {
-      
       // Update the local central node coverage
-      const updatedCentralNodes = centralNodes.map(node => 
-        node.id === selectedCentral.id 
+      const updatedCentralNodes = centralNodes.map((node) =>
+        node.id === selectedCentral.id
           ? { ...node, coverage: newCoverage[0] }
           : node
       );
       setCentralNodes(updatedCentralNodes);
-      
+
       // Update the selected central with new coverage
       setSelectedCentral({ ...selectedCentral, coverage: newCoverage[0] });
-      
+
       // Note: Add API call here when central node coverage update API is available
       // if (updateCentralCoverage) {
       //   await updateCentralCoverage(selectedCentral.id, newCoverage[0]);
@@ -228,7 +234,7 @@ export default function ControlPanelContent({
           assignedEdge: user.assigned_edge || null,
           assignedCentral: user.assigned_central || null,
           assignedNodeID: user.assigned_node_id || null,
-        latency: user.latency || 0,
+          latency: user.latency || 0,
           size: user.size || userSize[0] || 10,
           last_executed_period: user.last_executed_period || null,
         }));
@@ -291,14 +297,18 @@ export default function ControlPanelContent({
 
       // Generate initial street map users
       const streetUsers = generateStreetMapUsers(
-        newRoadNetwork, 
+        newRoadNetwork,
         8, // initial user count (reduced for better performance)
-        userSpeed[0], 
+        userSpeed[0],
         userSize[0]
       );
       setUsers(streetUsers);
 
-      console.log("Street map scenario initialized with", streetUsers.length, "users");
+      console.log(
+        "Street map scenario initialized with",
+        streetUsers.length,
+        "users"
+      );
     } catch (error) {
       console.error("Error initializing street map scenario:", error);
       setDataError(`Failed to initialize street map: ${error.message}`);
@@ -476,10 +486,10 @@ export default function ControlPanelContent({
     await fetchLiveClusterStatus();
 
     // Start real-time polling with interval based on simulation speed
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-      }
-      
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+    }
+
     // Calculate interval: 1x = 5000ms, 5x = 1000ms
     const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
     intervalRef.current = setInterval(fetchLiveClusterStatus, intervalMs);
@@ -487,14 +497,14 @@ export default function ControlPanelContent({
 
   // Stop live data polling
   const stopLiveDataPolling = () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
       // Calculate interval: 1x = 5000ms, 5x = 1000ms
       // Formula: 5000 / simulationSpeed[0]
       const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
       realModeIntervalRef.current = setInterval(
-        fetchRealClusterStatus,
+        fetchLiveClusterStatus,
         intervalMs
       );
     } else {
@@ -503,18 +513,16 @@ export default function ControlPanelContent({
         clearInterval(realModeIntervalRef.current);
         realModeIntervalRef.current = null;
       }
+    }
   };
-
   useEffect(() => {
     // Cleanup on unmount
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-
     };
   }, []);
-
 
   // Handle simulation speed changes in real mode - this should run continuously when in real mode
   useEffect(() => {
@@ -545,13 +553,10 @@ export default function ControlPanelContent({
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      
+
       // Calculate interval based on simulation speed
       const intervalMs = Math.max(1000, 3000 / simulationSpeed[0]);
-      intervalRef.current = setInterval(
-        refreshClusterAndUsersData,
-        intervalMs
-      );
+      intervalRef.current = setInterval(refreshClusterAndUsersData, intervalMs);
     } else if (!isSimulating && intervalRef.current) {
       // Stop polling when simulation stops
       clearInterval(intervalRef.current);
@@ -564,21 +569,24 @@ export default function ControlPanelContent({
     try {
       setDataError(""); // Clear any previous errors
       setSimulationLoading(true);
-      
+
       // Start the simulation via API
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_simulation`
       );
-      
+
       if (response.data && response.data.success) {
         setIsSimulating(true);
-        
+
         // After starting simulation, refresh the cluster status and users data
         // This ensures the UI shows the latest user assignments and cluster info
         try {
           await refreshClusterAndUsersData();
         } catch (fetchError) {
-          console.error("Error fetching updated data after starting simulation:", fetchError);
+          console.error(
+            "Error fetching updated data after starting simulation:",
+            fetchError
+          );
           // Don't fail the entire operation if data fetch fails
         }
       }
@@ -600,13 +608,16 @@ export default function ControlPanelContent({
       );
       if (response.data && response.data.success) {
         setIsSimulating(false);
-        
+
         // After stopping simulation, refresh the cluster status and users data
         // This ensures the UI shows the latest state after stopping
         try {
           await refreshClusterAndUsersData();
         } catch (fetchError) {
-          console.error("Error fetching updated data after stopping simulation:", fetchError);
+          console.error(
+            "Error fetching updated data after stopping simulation:",
+            fetchError
+          );
           // Don't fail the entire operation if data fetch fails
         }
       }
@@ -708,9 +719,9 @@ export default function ControlPanelContent({
                   </>
                 ) : (
                   <>
-                <div>• Drag to move elements</div>
-                <div>• Click to select elements</div>
-                <div>• Dashed rings show editable items</div>
+                    <div>• Drag to move elements</div>
+                    <div>• Click to select elements</div>
+                    <div>• Dashed rings show editable items</div>
                   </>
                 )}
               </div>
@@ -757,19 +768,15 @@ export default function ControlPanelContent({
               </Button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-                <Button
-                  onClick={clearAllCentralNodes}
-                  size="sm"
-                  variant="outline"
-                >
+              <Button
+                onClick={clearAllCentralNodes}
+                size="sm"
+                variant="outline"
+              >
                 <Database className="w-4 h-4 mr-1" />
                 Central
               </Button>
-                <Button
-                  onClick={clearEverything}
-                  size="sm"
-                  variant="destructive"
-                >
+              <Button onClick={clearEverything} size="sm" variant="destructive">
                 <Trash2 className="w-4 h-4 mr-1" />
                 All
               </Button>
@@ -803,25 +810,25 @@ export default function ControlPanelContent({
                 </SelectContent>
               </Select>
             </div>
-            
+
             <div className="space-y-2">
               <Label className="text-xs">
                 Max Coverage Distance: {maxCoverageDistance[0]}px
               </Label>
-              <Slider 
-                value={maxCoverageDistance} 
-                onValueChange={setMaxCoverageDistance} 
-                max={200} 
-                min={50} 
-                step={10} 
-                className="h-4" 
+              <Slider
+                value={maxCoverageDistance}
+                onValueChange={setMaxCoverageDistance}
+                max={200}
+                min={50}
+                step={10}
+                className="h-4"
               />
             </div>
-            
-            <Button 
-              onClick={runPlacementAlgorithm} 
-              size="sm" 
-              variant="default" 
+
+            <Button
+              onClick={runPlacementAlgorithm}
+              size="sm"
+              variant="default"
               className="w-full"
               disabled={!users?.length || !edgeNodes.length}
             >
@@ -850,8 +857,12 @@ export default function ControlPanelContent({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="nearest-distance">Nearest Distance</SelectItem>
-                  <SelectItem value="nearest-latency">Nearest Latency</SelectItem>
+                  <SelectItem value="nearest-distance">
+                    Nearest Distance
+                  </SelectItem>
+                  <SelectItem value="nearest-latency">
+                    Nearest Latency
+                  </SelectItem>
                   <SelectItem value="gap-baseline">GAP Baseline</SelectItem>
                   <SelectItem value="random">Random Assignment</SelectItem>
                 </SelectContent>
@@ -870,19 +881,24 @@ export default function ControlPanelContent({
                 size="sm"
                 variant="outline"
                 className="w-full"
-                disabled={!users?.length || (!edgeNodes.length && !centralNodes.length)}
+                disabled={
+                  !users?.length || (!edgeNodes.length && !centralNodes.length)
+                }
               >
                 <MapPin className="w-4 h-4 mr-1" />
                 Run User Assignment
               </Button>
-              
+
               {assignmentAlgorithm === "gap-baseline" && (
                 <Button
                   onClick={() => runGAPBatch()}
                   size="sm"
                   variant="default"
                   className="w-full bg-blue-600 hover:bg-blue-700"
-                  disabled={!users?.length || (!edgeNodes.length && !centralNodes.length)}
+                  disabled={
+                    !users?.length ||
+                    (!edgeNodes.length && !centralNodes.length)
+                  }
                 >
                   <Target className="w-4 h-4 mr-1" />
                   Run GAP Batch (Optimal)
@@ -927,9 +943,7 @@ export default function ControlPanelContent({
                       Central CPU:{" "}
                       {liveData.central_node?.cpu_usage?.toFixed(1)}%
                     </div>
-                    <div>
-                      Edge Nodes: {liveData.edge_nodes?.length || 0}
-                    </div>
+                    <div>Edge Nodes: {liveData.edge_nodes?.length || 0}</div>
                   </div>
                 )}
               </div>
@@ -945,7 +959,7 @@ export default function ControlPanelContent({
                   <Database className="w-3 h-3 mr-1" />
                   Refresh
                 </Button>
-                
+
                 <Button
                   onClick={startLiveDataPolling}
                   size="sm"
@@ -986,9 +1000,15 @@ export default function ControlPanelContent({
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="none">None (Self adding user)</SelectItem>
-                  <SelectItem value="scenario2">Scenario 2: DACT Sample</SelectItem>
-                  <SelectItem value="scenario3">Scenario 3: Vehicle Sample</SelectItem>
-                  <SelectItem value="scenario4">Scenario 4: Street Map (Saigon)</SelectItem>
+                  <SelectItem value="scenario2">
+                    Scenario 2: DACT Sample
+                  </SelectItem>
+                  <SelectItem value="scenario3">
+                    Scenario 3: Vehicle Sample
+                  </SelectItem>
+                  <SelectItem value="scenario4">
+                    Scenario 4: Street Map (Saigon)
+                  </SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1004,13 +1024,13 @@ export default function ControlPanelContent({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Simulation</CardTitle>
           </CardHeader>
-          
+
           <CardContent className="space-y-3">
             <div className="flex gap-2">
-              <Button 
+              <Button
                 onClick={handleToggleSimulation}
-                variant={isSimulating ? "destructive" : "default"} 
-                size="sm" 
+                variant={isSimulating ? "destructive" : "default"}
+                size="sm"
                 className="flex-1"
                 disabled={users?.length === 0 || simulationLoading} // Disable if no users or loading
               >
@@ -1059,7 +1079,7 @@ export default function ControlPanelContent({
             </div>
           </CardContent>
         </Card>
-      
+
         {/* Zoom Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -1234,7 +1254,7 @@ export default function ControlPanelContent({
             <CardTitle className="text-sm">Edge Nodes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-                        <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
+            <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
               Edge Nodes managed by live backend system
             </div>
 
@@ -1247,11 +1267,10 @@ export default function ControlPanelContent({
                 min={0}
                 step={10}
               />
-              </div>
+            </div>
           </CardContent>
         </Card>
       </div>
     </>
   );
 }
-

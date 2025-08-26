@@ -1,4 +1,3 @@
-import { useCallback } from "react";
 import { 
   updateStreetMapUsers, 
   spawnNewStreetMapUsers, 
@@ -23,15 +22,11 @@ export const useSimulationLogic = (state, actions) => {
     edgeNodes,
     centralNodes,
     assignmentAlgorithm,
-  } = state;
-
-  const { setUsers, setRoadNetwork } = actions;
     simulationMode,
-    edgeNodes,
-    centralNodes,
   } = state;
 
-  const { setUsers, setTotalLatency } = actions;
+  const { setUsers, setRoadNetwork, setTotalLatency } = actions;
+   
 
   // Step counter for periodic operations in demo mode
   const stepCounterRef = useRef(0);

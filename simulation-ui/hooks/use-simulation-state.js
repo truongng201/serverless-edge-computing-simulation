@@ -63,7 +63,6 @@ export function useSimulationState() {
 
   // Road Network state (for street map scenario)
   const [roadNetwork, setRoadNetwork] = useState(null);
-  const [selectedScenario, setSelectedScenario] = useState("none");
 
   // Scenario selection state
   const [selectedScenario, setSelectedScenario] = useState("none");
