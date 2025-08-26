@@ -6,7 +6,6 @@ export function useSimulationState() {
   const [edgeNodes, setEdgeNodes] = useState([]);
   const [centralNodes, setCentralNodes] = useState([]);
 
-  const [totalLatency, setTotalLatency] = useState(0);
 
   // UI State
   const [selectedUser, setSelectedUser] = useState(null);
@@ -28,15 +27,7 @@ export function useSimulationState() {
   // Road Network state (for street map scenario)
   const [roadNetwork, setRoadNetwork] = useState(null);
 
-  // Recalculate average latency whenever users update
-  useEffect(() => {
-    if (!users || users.length === 0) {
-      setTotalLatency(0);
-      return;
-    }
-    const sum = users.reduce((acc, u) => acc + (Number(u.latency) || 0), 0);
-    setTotalLatency(Math.round(sum / users.length));
-  }, [users, setTotalLatency]);
+  
 
   // Periodic auto (re)assignment every 10s: pick min latency among all edges and centrals
   useEffect(() => {
@@ -115,8 +106,6 @@ export function useSimulationState() {
     setEdgeNodes,
     centralNodes,
     setCentralNodes,
-    totalLatency,
-    setTotalLatency,
     selectedUser,
     setSelectedUser,
     selectedEdge,

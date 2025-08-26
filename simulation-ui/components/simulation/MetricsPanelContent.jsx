@@ -10,7 +10,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function MetricsPanelContent({
   users,
-  totalLatency,
   selectedUser,
   setSelectedUser,
   roadNetwork,
@@ -32,7 +31,6 @@ export default function MetricsPanelContent({
       <div className="pt-8">
         <SystemStatusCard
           users={users}
-          totalLatency={totalLatency}
         />
 
         <StreetMapMetricsCard

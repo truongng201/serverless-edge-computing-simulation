@@ -157,8 +157,6 @@ export default function Component() {
           setEdgeNodes={state.setEdgeNodes}
           centralNodes={state.centralNodes}
           setCentralNodes={state.setCentralNodes}
-          totalLatency={state.totalLatency}
-          setTotalLatency={state.setTotalLatency}
           selectedUser={state.selectedUser}
           setSelectedUser={state.setSelectedUser}
           selectedEdge={state.selectedEdge}
@@ -213,7 +211,6 @@ export default function Component() {
           users={state.users}
           edgeNodes={state.edgeNodes}
           centralNodes={state.centralNodes}
-          totalLatency={state.totalLatency}
           selectedUser={state.selectedUser}
           setSelectedUser={state.setSelectedUser}
           selectedEdge={state.selectedEdge}

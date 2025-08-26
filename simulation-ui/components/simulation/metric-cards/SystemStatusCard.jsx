@@ -6,9 +6,8 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function SystemStatusCard({
   users,
-  totalLatency,
 }) {
-  const { liveData } = useSimulationStore();
+  const { liveData, totalLatency } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
