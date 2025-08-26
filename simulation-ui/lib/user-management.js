@@ -6,6 +6,7 @@ import {
   calculateLatency 
 } from "./placement-algorithms";
 import { calculateDistance } from "./helper";
+import { solveGAP, getGAPStats } from "./gap-solver";
 
 // Main placement algorithm runner
 export const runPlacementAlgorithm = (
@@ -112,6 +113,207 @@ export const runPlacementAlgorithm = (
   });
 
   console.log(`Placement algorithm ${placementAlgorithm} completed with ${selectedPositions.length} positions`);
+};
+
+// Run user assignment algorithm
+export const runAssignmentAlgorithm = (
+  users,
+  edgeNodes,
+  centralNodes,
+  assignmentAlgorithm,
+  setUsers
+) => {
+  if (users.length === 0) {
+    alert("No users available for assignment");
+    return;
+  }
+
+  if (edgeNodes.length === 0 && centralNodes.length === 0) {
+    alert("No nodes available for assignment");
+    return;
+  }
+
+  setUsers(prevUsers => {
+    return prevUsers.map(user => {
+      let bestNode = null;
+      let bestType = null;
+      let bestLatency = Number.POSITIVE_INFINITY;
+
+      switch (assignmentAlgorithm) {
+        case "nearest-distance":
+          // Find nearest node by distance
+          let minDistance = Number.POSITIVE_INFINITY;
+          
+          edgeNodes.forEach(node => {
+            const distance = calculateDistance(user.x, user.y, node.x, node.y);
+            if (distance < minDistance) {
+              minDistance = distance;
+              bestNode = node;
+              bestType = "edge";
+            }
+          });
+
+          centralNodes.forEach(node => {
+            const distance = calculateDistance(user.x, user.y, node.x, node.y);
+            if (distance < minDistance) {
+              minDistance = distance;
+              bestNode = node;
+              bestType = "central";
+            }
+          });
+          break;
+
+        case "nearest-latency":
+          // Find node with minimum latency
+          edgeNodes.forEach(node => {
+            const latency = calculateLatency(user, node.id, "edge", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
+            if (latency < bestLatency) {
+              bestLatency = latency;
+              bestNode = node;
+              bestType = "edge";
+            }
+          });
+
+          centralNodes.forEach(node => {
+            const latency = calculateLatency(user, node.id, "central", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
+            if (latency < bestLatency) {
+              bestLatency = latency;
+              bestNode = node;
+              bestType = "central";
+            }
+          });
+          break;
+
+        case "gap-baseline":
+          // Use GAP solver for this user
+          const gapAssignment = solveGAP([user], edgeNodes, centralNodes, {
+            method: 'greedy',
+            latencyParams: window.__LATENCY_PARAMS__,
+            enableMemoryConstraints: false
+          });
+          
+          if (gapAssignment[user.id]) {
+            const assignment = gapAssignment[user.id];
+            bestNode = [...edgeNodes, ...centralNodes].find(n => n.id === assignment.nodeId);
+            bestType = assignment.nodeType;
+            bestLatency = assignment.latency;
+            
+            // Log GAP stats for debugging
+            if (window.__GAP_DEBUG__) {
+              const stats = getGAPStats(gapAssignment, [user]);
+              console.log(`GAP assignment for ${user.id}:`, {
+                nodeId: assignment.nodeId,
+                nodeType: assignment.nodeType,
+                profit: assignment.profit,
+                latency: assignment.latency,
+                stats
+              });
+            }
+          }
+          break;
+
+        case "random":
+          // Random assignment
+          const allNodes = [
+            ...edgeNodes.map(n => ({...n, type: "edge"})),
+            ...centralNodes.map(n => ({...n, type: "central"}))
+          ];
+          if (allNodes.length > 0) {
+            const randomNode = allNodes[Math.floor(Math.random() * allNodes.length)];
+            bestNode = randomNode;
+            bestType = randomNode.type;
+          }
+          break;
+
+        default:
+          console.warn(`Unknown assignment algorithm: ${assignmentAlgorithm}`);
+          return user;
+      }
+
+      if (!bestNode) {
+        return user;
+      }
+
+      const finalLatency = bestLatency !== Number.POSITIVE_INFINITY 
+        ? bestLatency 
+        : calculateLatency(user, bestNode.id, bestType, edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
+
+      return {
+        ...user,
+        assignedEdge: bestType === "edge" ? bestNode.id : null,
+        assignedCentral: bestType === "central" ? bestNode.id : null,
+        latency: finalLatency,
+        manualConnection: false
+      };
+    });
+  });
+
+  console.log(`Assignment algorithm ${assignmentAlgorithm} completed`);
+};
+
+// Run GAP assignment for all users (more efficient than per-user)
+export const runGAPAssignment = (
+  users,
+  edgeNodes, 
+  centralNodes,
+  setUsers,
+  options = {}
+) => {
+  if (users.length === 0) {
+    alert("No users available for GAP assignment");
+    return;
+  }
+
+  if (edgeNodes.length === 0 && centralNodes.length === 0) {
+    alert("No nodes available for GAP assignment");
+    return;
+  }
+
+  const {
+    method = 'greedy',
+    enableMemoryConstraints = false,
+    debug = false
+  } = options;
+
+  try {
+    // Solve GAP for all users simultaneously
+    const gapAssignment = solveGAP(users, edgeNodes, centralNodes, {
+      method,
+      latencyParams: window.__LATENCY_PARAMS__,
+      enableMemoryConstraints
+    });
+
+    // Apply assignment results
+    setUsers(prevUsers => {
+      return prevUsers.map(user => {
+        const assignment = gapAssignment[user.id];
+        if (!assignment) {
+          return user; // No assignment found, keep current state
+        }
+
+        return {
+          ...user,
+          assignedEdge: assignment.nodeType === "edge" ? assignment.nodeId : null,
+          assignedCentral: assignment.nodeType === "central" ? assignment.nodeId : null,
+          latency: assignment.latency,
+          manualConnection: false
+        };
+      });
+    });
+
+    // Log stats if debug enabled
+    if (debug || window.__GAP_DEBUG__) {
+      const stats = getGAPStats(gapAssignment, users);
+      console.log("GAP Assignment completed:", stats);
+      console.log("Individual assignments:", gapAssignment);
+    }
+
+    console.log(`GAP assignment completed for ${Object.keys(gapAssignment).length}/${users.length} users`);
+    
+  } catch (error) {
+    console.error("GAP assignment failed:", error);
+    alert("GAP assignment failed. Check console for details.");
+  }
 };
 
 // Manually connect user to a specific node

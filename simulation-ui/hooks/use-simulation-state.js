@@ -51,13 +51,19 @@ export function useSimulationState() {
   const [manualConnectionMode, setManualConnectionMode] = useState(false);
   const [autoAssignment, setAutoAssignment] = useState(true);
 
-  // Simulation mode state
-  const [simulationMode, setSimulationMode] = useState("demo"); // "demo" or "real"
-  const [realModeData, setRealModeData] = useState(null);
+  // Live data state (only real mode now)
+  const [liveData, setLiveData] = useState(null);
 
   // Auto Placement state
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
   const [maxCoverageDistance, setMaxCoverageDistance] = useState([100]);
+  
+  // User Assignment state
+  const [assignmentAlgorithm, setAssignmentAlgorithm] = useState("nearest-distance");
+
+  // Road Network state (for street map scenario)
+  const [roadNetwork, setRoadNetwork] = useState(null);
+  const [selectedScenario, setSelectedScenario] = useState("none");
 
   // Scenario selection state
   const [selectedScenario, setSelectedScenario] = useState("none");
@@ -207,14 +213,16 @@ export function useSimulationState() {
     setManualConnectionMode,
     autoAssignment,
     setAutoAssignment,
-    simulationMode,
-    setSimulationMode,
-    realModeData,
-    setRealModeData,
+    liveData,
+    setLiveData,
     placementAlgorithm,
     setPlacementAlgorithm,
     maxCoverageDistance,
     setMaxCoverageDistance,
+    assignmentAlgorithm,
+    setAssignmentAlgorithm,
+    roadNetwork,
+    setRoadNetwork,
     selectedScenario,
     setSelectedScenario,
   };

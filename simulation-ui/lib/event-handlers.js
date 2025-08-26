@@ -327,7 +327,7 @@ export const useEventHandlers = (state, actions) => {
       if (selectedUser && selectedUser.id === draggedUser.id) {
         setSelectedUser((prev) => ({ ...prev, x: newX, y: newY }));
       }
-    } else if (isDraggingNode && draggedNode) {
+    } else if (isDraggingNode && draggedNode && draggedNode.node) {
       const canvas = canvasRef.current;
       if (!canvas) return;
 
@@ -351,7 +351,7 @@ export const useEventHandlers = (state, actions) => {
         // Update draggedNode with current position for API call
         setDraggedNode(prev => ({
           ...prev,
-          node: { ...prev?.node, x: newX, y: newY }
+          node: prev.node ? { ...prev?.node, x: newX, y: newY } : null
         }));
 
         // Update selected edge if it's the one being dragged
@@ -369,7 +369,7 @@ export const useEventHandlers = (state, actions) => {
         // Update draggedNode with current position
         setDraggedNode(prev => ({
           ...prev,
-          node: { ...prev?.node, x: newX, y: newY }
+          node: prev.node ? { ...prev.node, x: newX, y: newY } : null
         }));
 
         // Update selected central if it's the one being dragged
@@ -408,7 +408,7 @@ export const useEventHandlers = (state, actions) => {
 
   const handleMouseUp = useCallback(async () => {
     // Handle API call for edge node position update
-    if (isDraggingNode && draggedNode && draggedNode.type === "edge") {
+    if (isDraggingNode && draggedNode && draggedNode.node && draggedNode.type === "edge") {
       try {
         const payload = {
           node_id: draggedNode.node.id,

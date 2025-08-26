@@ -15,7 +15,7 @@ import { useSimulationState } from "@/hooks/use-simulation-state";
 import { useEventHandlers } from "@/lib/event-handlers";
 import { useSimulationLogic, getEditModeDescription } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
-import { runPlacementAlgorithm } from "@/lib/user-management";
+import { runPlacementAlgorithm, runAssignmentAlgorithm, runGAPAssignment } from "@/lib/user-management";
 import * as NodeManagement from "@/lib/node-management";
 import * as UserManagement from "@/lib/user-management";
 
@@ -120,7 +120,15 @@ export default function Component() {
       state.maxCoverageDistance,
       state.setEdgeNodes,
       state.setUsers
-    )
+    ),
+    runAssignmentAlgorithm: () => runAssignmentAlgorithm(
+      state.users,
+      state.edgeNodes,
+      state.centralNodes,
+      state.assignmentAlgorithm,
+      state.setUsers
+    ),
+    runGAPAssignment: runGAPAssignment
   };
 
   // Animation loop
@@ -282,6 +290,16 @@ export default function Component() {
           maxCoverageDistance={state.maxCoverageDistance}
           setMaxCoverageDistance={state.setMaxCoverageDistance}
           runPlacementAlgorithm={userActions.runPlacementAlgorithm}
+          assignmentAlgorithm={state.assignmentAlgorithm}
+          setAssignmentAlgorithm={state.setAssignmentAlgorithm}
+          runAssignmentAlgorithm={userActions.runAssignmentAlgorithm}
+          runGAPAssignment={userActions.runGAPAssignment}
+          liveData={state.liveData}
+          setLiveData={state.setLiveData}
+          selectedScenario={state.selectedScenario}
+          setSelectedScenario={state.setSelectedScenario}
+          roadNetwork={state.roadNetwork}
+          setRoadNetwork={state.setRoadNetwork}
           simulationMode={state.simulationMode}
           setSimulationMode={state.setSimulationMode}
           realModeData={state.realModeData}
@@ -308,8 +326,9 @@ export default function Component() {
           selectedModel={state.selectedModel}
           rightPanelOpen={state.rightPanelOpen}
           setRightPanelOpen={state.setRightPanelOpen}
-          simulationMode={state.simulationMode}
-          realModeData={state.realModeData}
+          liveData={state.liveData}
+          roadNetwork={state.roadNetwork}
+          selectedScenario={state.selectedScenario}
         />
       </MetricsPanel>
 
