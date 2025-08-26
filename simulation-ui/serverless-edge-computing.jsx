@@ -103,7 +103,6 @@ export default function Component() {
       state.users,
       state.edgeNodes,
       state.placementAlgorithm,
-      state.maxCoverageDistance,
       state.setEdgeNodes,
       state.setUsers
     ),
@@ -214,8 +213,6 @@ export default function Component() {
           updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
           placementAlgorithm={state.placementAlgorithm}
           setPlacementAlgorithm={state.setPlacementAlgorithm}
-          maxCoverageDistance={state.maxCoverageDistance}
-          setMaxCoverageDistance={state.setMaxCoverageDistance}
           runPlacementAlgorithm={userActions.runPlacementAlgorithm}
           assignmentAlgorithm={state.assignmentAlgorithm}
           setAssignmentAlgorithm={state.setAssignmentAlgorithm}

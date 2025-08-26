@@ -14,8 +14,6 @@ import { Target, MapPin } from "lucide-react";
 export default function NodePlacementCard({
   placementAlgorithm,
   setPlacementAlgorithm,
-  maxCoverageDistance,
-  setMaxCoverageDistance,
   runPlacementAlgorithm,
   users,
   edgeNodes,
@@ -45,20 +43,6 @@ export default function NodePlacementCard({
               <SelectItem value="random-nearest">Random-Nearest</SelectItem>
             </SelectContent>
           </Select>
-        </div>
-
-        <div className="space-y-2">
-          <Label className="text-xs">
-            Max Coverage Distance: {maxCoverageDistance[0]}px
-          </Label>
-          <Slider
-            value={maxCoverageDistance}
-            onValueChange={setMaxCoverageDistance}
-            max={200}
-            min={50}
-            step={10}
-            className="h-4"
-          />
         </div>
 
         <Button

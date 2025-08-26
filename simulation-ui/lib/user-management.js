@@ -13,7 +13,6 @@ export const runPlacementAlgorithm = (
   users, 
   edgeNodes, 
   placementAlgorithm, 
-  maxCoverageDistance, 
   setEdgeNodes, 
   setUsers
 ) => {
@@ -29,10 +28,10 @@ export const runPlacementAlgorithm = (
   // Use user positions as candidates
   const candidates = users.map(user => ({ x: user.x, y: user.y }));
   let selectedPositions = [];
-
+  const maxCoverageDistance = 300
   switch (placementAlgorithm) {
     case "topk-demand":
-      selectedPositions = topKDemandPlacement(users, candidates, k, maxCoverageDistance[0]);
+      selectedPositions = topKDemandPlacement(users, candidates, k, maxCoverageDistance);
       break;
     case "kmeans":
       selectedPositions = kMeansPlacement(users, candidates, k);
@@ -44,7 +43,6 @@ export const runPlacementAlgorithm = (
       selectedPositions = randomNearestPlacement(users, candidates, k);
       break;
     default:
-      alert("Unknown placement algorithm");
       return;
   }
 

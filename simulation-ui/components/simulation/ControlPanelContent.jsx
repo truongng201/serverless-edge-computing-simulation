@@ -63,8 +63,6 @@ export default function ControlPanelContent({
   setLeftPanelOpen,
   placementAlgorithm,
   setPlacementAlgorithm,
-  maxCoverageDistance,
-  setMaxCoverageDistance,
   runPlacementAlgorithm,
   assignmentAlgorithm,
   setAssignmentAlgorithm,
@@ -677,8 +675,6 @@ export default function ControlPanelContent({
         <NodePlacementCard
           placementAlgorithm={placementAlgorithm}
           setPlacementAlgorithm={setPlacementAlgorithm}
-          maxCoverageDistance={maxCoverageDistance}
-          setMaxCoverageDistance={setMaxCoverageDistance}
           runPlacementAlgorithm={runPlacementAlgorithm}
           users={users}
           edgeNodes={edgeNodes}

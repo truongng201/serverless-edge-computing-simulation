@@ -36,7 +36,6 @@ export function useSimulationState() {
 
   // Auto Placement state
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
-  const [maxCoverageDistance, setMaxCoverageDistance] = useState([100]);
   
   // User Assignment state
   const [assignmentAlgorithm, setAssignmentAlgorithm] = useState("nearest-distance");
@@ -167,8 +166,6 @@ export function useSimulationState() {
     setLiveData,
     placementAlgorithm,
     setPlacementAlgorithm,
-    maxCoverageDistance,
-    setMaxCoverageDistance,
     assignmentAlgorithm,
     setAssignmentAlgorithm,
     roadNetwork,

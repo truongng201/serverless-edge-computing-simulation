@@ -237,20 +237,13 @@ const useSimulationStore = create((set) => ({
 
   // Auto Placement state
   placementAlgorithm: "topk-demand",
-  maxCoverageDistance: [100],
   setPlacementAlgorithm: (updater) =>
     set((state) => ({
       placementAlgorithm: typeof updater === "function"
         ? updater(state.placementAlgorithm)
         : updater
     })),
-  setMaxCoverageDistance: (updater) =>
-    set((state) => ({
-      maxCoverageDistance: typeof updater === "function"
-        ? updater(state.maxCoverageDistance)
-        : updater
-    })),
-
+  
   // User Assignment state
   assignmentAlgorithm: "nearest-distance",
   setAssignmentAlgorithm: (updater) =>
