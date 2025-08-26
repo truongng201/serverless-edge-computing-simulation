@@ -53,7 +53,6 @@ export default function ControlPanelContent({
   setAssignmentAlgorithm,
   runAssignmentAlgorithm,
   runGAPAssignment,
-  setRoadNetwork,
   simulationMode,
   setRealModeData,
   updateEdgeCoverage,
@@ -73,6 +72,7 @@ export default function ControlPanelContent({
     setSelectedScenario,
     simulationSpeed,
     setLiveData,
+    setRoadNetwork
   } = useSimulationStore();
 
   // Helper function to clear all users from backend

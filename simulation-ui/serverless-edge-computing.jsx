@@ -198,10 +198,6 @@ export default function Component() {
           setAssignmentAlgorithm={state.setAssignmentAlgorithm}
           runAssignmentAlgorithm={userActions.runAssignmentAlgorithm}
           runGAPAssignment={userActions.runGAPAssignment}
-          roadNetwork={state.roadNetwork}
-          setRoadNetwork={state.setRoadNetwork}
-          realModeData={state.realModeData}
-          setRealModeData={state.setRealModeData}
         />
       </ControlPanel>
 
@@ -217,7 +213,6 @@ export default function Component() {
           setSelectedEdge={state.setSelectedEdge}
           selectedCentral={state.selectedCentral}
           setSelectedCentral={state.setSelectedCentral}
-          roadNetwork={state.roadNetwork}
         />
       </MetricsPanel>
 

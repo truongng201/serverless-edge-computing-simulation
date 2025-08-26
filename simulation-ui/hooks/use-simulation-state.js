@@ -24,10 +24,6 @@ export function useSimulationState() {
   // User Assignment state
   const [assignmentAlgorithm, setAssignmentAlgorithm] = useState("nearest-distance");
 
-  // Road Network state (for street map scenario)
-  const [roadNetwork, setRoadNetwork] = useState(null);
-
-  
 
   // Periodic auto (re)assignment every 10s: pick min latency among all edges and centrals
   useEffect(() => {
@@ -68,36 +64,6 @@ export function useSimulationState() {
     return () => clearInterval(interval);
   }, [edgeNodes, centralNodes, users]);
 
-  // Note: Coverage updates are now handled individually per selected node in ControlPanelContent
-  // This prevents the slider from affecting all nodes when only the selected one should change
-
-  // Container timeout management - reset warm state after 30 seconds of inactivity
-  useEffect(() => {
-    const interval = setInterval(() => {
-      const currentTime = Date.now();
-      const timeoutDuration = 30000; // 30 seconds
-
-      // Reset warm state for edge nodes
-      setEdgeNodes(prev => prev.map(edge => {
-        if (edge.isWarm && edge.lastAccessTime && 
-            (currentTime - edge.lastAccessTime) > timeoutDuration) {
-          return { ...edge, isWarm: false, lastAccessTime: null };
-        }
-        return edge;
-      }));
-
-      // Reset warm state for central nodes
-      setCentralNodes(prev => prev.map(central => {
-        if (central.isWarm && central.lastAccessTime && 
-            (currentTime - central.lastAccessTime) > timeoutDuration) {
-          return { ...central, isWarm: false, lastAccessTime: null };
-        }
-        return central;
-      }));
-    }, 5000); // Check every 5 seconds
-
-    return () => clearInterval(interval);
-  }, []);
 
   return {
     users,
@@ -120,7 +86,5 @@ export function useSimulationState() {
     setPlacementAlgorithm,
     assignmentAlgorithm,
     setAssignmentAlgorithm,
-    roadNetwork,
-    setRoadNetwork,
   };
 }

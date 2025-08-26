@@ -12,7 +12,6 @@ export default function MetricsPanelContent({
   users,
   selectedUser,
   setSelectedUser,
-  roadNetwork,
 }) {
   const { rightPanelOpen, setRightPanelOpen } = useSimulationStore();
   return (
@@ -35,7 +34,6 @@ export default function MetricsPanelContent({
 
         <StreetMapMetricsCard
           users={users}
-          roadNetwork={roadNetwork}
         />
 
         <LiveSystemMetricsCard

@@ -6,9 +6,8 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function StreetMapMetricsCard({
   users,
-  roadNetwork,
 }) {
-  const { selectedScenario } = useSimulationStore();
+  const { selectedScenario, roadNetwork } = useSimulationStore();
   if (selectedScenario !== "scenario4" || !roadNetwork) {
     return null;
   }
