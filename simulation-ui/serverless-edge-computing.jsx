@@ -94,22 +94,6 @@ export default function Component() {
   };
 
   const userActions = {
-    connectUserToNode: (userId, nodeId, nodeType) => UserManagement.connectUserToNode(
-      userId, 
-      nodeId, 
-      nodeType, 
-      state.setUsers, 
-      state.edgeNodes, 
-      state.centralNodes
-    ),
-    disconnectUser: (userId) => UserManagement.disconnectUser(userId, state.setUsers),
-    resetAllConnections: () => UserManagement.resetAllConnections(state.setUsers),
-    updateSelectedUser: (updates) => UserManagement.updateSelectedUser(
-      state.selectedUser, 
-      updates, 
-      state.setUsers, 
-      state.setSelectedUser
-    ),
     deleteSelectedUser: async () => await UserManagement.deleteSelectedUser(
       state.selectedUser, 
       state.setUsers, 
@@ -210,10 +194,6 @@ export default function Component() {
           setAutoAssignment={state.setAutoAssignment}
           simulationData={state.simulationData}
           models={models}
-          connectUserToNode={userActions.connectUserToNode}
-          disconnectUser={userActions.disconnectUser}
-          resetAllConnections={userActions.resetAllConnections}
-          updateSelectedUser={userActions.updateSelectedUser}
           deleteSelectedUser={userActions.deleteSelectedUser}
           simulationStep={simulationStep}
           handleCanvasClick={eventHandlers.handleCanvasClick}

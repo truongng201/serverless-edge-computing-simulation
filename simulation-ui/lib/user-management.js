@@ -312,78 +312,7 @@ export const runGAPAssignment = (
     
   } catch (error) {
     console.error("GAP assignment failed:", error);
-    alert("GAP assignment failed. Check console for details.");
   }
-};
-
-// Manually connect user to a specific node
-export const connectUserToNode = (userId, nodeId, nodeType, setUsers, edgeNodes, centralNodes) => {
-  setUsers((prevUsers) =>
-    prevUsers.map((user) => {
-      if (user.id === userId) {
-        const latency = calculateLatency(user, nodeId, nodeType, edgeNodes, centralNodes);
-        return {
-          ...user,
-          assignedEdge: nodeType === "edge" ? nodeId : null,
-          assignedCentral: nodeType === "central" ? nodeId : null,
-          manualConnection: true,
-          latency,
-        };
-      }
-      return user;
-    })
-  );
-};
-
-// Disconnect user from all nodes
-export const disconnectUser = (userId, setUsers) => {
-  setUsers((prevUsers) => {
-    const newUsers = [];
-    for (let i = 0; i < prevUsers.length; i++) {
-      const user = prevUsers[i];
-      if (user.id === userId) {
-        newUsers.push({
-          ...user,
-          assignedEdge: null,
-          assignedCentral: null,
-          manualConnection: false,
-          latency: 100 + Math.random() * 50,
-        });
-      } else {
-        newUsers.push(user);
-      }
-    }
-    return newUsers;
-  });
-};
-
-// Reset all manual connections
-export const resetAllConnections = (setUsers) => {
-  setUsers((prevUsers) => {
-    const newUsers = [];
-    for (let i = 0; i < prevUsers.length; i++) {
-      newUsers.push({ ...prevUsers[i], manualConnection: false });
-    }
-    return newUsers;
-  });
-};
-
-// Update selected user properties
-export const updateSelectedUser = (selectedUser, updates, setUsers, setSelectedUser) => {
-  if (!selectedUser) return;
-  setUsers((prevUsers) => {
-    const newUsers = [];
-    for (let i = 0; i < prevUsers.length; i++) {
-      const user = prevUsers[i];
-      if (user.id === selectedUser.id) {
-        newUsers.push({ ...user, ...updates });
-      } else {
-        newUsers.push(user);
-      }
-    }
-    return newUsers;
-  });
-  setSelectedUser((prev) => ({ ...prev, ...updates }));
 };
 
 // Delete selected user
