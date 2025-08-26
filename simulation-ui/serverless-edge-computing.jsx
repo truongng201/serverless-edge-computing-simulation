@@ -30,7 +30,7 @@ import * as UserManagement from "@/lib/user-management";
 export default function Component() {
   // Get all state from the custom hook
   const state = useSimulationState();
-  const { leftPanelOpen, setLeftPanelOpen } = useSimulationStore();
+  const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } = useSimulationStore();
 
   // Get event handlers
   const eventHandlers = useEventHandlers(state, state);
@@ -190,8 +190,6 @@ export default function Component() {
           setPredictionEnabled={state.setPredictionEnabled}
           totalLatency={state.totalLatency}
           setTotalLatency={state.setTotalLatency}
-          rightPanelOpen={state.rightPanelOpen}
-          setRightPanelOpen={state.setRightPanelOpen}
           selectedModel={state.selectedModel}
           setSelectedModel={state.setSelectedModel}
           selectedUser={state.selectedUser}
@@ -252,7 +250,7 @@ export default function Component() {
       </ControlPanel>
 
       {/* Right Metrics Panel */}
-      <MetricsPanel rightPanelOpen={state.rightPanelOpen}>
+      <MetricsPanel>
         <MetricsPanelContent
           users={state.users}
           edgeNodes={state.edgeNodes}
@@ -266,8 +264,6 @@ export default function Component() {
           setSelectedCentral={state.setSelectedCentral}
           models={models}
           selectedModel={state.selectedModel}
-          rightPanelOpen={state.rightPanelOpen}
-          setRightPanelOpen={state.setRightPanelOpen}
           liveData={state.liveData}
           roadNetwork={state.roadNetwork}
           selectedScenario={state.selectedScenario}
@@ -284,11 +280,11 @@ export default function Component() {
           <Settings className="w-4 h-4" />
         </Button>
       )}
-      {!state.rightPanelOpen && (
+      {!rightPanelOpen && (
         <Button
           className="absolute right-4 top-4 z-20"
           size="sm"
-          onClick={() => state.setRightPanelOpen(true)}
+          onClick={() => setRightPanelOpen(true)}
         >
           <MapPin className="w-4 h-4" />
         </Button>

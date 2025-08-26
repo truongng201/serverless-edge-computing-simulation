@@ -6,6 +6,7 @@ import {
   ConnectionStatusCard,
   CurrentAlgorithmCard
 } from "./metric-cards/MetricCards";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function MetricsPanelContent({
   users,
@@ -15,12 +16,11 @@ export default function MetricsPanelContent({
   models,
   selectedModel,
   setSelectedModel,
-  rightPanelOpen,
-  setRightPanelOpen,
   liveData,
   roadNetwork,
   selectedScenario,
 }) {
+  const { rightPanelOpen, setRightPanelOpen } = useSimulationStore();
   return (
     <>
       {/* Close panel - small right arrow button at the very top, outside all cards */}
