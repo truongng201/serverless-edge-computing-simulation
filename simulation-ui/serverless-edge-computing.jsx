@@ -85,27 +85,6 @@ export default function Component() {
       ),
     clearAllUsers: async () =>
       await NodeManagement.clearAllUsers(state.setUsers, state.setSelectedUser),
-    clearAllEdgeNodes: () =>
-      NodeManagement.clearAllEdgeNodes(
-        state.setEdgeNodes,
-        state.setSelectedEdge
-      ),
-    clearAllCentralNodes: () =>
-      NodeManagement.clearAllCentralNodes(
-        state.setCentralNodes,
-        state.setSelectedCentral
-      ),
-    clearEverything: () =>
-      NodeManagement.clearEverything(
-        state.setUsers,
-        state.setEdgeNodes,
-        state.setCentralNodes,
-        state.setSelectedUser,
-        state.setSelectedEdge,
-        state.setSelectedCentral,
-        state.setIsSimulating,
-        state.setTotalLatency
-      ),
     resetSimulation: () => {
       NodeManagement.resetSimulation(() => nodeActions.clearEverything());
       // Also reset the simulation data if available
@@ -182,8 +161,6 @@ export default function Component() {
           setEdgeNodes={state.setEdgeNodes}
           centralNodes={state.centralNodes}
           setCentralNodes={state.setCentralNodes}
-          isSimulating={state.isSimulating}
-          setIsSimulating={state.setIsSimulating}
           simulationSpeed={state.simulationSpeed}
           setSimulationSpeed={state.setSimulationSpeed}
           predictionEnabled={state.predictionEnabled}

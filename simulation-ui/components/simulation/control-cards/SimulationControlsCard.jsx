@@ -4,9 +4,9 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Play, Pause, RotateCcw } from "lucide-react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function SimulationControlsCard({
-  isSimulating,
   handleToggleSimulation,
   handleResetSimulation,
   simulationSpeed,
@@ -16,6 +16,7 @@ export default function SimulationControlsCard({
   users,
   simulationLoading,
 }) {
+  const { isSimulating } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

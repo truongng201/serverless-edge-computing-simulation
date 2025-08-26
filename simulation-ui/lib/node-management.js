@@ -89,35 +89,6 @@ export const clearAllUsers = async (setUsers, setSelectedUser) => {
   setSelectedUser(null);
 };
 
-export const clearAllEdgeNodes = (setEdgeNodes, setSelectedEdge) => {
-  setEdgeNodes([]);
-  setSelectedEdge(null);
-};
-
-export const clearAllCentralNodes = (setCentralNodes, setSelectedCentral) => {
-  setCentralNodes([]);
-  setSelectedCentral(null);
-};
-
-export const clearEverything = (
-  setUsers,
-  setEdgeNodes,
-  setCentralNodes,
-  setSelectedUser,
-  setSelectedEdge,
-  setSelectedCentral,
-  setIsSimulating,
-  setTotalLatency
-) => {
-  setUsers([]);
-  setEdgeNodes([]);
-  setCentralNodes([]);
-  setSelectedUser(null);
-  setSelectedEdge(null);
-  setSelectedCentral(null);
-  setIsSimulating(false);
-  setTotalLatency(0);
-};
 
 export const resetSimulation = (clearEverything) => {
   clearEverything();

@@ -1,8 +1,8 @@
 import "./globals.css"
 
 export const metadata = {
-  title: "Digital Twin Simulation",
-  description: "Interactive hierarchical digital twin simulation with predictive replica placement",
+  title: "Serverless Edge Simulation",
+  description: "Interactive hierarchical serverless edge simulation with predictive replica placement",
 }
 
 export default function RootLayout({ children }) {
