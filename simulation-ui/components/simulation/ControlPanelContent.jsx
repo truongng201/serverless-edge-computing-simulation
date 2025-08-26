@@ -47,7 +47,6 @@ export default function ControlPanelContent({
   setEdgeCoverage,
   centralCoverage,
   setCentralCoverage,
-  zoomLevel,
   models,
   deleteSelectedUser,
   resetSimulation,
@@ -724,7 +723,6 @@ export default function ControlPanelContent({
           zoomIn={zoomIn}
           zoomOut={zoomOut}
           resetZoom={resetZoom}
-          zoomLevel={zoomLevel}
         />
 
         <ModelSelectionCard

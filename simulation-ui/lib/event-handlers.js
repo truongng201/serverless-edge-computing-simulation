@@ -5,7 +5,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 // Event Handlers
 export const useEventHandlers = (state, actions) => {
   const {
-    zoomLevel,
     isDragging,
     isDraggingNode,
     isDraggingUser,
@@ -25,7 +24,7 @@ export const useEventHandlers = (state, actions) => {
     lastPanPoint
   } = state;
 
-  const {panOffset, setPanOffset, isPanning, setIsPanning, canvasRef, editMode} = useSimulationStore();
+  const {panOffset, setPanOffset, isPanning, setIsPanning, canvasRef, editMode, zoomLevel, setZoomLevel} = useSimulationStore();
 
   const {
     setIsDragging,
@@ -41,7 +40,6 @@ export const useEventHandlers = (state, actions) => {
     setUsers,
     setEdgeNodes,
     setCentralNodes,
-    setZoomLevel
   } = actions;
 
   // Handle canvas click to add users or select nodes

@@ -2,13 +2,14 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Plus, Minus, RotateCcw } from "lucide-react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function ZoomControlsCard({
   zoomIn,
   zoomOut,
   resetZoom,
-  zoomLevel,
 }) {
+  const {zoomLevel} = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

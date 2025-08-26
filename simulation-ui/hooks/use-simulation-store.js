@@ -58,7 +58,12 @@ const useSimulationStore = create((set) => ({
   panOffset: { x: 0, y: 0 },
   isPanning: false,
   lastPanPoint: { x: 0, y: 0 },
-  setZoomLevel: (zoomLevel) => set({ zoomLevel }),
+  setZoomLevel: (updater) =>
+    set((state) => ({
+      zoomLevel: typeof updater === "function"
+        ? updater(state.zoomLevel) 
+        : updater,                   
+    })),
   setPanOffset: (updater) =>
     set((state) => ({
       panOffset: typeof updater === "function"

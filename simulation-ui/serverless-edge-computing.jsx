@@ -210,8 +210,6 @@ export default function Component() {
           setEdgeCoverage={state.setEdgeCoverage}
           centralCoverage={state.centralCoverage}
           setCentralCoverage={state.setCentralCoverage}
-          zoomLevel={state.zoomLevel}
-          setZoomLevel={state.setZoomLevel}
           lastPanPoint={state.lastPanPoint}
           setLastPanPoint={state.setLastPanPoint}
           isDraggingNode={state.isDraggingNode}
