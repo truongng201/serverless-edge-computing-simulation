@@ -1,6 +1,6 @@
 "use client"
 
-import Component from "../digital-twin-simulation.jsx"
+import Component from "../serverless-edge-computing.jsx"
 
 export default function Page() {
   return <Component />
