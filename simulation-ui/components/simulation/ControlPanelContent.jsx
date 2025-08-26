@@ -1,39 +1,23 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Slider } from "@/components/ui/slider";
-import { Switch } from "@/components/ui/switch";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
-import {
-  Play,
-  Pause,
-  RotateCcw,
-  Users,
-  Server,
-  Plus,
-  Minus,
-  Database,
-  Trash2,
-  Edit3,
-  ChevronLeft,
-  MapPin,
-  Target,
-  Navigation,
-} from "lucide-react";
+  EdgeNodeSettingsCard,
+  CentralNodeSettingsCard,
+  UserSettingsCard,
+  EditModeCard,
+  ClearControlsCard,
+  SimulationControlsCard,
+  NodePlacementCard,
+  UserAssignmentCard,
+  LiveSystemStatusCard,
+  ScenarioSelectionCard,
+  ZoomControlsCard,
+  ModelSelectionCard
+} from "./control-cards/ControlCards";
+import { ChevronLeft } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { generateSaigonRoadNetwork } from "../../lib/road-network";
 import {
-  generateStreetMapUsers,
-  convertToStreetMapUsers,
+  generateStreetMapUsers
 } from "../../lib/street-map-users";
 
 export default function ControlPanelContent({
@@ -685,591 +669,102 @@ export default function ControlPanelContent({
         </button>
       </div>
       <div className="pt-8">
-        {/* Edit Mode Controls */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Edit3 className="w-4 h-4" />
-              Edit Mode
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label className="text-xs">Edit Mode</Label>
-              <Select value={editMode} onValueChange={setEditMode}>
-                <SelectTrigger className="h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None - Add Users</SelectItem>
-                  <SelectItem value="drag">Drag - Pan View</SelectItem>
-                  <SelectItem value="nodes">Nodes Only</SelectItem>
-                  <SelectItem value="users">Users Only</SelectItem>
-                  <SelectItem value="both">Nodes & Users</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {editMode !== "none" && (
-              <div className="text-xs text-gray-600 space-y-1">
-                {editMode === "drag" ? (
-                  <>
-                    <div>• Drag to pan the view</div>
-                    <div>• Mouse wheel to zoom</div>
-                    <div>• Click to select elements</div>
-                  </>
-                ) : (
-                  <>
-                    <div>• Drag to move elements</div>
-                    <div>• Click to select elements</div>
-                    <div>• Dashed rings show editable items</div>
-                  </>
-                )}
-              </div>
-            )}
-            {(selectedEdge || selectedCentral) && (
-              <Button
-                onClick={deleteSelectedNode}
-                size="sm"
-                variant="destructive"
-                className="w-full"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Selected Node
-              </Button>
-            )}
-            {selectedUser && (
-              <Button
-                onClick={deleteSelectedUser}
-                size="sm"
-                variant="destructive"
-                className="w-full"
-              >
-                <Trash2 className="w-4 h-4 mr-2" />
-                Delete Selected User
-              </Button>
-            )}
-          </CardContent>
-        </Card>
+        <EditModeCard
+          editMode={editMode}
+          setEditMode={setEditMode}
+          selectedEdge={selectedEdge}
+          selectedCentral={selectedCentral}
+          selectedUser={selectedUser}
+          deleteSelectedNode={deleteSelectedNode}
+          deleteSelectedUser={deleteSelectedUser}
+        />
 
-        {/* Clear All Controls */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Clear Controls</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-2">
-            <div className="grid grid-cols-2 gap-2">
-              <Button onClick={clearAllUsers} size="sm" variant="outline">
-                <Users className="w-4 h-4 mr-1" />
-                Users
-              </Button>
-              <Button onClick={clearAllEdgeNodes} size="sm" variant="outline">
-                <Server className="w-4 h-4 mr-1" />
-                Edges
-              </Button>
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <Button
-                onClick={clearAllCentralNodes}
-                size="sm"
-                variant="outline"
-              >
-                <Database className="w-4 h-4 mr-1" />
-                Central
-              </Button>
-              <Button onClick={clearEverything} size="sm" variant="destructive">
-                <Trash2 className="w-4 h-4 mr-1" />
-                All
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+        <ClearControlsCard
+          clearAllUsers={clearAllUsers}
+          clearAllEdgeNodes={clearAllEdgeNodes}
+          clearAllCentralNodes={clearAllCentralNodes}
+          clearEverything={clearEverything}
+        />
 
-        {/* Node Placement Controls */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Target className="w-4 h-4" />
-              Node Placement
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label className="text-xs">Placement Algorithm</Label>
-              <Select
-                value={placementAlgorithm}
-                onValueChange={setPlacementAlgorithm}
-              >
-                <SelectTrigger className="h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="topk-demand">Top-K Demand</SelectItem>
-                  <SelectItem value="kmeans">K-Means Clustering</SelectItem>
-                  <SelectItem value="random-random">Random-Random</SelectItem>
-                  <SelectItem value="random-nearest">Random-Nearest</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <NodePlacementCard
+          placementAlgorithm={placementAlgorithm}
+          setPlacementAlgorithm={setPlacementAlgorithm}
+          maxCoverageDistance={maxCoverageDistance}
+          setMaxCoverageDistance={setMaxCoverageDistance}
+          runPlacementAlgorithm={runPlacementAlgorithm}
+          users={users}
+          edgeNodes={edgeNodes}
+        />
 
-            <div className="space-y-2">
-              <Label className="text-xs">
-                Max Coverage Distance: {maxCoverageDistance[0]}px
-              </Label>
-              <Slider
-                value={maxCoverageDistance}
-                onValueChange={setMaxCoverageDistance}
-                max={200}
-                min={50}
-                step={10}
-                className="h-4"
-              />
-            </div>
+        <UserAssignmentCard
+          assignmentAlgorithm={assignmentAlgorithm}
+          setAssignmentAlgorithm={setAssignmentAlgorithm}
+          runAssignmentAlgorithm={runAssignmentAlgorithm}
+          runGAPBatch={runGAPBatch}
+          users={users}
+          edgeNodes={edgeNodes}
+          centralNodes={centralNodes}
+        />
 
-            <Button
-              onClick={runPlacementAlgorithm}
-              size="sm"
-              variant="default"
-              className="w-full"
-              disabled={!users?.length || !edgeNodes.length}
-            >
-              <MapPin className="w-4 h-4 mr-1" />
-              Run Node Placement
-            </Button>
-          </CardContent>
-        </Card>
+        <LiveSystemStatusCard
+          liveData={liveData}
+          loadingData={loadingData}
+          dataError={dataError}
+          fetchLiveClusterStatus={fetchLiveClusterStatus}
+          startLiveDataPolling={startLiveDataPolling}
+        />
 
-        {/* User Assignment Controls */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Target className="w-4 h-4" />
-              User Assignment
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label className="text-xs">Assignment Algorithm</Label>
-              <Select
-                value={assignmentAlgorithm}
-                onValueChange={setAssignmentAlgorithm}
-              >
-                <SelectTrigger className="h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="nearest-distance">
-                    Nearest Distance
-                  </SelectItem>
-                  <SelectItem value="nearest-latency">
-                    Nearest Latency
-                  </SelectItem>
-                  <SelectItem value="gap-baseline">GAP Baseline</SelectItem>
-                  <SelectItem value="random">Random Assignment</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <ScenarioSelectionCard
+          selectedScenario={selectedScenario}
+          handleScenarioChange={handleScenarioChange}
+        />
 
-            <div className="text-xs text-gray-600 mb-2">
-              <div>Edge Servers: {edgeNodes.length}</div>
-              <div>Central Servers: {centralNodes.length}</div>
-              <div>Users: {users?.length || 0}</div>
-            </div>
+        <SimulationControlsCard
+          isSimulating={isSimulating}
+          handleToggleSimulation={handleToggleSimulation}
+          handleResetSimulation={handleResetSimulation}
+          simulationSpeed={simulationSpeed}
+          setSimulationSpeed={setSimulationSpeed}
+          predictionEnabled={predictionEnabled}
+          setPredictionEnabled={setPredictionEnabled}
+          users={users}
+          simulationLoading={simulationLoading}
+        />
 
-            <div className="grid grid-cols-1 gap-2">
-              <Button
-                onClick={runAssignmentAlgorithm}
-                size="sm"
-                variant="outline"
-                className="w-full"
-                disabled={
-                  !users?.length || (!edgeNodes.length && !centralNodes.length)
-                }
-              >
-                <MapPin className="w-4 h-4 mr-1" />
-                Run User Assignment
-              </Button>
+        <ZoomControlsCard
+          zoomIn={zoomIn}
+          zoomOut={zoomOut}
+          resetZoom={resetZoom}
+          zoomLevel={zoomLevel}
+        />
 
-              {assignmentAlgorithm === "gap-baseline" && (
-                <Button
-                  onClick={() => runGAPBatch()}
-                  size="sm"
-                  variant="default"
-                  className="w-full bg-blue-600 hover:bg-blue-700"
-                  disabled={
-                    !users?.length ||
-                    (!edgeNodes.length && !centralNodes.length)
-                  }
-                >
-                  <Target className="w-4 h-4 mr-1" />
-                  Run GAP Batch (Optimal)
-                </Button>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+        <ModelSelectionCard
+          selectedModel={selectedModel}
+          setSelectedModel={setSelectedModel}
+          predictionSteps={predictionSteps}
+          setPredictionSteps={setPredictionSteps}
+          models={models}
+        />
 
-        {/* Live System Status */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Server className="w-4 h-4" />
-              Live System Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <div className="text-xs text-green-600 font-medium">
-                Live Data - Connected to backend cluster
-              </div>
+        <UserSettingsCard
+          userSpeed={userSpeed}
+          setUserSpeed={setUserSpeed}
+          userSize={userSize}
+          setUserSize={setUserSize}
+        />
 
-              <div className="bg-green-50 p-2 rounded text-xs">
-                <div className="flex items-center justify-between">
-                  <span>Status:</span>
-                  <Badge variant="default" className="text-xs bg-green-600">
-                    Connected
-                  </Badge>
-                </div>
-                <div className="mt-1 text-gray-600">
-                  📊 View detailed metrics in the right panel →
-                  {loadingData && (
-                    <span className="ml-1 text-xs text-blue-600">
-                      Fetching live data...
-                    </span>
-                  )}
-                </div>
-                {liveData && (
-                  <div className="mt-2 text-gray-700">
-                    <div>
-                      Central CPU:{" "}
-                      {liveData.central_node?.cpu_usage?.toFixed(1)}%
-                    </div>
-                    <div>Edge Nodes: {liveData.edge_nodes?.length || 0}</div>
-                  </div>
-                )}
-              </div>
+        <CentralNodeSettingsCard
+          simulationMode={simulationMode}
+          addCentralNode={addCentralNode}
+          removeCentralNode={removeCentralNode}
+          centralCoverage={centralCoverage}
+          handleCentralCoverageChange={handleCentralCoverageChange}
+        />
 
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  onClick={fetchLiveClusterStatus}
-                  size="sm"
-                  variant="outline"
-                  disabled={loadingData}
-                  className="text-xs"
-                >
-                  <Database className="w-3 h-3 mr-1" />
-                  Refresh
-                </Button>
-
-                <Button
-                  onClick={startLiveDataPolling}
-                  size="sm"
-                  variant="default"
-                  className="text-xs bg-green-600 hover:bg-green-700"
-                >
-                  <Play className="w-3 h-3 mr-1" />
-                  Auto Poll
-                </Button>
-              </div>
-            </div>
-
-            {dataError && (
-              <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-                {dataError}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Scenario Selection */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Navigation className="w-4 h-4" />
-              Scenario Selection
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label className="text-xs">Scenario</Label>
-              <Select
-                value={selectedScenario}
-                onValueChange={handleScenarioChange}
-              >
-                <SelectTrigger className="h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">None (Self adding user)</SelectItem>
-                  <SelectItem value="scenario2">
-                    Scenario 2: DACT Sample
-                  </SelectItem>
-                  <SelectItem value="scenario3">
-                    Scenario 3: Vehicle Sample
-                  </SelectItem>
-                  <SelectItem value="scenario4">
-                    Scenario 4: Street Map (Saigon)
-                  </SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="text-xs text-gray-600">
-              Select a predefined scenario to load sample data, or choose "None"
-              to manually add users.
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Simulation Controls */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Simulation</CardTitle>
-          </CardHeader>
-
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Button
-                onClick={handleToggleSimulation}
-                variant={isSimulating ? "destructive" : "default"}
-                size="sm"
-                className="flex-1"
-                disabled={users?.length === 0 || simulationLoading} // Disable if no users or loading
-              >
-                {isSimulating ? (
-                  <Pause className="w-4 h-4" />
-                ) : (
-                  <Play className="w-4 h-4" />
-                )}
-                {simulationLoading
-                  ? "Loading..."
-                  : isSimulating
-                  ? "Stop"
-                  : "Start"}
-              </Button>
-              <Button
-                onClick={handleResetSimulation}
-                variant="outline"
-                size="sm"
-                disabled={simulationLoading}
-              >
-                <RotateCcw className="w-4 h-4" />
-              </Button>
-            </div>
-            {isSimulating && (
-              <div className="text-xs text-green-600 font-medium flex items-center gap-1">
-                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                API Simulation Active
-              </div>
-            )}
-            <div className="space-y-2">
-              <Label className="text-xs">Speed: {simulationSpeed[0]}x</Label>
-              <Slider
-                value={simulationSpeed}
-                onValueChange={setSimulationSpeed}
-                max={5}
-                min={0.1}
-                step={0.1}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Label className="text-xs">Prediction</Label>
-              <Switch
-                checked={predictionEnabled}
-                onCheckedChange={setPredictionEnabled}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Zoom Controls */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Zoom & Pan</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex gap-2">
-              <Button
-                onClick={zoomIn}
-                size="sm"
-                variant="outline"
-                className="flex-1"
-              >
-                <Plus className="w-4 h-4" />
-                Zoom In
-              </Button>
-              <Button
-                onClick={zoomOut}
-                size="sm"
-                variant="outline"
-                className="flex-1"
-              >
-                <Minus className="w-4 h-4" />
-                Zoom Out
-              </Button>
-            </div>
-            <Button
-              onClick={resetZoom}
-              size="sm"
-              variant="outline"
-              className="w-full"
-            >
-              <RotateCcw className="w-4 h-4 mr-2" />
-              Reset View
-            </Button>
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>Zoom Level</span>
-                <span>{(zoomLevel * 100).toFixed(0)}%</span>
-              </div>
-              <Progress
-                value={((zoomLevel - 0.2) / (5 - 0.2)) * 100}
-                className="h-2"
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Model Selection */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Model</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label className="text-xs">Prediction Model</Label>
-              <Select value={selectedModel} onValueChange={setSelectedModel}>
-                <SelectTrigger className="h-8">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(models).map(([key, name]) => (
-                    <SelectItem key={key} value={key}>
-                      {name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">
-                Prediction Steps: {predictionSteps[0]}
-              </Label>
-              <Slider
-                value={predictionSteps}
-                onValueChange={setPredictionSteps}
-                max={20}
-                min={5}
-                step={1}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* User Settings */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">User Settings</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2">
-              <Label className="text-xs">Speed: {userSpeed[0]}</Label>
-              <Slider
-                value={userSpeed}
-                onValueChange={setUserSpeed}
-                max={10}
-                min={0.5}
-                step={0.5}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-xs">Size: {userSize[0]}</Label>
-              <Slider
-                value={userSize}
-                onValueChange={setUserSize}
-                max={15}
-                min={5}
-                step={1}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Central Node Settings */}
-        <Card className="mb-4">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm flex items-center gap-2">
-              <Database className="w-4 h-4" />
-              Central Nodes
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {simulationMode !== "real" && (
-              <>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={addCentralNode}
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Plus className="w-4 h-4" />
-                    Add
-                  </Button>
-                  <Button
-                    onClick={removeCentralNode}
-                    size="sm"
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Minus className="w-4 h-4" />
-                    Remove
-                  </Button>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-xs">
-                    Coverage: {centralCoverage[0]}px
-                  </Label>
-                  <Slider
-                    value={centralCoverage}
-                    onValueChange={handleCentralCoverageChange}
-                    max={1000}
-                    min={0}
-                    step={20}
-                  />
-                </div>
-              </>
-            )}
-            {simulationMode === "real" && (
-              <>
-                <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
-                  Central Node managed by real system
-                </div>
-              </>
-            )}
-          </CardContent>
-        </Card>
-
-        {/* Edge Node Settings */}
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm">Edge Nodes</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
-              Edge Nodes managed by live backend system
-            </div>
-
-            <div className="space-y-2">
-              <Label className="text-xs">Coverage: {edgeCoverage[0]}px</Label>
-              <Slider
-                value={edgeCoverage}
-                onValueChange={handleEdgeCoverageChange}
-                max={1000}
-                min={0}
-                step={10}
-              />
-            </div>
-          </CardContent>
-        </Card>
+        <EdgeNodeSettingsCard
+          edgeCoverage={edgeCoverage}
+          handleEdgeCoverageChange={handleEdgeCoverageChange}
+        />
       </div>
     </>
   );
