@@ -9,14 +9,12 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export default function SimulationControlsCard({
   handleToggleSimulation,
   handleResetSimulation,
-  simulationSpeed,
-  setSimulationSpeed,
   predictionEnabled,
   setPredictionEnabled,
   users,
   simulationLoading,
 }) {
-  const { isSimulating } = useSimulationStore();
+  const { isSimulating, simulationSpeed, setSimulationSpeed } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

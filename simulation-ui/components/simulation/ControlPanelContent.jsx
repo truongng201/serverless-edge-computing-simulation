@@ -26,8 +26,6 @@ export default function ControlPanelContent({
   setEdgeNodes,
   centralNodes,
   setCentralNodes,
-  simulationSpeed,
-  setSimulationSpeed,
   predictionEnabled,
   setPredictionEnabled,
   selectedUser,
@@ -71,7 +69,7 @@ export default function ControlPanelContent({
   const [simulationLoading, setSimulationLoading] = useState(false);
   const intervalRef = useRef(null);
   const realModeIntervalRef = useRef(null);
-  const { userSpeed, userSize, leftPanelOpen, setLeftPanelOpen, isSimulating, setIsSimulating, setSelectedScenario } =
+  const { userSpeed, userSize, leftPanelOpen, setLeftPanelOpen, isSimulating, setIsSimulating, setSelectedScenario, simulationSpeed } =
     useSimulationStore();
 
   // Helper function to clear all users from backend
@@ -695,8 +693,6 @@ export default function ControlPanelContent({
         <SimulationControlsCard
           handleToggleSimulation={handleToggleSimulation}
           handleResetSimulation={handleResetSimulation}
-          simulationSpeed={simulationSpeed}
-          setSimulationSpeed={setSimulationSpeed}
           predictionEnabled={predictionEnabled}
           setPredictionEnabled={setPredictionEnabled}
           users={users}

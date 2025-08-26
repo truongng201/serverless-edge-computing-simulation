@@ -6,7 +6,6 @@ export function useSimulationState() {
   const [edgeNodes, setEdgeNodes] = useState([]);
   const [centralNodes, setCentralNodes] = useState([]);
 
-  const [simulationSpeed, setSimulationSpeed] = useState([1]);
   const [predictionEnabled, setPredictionEnabled] = useState(true);
   const [totalLatency, setTotalLatency] = useState(0);
 
@@ -127,8 +126,6 @@ export function useSimulationState() {
     setEdgeNodes,
     centralNodes,
     setCentralNodes,
-    simulationSpeed,
-    setSimulationSpeed,
     predictionEnabled,
     setPredictionEnabled,
     totalLatency,

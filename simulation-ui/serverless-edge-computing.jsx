@@ -157,8 +157,6 @@ export default function Component() {
           setEdgeNodes={state.setEdgeNodes}
           centralNodes={state.centralNodes}
           setCentralNodes={state.setCentralNodes}
-          simulationSpeed={state.simulationSpeed}
-          setSimulationSpeed={state.setSimulationSpeed}
           predictionEnabled={state.predictionEnabled}
           setPredictionEnabled={state.setPredictionEnabled}
           totalLatency={state.totalLatency}
