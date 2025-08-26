@@ -244,7 +244,6 @@ class Scheduler:
         return True
     
     def _node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
-        """Find the nearest node (edge or central) to the user location"""
         min_distance = self._calculate_distance(user_location, self.central_node["location"])
         nearest_node_id = "central_node"  # default to central node
         

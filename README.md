@@ -104,7 +104,7 @@ This project implements a hierarchical distributed system with two main componen
 
 ### Frontend (`simulation-ui/`)
 
-```
+``` PLaintext
 📁 simulation-ui/
 ├── 📄 package.json           # Node.js dependencies
 ├── 📄 next.config.mjs        # Next.js configuration
@@ -208,6 +208,7 @@ The system manages four distinct container states:
 - **Network**: All nodes must be on the same network
 
 ### Software Dependencies
+
 - pip3 package manager
 - npm/yarn package manager
 - Git version control
@@ -216,12 +217,14 @@ The system manages four distinct container states:
 ## 🚀 Quick Start
 
 ### 1. Clone Repository
+
 ```bash
 git clone https://github.com/truongng201/Serverless-edge-computing-simulation.git
 cd Serverless-edge-computing-simulation
 ```
 
 ### 2. Setup Backend
+
 ```bash
 cd serverless-sim
 pip install -r requirements.txt
@@ -233,28 +236,29 @@ cp edge_config.env.example edge_config.env
 ```
 
 ### 3. Setup Frontend
+
 ```bash
 cd ../simulation-ui
 npm install
 ```
 
 ### 4. Deploy Central Node
+
 ```bash
 cd ../serverless-sim
-python central_main.py
-# Or use deployment script:
 ./deploy_central.sh
 ```
 
 ### 5. Deploy Edge Nodes
+
 ```bash
 # On each edge machine:
-python edge_main.py --node-id edge_001 --central-url http://CENTRAL_IP:5001
-# Or use deployment script:
-./deploy_edge.sh
+cd ../serverless-sim
+./deploy_edge.sh --node-id edge_<index> --central-url http://CENTRAL_IP:8000 --port <port>
 ```
 
 ### 6. Start Web Interface
+
 ```bash
 cd ../simulation-ui  
 npm run dev
@@ -264,6 +268,7 @@ npm run dev
 ## 🔧 Configuration
 
 ### Central Node Configuration (`central_config.env`)
+
 ```env
 NODE_TYPE=central
 PORT=5001
@@ -274,6 +279,7 @@ ENABLE_MIGRATION=true
 ```
 
 ### Edge Node Configuration (`edge_config.env`)
+
 ```env
 NODE_TYPE=edge
 NODE_ID=edge_001
