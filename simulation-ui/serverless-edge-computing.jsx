@@ -168,8 +168,6 @@ export default function Component() {
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
-          predictionSteps={state.predictionSteps}
-          setPredictionSteps={state.setPredictionSteps}
           edgeCoverage={state.edgeCoverage}
           setEdgeCoverage={state.setEdgeCoverage}
           centralCoverage={state.centralCoverage}

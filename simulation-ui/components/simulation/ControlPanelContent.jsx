@@ -30,8 +30,6 @@ export default function ControlPanelContent({
   selectedEdge,
   setSelectedEdge,
   selectedCentral,
-  predictionSteps,
-  setPredictionSteps,
   edgeCoverage,
   setEdgeCoverage,
   centralCoverage,
@@ -67,8 +65,16 @@ export default function ControlPanelContent({
   const [simulationLoading, setSimulationLoading] = useState(false);
   const intervalRef = useRef(null);
   const realModeIntervalRef = useRef(null);
-  const { userSpeed, userSize, leftPanelOpen, setLeftPanelOpen, isSimulating, setIsSimulating, setSelectedScenario, simulationSpeed } =
-    useSimulationStore();
+  const {
+    userSpeed,
+    userSize,
+    leftPanelOpen,
+    setLeftPanelOpen,
+    isSimulating,
+    setIsSimulating,
+    setSelectedScenario,
+    simulationSpeed,
+  } = useSimulationStore();
 
   // Helper function to clear all users from backend
   const clearAllUsersFromBackend = async () => {
@@ -684,9 +690,7 @@ export default function ControlPanelContent({
           startLiveDataPolling={startLiveDataPolling}
         />
 
-        <ScenarioSelectionCard
-          handleScenarioChange={handleScenarioChange}
-        />
+        <ScenarioSelectionCard handleScenarioChange={handleScenarioChange} />
 
         <SimulationControlsCard
           handleToggleSimulation={handleToggleSimulation}
@@ -701,10 +705,7 @@ export default function ControlPanelContent({
           resetZoom={resetZoom}
         />
 
-        <ModelSelectionCard
-          predictionSteps={predictionSteps}
-          setPredictionSteps={setPredictionSteps}
-        />
+        <ModelSelectionCard />
 
         <UserSettingsCard />
 

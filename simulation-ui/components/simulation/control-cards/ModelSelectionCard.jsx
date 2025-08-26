@@ -10,11 +10,14 @@ import {
 } from "@/components/ui/select";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
-export default function ModelSelectionCard({
-  predictionSteps,
-  setPredictionSteps,
-}) {
-  const { selectedModel, setSelectedModel, models } = useSimulationStore();
+export default function ModelSelectionCard({}) {
+  const {
+    selectedModel,
+    setSelectedModel,
+    models,
+    predictionSteps,
+    setPredictionSteps,
+  } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

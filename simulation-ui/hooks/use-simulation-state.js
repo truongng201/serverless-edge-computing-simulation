@@ -13,9 +13,6 @@ export function useSimulationState() {
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [selectedCentral, setSelectedCentral] = useState(null);
 
-  // User settings
-  const [predictionSteps, setPredictionSteps] = useState([10]);
-
   // Edge settings
   const [edgeCoverage, setEdgeCoverage] = useState([500]);
 
@@ -133,8 +130,6 @@ export function useSimulationState() {
     setSelectedEdge,
     selectedCentral,
     setSelectedCentral,
-    predictionSteps,
-    setPredictionSteps,
     edgeCoverage,
     setEdgeCoverage,
     centralCoverage,
