@@ -59,7 +59,12 @@ const useSimulationStore = create((set) => ({
   isPanning: false,
   lastPanPoint: { x: 0, y: 0 },
   setZoomLevel: (zoomLevel) => set({ zoomLevel }),
-  setPanOffset: (panOffset) => set({ panOffset }),
+  setPanOffset: (updater) =>
+    set((state) => ({
+      panOffset: typeof updater === "function"
+        ? updater(state.panOffset)  
+        : updater                    
+    })),
   setIsPanning: (isPanning) => set({ isPanning }),
   setLastPanPoint: (lastPanPoint) => set({ lastPanPoint }),
 
@@ -92,7 +97,7 @@ const useSimulationStore = create((set) => ({
   maxCoverageDistance: [100],
   setPlacementAlgorithm: (placementAlgorithm) => set({ placementAlgorithm }),
   setMaxCoverageDistance: (maxCoverageDistance) => set({ maxCoverageDistance }),
-  
+
   // User Assignment state
   assignmentAlgorithm: "nearest-distance",
   setAssignmentAlgorithm: (assignmentAlgorithm) => set({ assignmentAlgorithm }),

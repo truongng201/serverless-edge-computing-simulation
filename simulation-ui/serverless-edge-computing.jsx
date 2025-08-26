@@ -212,10 +212,6 @@ export default function Component() {
           setCentralCoverage={state.setCentralCoverage}
           zoomLevel={state.zoomLevel}
           setZoomLevel={state.setZoomLevel}
-          panOffset={state.panOffset}
-          setPanOffset={state.setPanOffset}
-          isPanning={state.isPanning}
-          setIsPanning={state.setIsPanning}
           lastPanPoint={state.lastPanPoint}
           setLastPanPoint={state.setLastPanPoint}
           isDraggingNode={state.isDraggingNode}

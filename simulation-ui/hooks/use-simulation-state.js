@@ -33,8 +33,6 @@ export function useSimulationState() {
 
   // Zoom and Pan state
   const [zoomLevel, setZoomLevel] = useState(1);
-  const [panOffset, setPanOffset] = useState({ x: 0, y: 0 });
-  const [isPanning, setIsPanning] = useState(false);
   const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
 
   // Edit mode states
@@ -187,10 +185,6 @@ export function useSimulationState() {
     setCentralCoverage,
     zoomLevel,
     setZoomLevel,
-    panOffset,
-    setPanOffset,
-    isPanning,
-    setIsPanning,
     lastPanPoint,
     setLastPanPoint,
     editMode,
