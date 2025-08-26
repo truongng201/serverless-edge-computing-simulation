@@ -28,11 +28,6 @@ export function useSimulationState() {
   // Central node settings
   const [centralCoverage, setCentralCoverage] = useState([0]);
 
-  // Zoom and Pan state
-  const [lastPanPoint, setLastPanPoint] = useState({ x: 0, y: 0 });
-
-  // Edit mode states
-
   // Manual connection state
   const [manualConnectionMode, setManualConnectionMode] = useState(false);
   const [autoAssignment, setAutoAssignment] = useState(true);
@@ -167,8 +162,6 @@ export function useSimulationState() {
     setEdgeCoverage,
     centralCoverage,
     setCentralCoverage,
-    lastPanPoint,
-    setLastPanPoint,
     manualConnectionMode,
     setManualConnectionMode,
     autoAssignment,

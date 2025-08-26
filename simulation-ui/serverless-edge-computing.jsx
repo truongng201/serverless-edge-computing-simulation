@@ -204,8 +204,6 @@ export default function Component() {
           setEdgeCoverage={state.setEdgeCoverage}
           centralCoverage={state.centralCoverage}
           setCentralCoverage={state.setCentralCoverage}
-          lastPanPoint={state.lastPanPoint}
-          setLastPanPoint={state.setLastPanPoint}
           manualConnectionMode={state.manualConnectionMode}
           setManualConnectionMode={state.setManualConnectionMode}
           autoAssignment={state.autoAssignment}

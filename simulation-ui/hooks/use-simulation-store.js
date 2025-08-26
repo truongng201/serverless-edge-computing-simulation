@@ -76,7 +76,12 @@ const useSimulationStore = create((set) => ({
         : updater                    
     })),
   setIsPanning: (isPanning) => set({ isPanning }),
-  setLastPanPoint: (lastPanPoint) => set({ lastPanPoint }),
+  setLastPanPoint: (updater) =>
+    set((state) => ({
+      lastPanPoint: typeof updater === "function"
+        ? updater(state.lastPanPoint)
+        : updater
+    })),
 
   // Edit mode states
   editMode: "none",
