@@ -19,9 +19,6 @@ export function useSimulationState() {
   // Central node settings
   const [centralCoverage, setCentralCoverage] = useState([0]);
 
-  // Manual connection state
-  const [autoAssignment, setAutoAssignment] = useState(true);
-
   // Auto Placement state
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
   
@@ -44,7 +41,6 @@ export function useSimulationState() {
   // Periodic auto (re)assignment every 10s: pick min latency among all edges and centrals
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!autoAssignment) return;
       if ((edgeNodes?.length || 0) + (centralNodes?.length || 0) === 0) return;
       if (!users || users.length === 0) return;
 
@@ -79,7 +75,7 @@ export function useSimulationState() {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [autoAssignment, edgeNodes, centralNodes, users]);
+  }, [edgeNodes, centralNodes, users]);
 
   // Note: Coverage updates are now handled individually per selected node in ControlPanelContent
   // This prevents the slider from affecting all nodes when only the selected one should change
@@ -131,8 +127,6 @@ export function useSimulationState() {
     setEdgeCoverage,
     centralCoverage,
     setCentralCoverage,
-    autoAssignment,
-    setAutoAssignment,
     placementAlgorithm,
     setPlacementAlgorithm,
     assignmentAlgorithm,

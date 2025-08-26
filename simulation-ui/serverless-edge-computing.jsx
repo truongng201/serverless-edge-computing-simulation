@@ -172,8 +172,6 @@ export default function Component() {
           setEdgeCoverage={state.setEdgeCoverage}
           centralCoverage={state.centralCoverage}
           setCentralCoverage={state.setCentralCoverage}
-          autoAssignment={state.autoAssignment}
-          setAutoAssignment={state.setAutoAssignment}
           simulationData={state.simulationData}
           deleteSelectedUser={userActions.deleteSelectedUser}
           simulationStep={simulationStep}

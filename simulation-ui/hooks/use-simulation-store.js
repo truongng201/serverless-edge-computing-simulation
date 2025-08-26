@@ -222,15 +222,6 @@ const useSimulationStore = create((set) => ({
         : updater
     })),
 
-  // Manual connection state
-  autoAssignment: true,
-  setAutoAssignment: (updater) =>
-    set((state) => ({
-      autoAssignment: typeof updater === "function"
-        ? updater(state.autoAssignment)
-        : updater
-    })),
-
   // Live data state
   liveData: null,
   setLiveData: (updater) =>
