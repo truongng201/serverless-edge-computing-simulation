@@ -8,11 +8,10 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
-export default function ScenarioSelectionCard({
-  selectedScenario,
-  handleScenarioChange,
-}) {
+export default function ScenarioSelectionCard({ handleScenarioChange }) {
+  const { selectedScenario } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -24,18 +23,13 @@ export default function ScenarioSelectionCard({
       <CardContent className="space-y-3">
         <div className="space-y-2">
           <Label className="text-xs">Scenario</Label>
-          <Select
-            value={selectedScenario}
-            onValueChange={handleScenarioChange}
-          >
+          <Select value={selectedScenario} onValueChange={handleScenarioChange}>
             <SelectTrigger className="h-8">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">None (Self adding user)</SelectItem>
-              <SelectItem value="scenario2">
-                Scenario 2: DACT Sample
-              </SelectItem>
+              <SelectItem value="scenario2">Scenario 2: DACT Sample</SelectItem>
               <SelectItem value="scenario3">
                 Scenario 3: Vehicle Sample
               </SelectItem>
@@ -46,8 +40,8 @@ export default function ScenarioSelectionCard({
           </Select>
         </div>
         <div className="text-xs text-gray-600">
-          Select a predefined scenario to load sample data, or choose "None"
-          to manually add users.
+          Select a predefined scenario to load sample data, or choose "None" to
+          manually add users.
         </div>
       </CardContent>
     </Card>

@@ -210,8 +210,6 @@ export default function Component() {
           runGAPAssignment={userActions.runGAPAssignment}
           liveData={state.liveData}
           setLiveData={state.setLiveData}
-          selectedScenario={state.selectedScenario}
-          setSelectedScenario={state.setSelectedScenario}
           roadNetwork={state.roadNetwork}
           setRoadNetwork={state.setRoadNetwork}
           realModeData={state.realModeData}
@@ -234,7 +232,6 @@ export default function Component() {
           setSelectedCentral={state.setSelectedCentral}
           liveData={state.liveData}
           roadNetwork={state.roadNetwork}
-          selectedScenario={state.selectedScenario}
         />
       </MetricsPanel>
 

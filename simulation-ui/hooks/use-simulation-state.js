@@ -39,9 +39,6 @@ export function useSimulationState() {
   // Road Network state (for street map scenario)
   const [roadNetwork, setRoadNetwork] = useState(null);
 
-  // Scenario selection state
-  const [selectedScenario, setSelectedScenario] = useState("none");
-
   // Recalculate average latency whenever users update
   useEffect(() => {
     if (!users || users.length === 0) {
@@ -158,7 +155,5 @@ export function useSimulationState() {
     setAssignmentAlgorithm,
     roadNetwork,
     setRoadNetwork,
-    selectedScenario,
-    setSelectedScenario,
   };
 }

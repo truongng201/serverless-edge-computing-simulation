@@ -2,12 +2,13 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Car } from "lucide-react";
 import { getStreetMapStats } from "../../../lib/street-map-users";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function StreetMapMetricsCard({
   users,
   roadNetwork,
-  selectedScenario,
 }) {
+  const { selectedScenario } = useSimulationStore();
   if (selectedScenario !== "scenario4" || !roadNetwork) {
     return null;
   }

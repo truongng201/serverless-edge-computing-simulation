@@ -14,7 +14,6 @@ export const useSimulationLogic = (state, actions) => {
     simulationSpeed,
     roadMode,
     roads,
-    selectedScenario,
     roadNetwork,
     edgeNodes,
     centralNodes,
@@ -23,7 +22,7 @@ export const useSimulationLogic = (state, actions) => {
   } = state;
 
   const { setUsers, setRoadNetwork, setTotalLatency } = actions;
-  const { userSpeed, isSimulating } = useSimulationStore();
+  const { userSpeed, isSimulating, selectedScenario } = useSimulationStore();
 
   // Step counter for periodic operations in demo mode
   const stepCounterRef = useRef(0);

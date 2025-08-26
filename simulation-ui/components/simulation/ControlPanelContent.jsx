@@ -64,8 +64,6 @@ export default function ControlPanelContent({
   setRoadNetwork,
   simulationMode,
   setRealModeData,
-  selectedScenario,
-  setSelectedScenario,
   updateEdgeCoverage,
 }) {
   const [loadingData, setLoadingData] = useState(false);
@@ -73,7 +71,7 @@ export default function ControlPanelContent({
   const [simulationLoading, setSimulationLoading] = useState(false);
   const intervalRef = useRef(null);
   const realModeIntervalRef = useRef(null);
-  const { userSpeed, userSize, leftPanelOpen, setLeftPanelOpen, isSimulating, setIsSimulating } =
+  const { userSpeed, userSize, leftPanelOpen, setLeftPanelOpen, isSimulating, setIsSimulating, setSelectedScenario } =
     useSimulationStore();
 
   // Helper function to clear all users from backend
@@ -691,7 +689,6 @@ export default function ControlPanelContent({
         />
 
         <ScenarioSelectionCard
-          selectedScenario={selectedScenario}
           handleScenarioChange={handleScenarioChange}
         />
 
