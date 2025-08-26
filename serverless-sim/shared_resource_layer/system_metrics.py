@@ -103,11 +103,26 @@ class SystemMetricsCollector:
             return 0.0
             
     def get_load_average(self) -> tuple:
-        """Get system load average using os.getloadavg()"""
+        """Get system load average.
+
+        On Windows, os.getloadavg() is not available. We return a synthetic
+        tuple based on CPU utilization to avoid repeated errors and keep
+        downstream code stable.
+        """
         try:
+            if platform.system() == "Windows" or not hasattr(os, "getloadavg"):
+                # Approximate: scale CPU percent (0-100) to a load-like number by cores
+                try:
+                    cpu_percent = psutil.cpu_percent(interval=0)
+                    cpu_cores = max(1, psutil.cpu_count() or 1)
+                    # Normalize to a load average-like value
+                    approx_load = round((cpu_percent / 100.0) * cpu_cores, 2)
+                    return (approx_load, approx_load, approx_load)
+                except Exception:
+                    return (0.0, 0.0, 0.0)
             return os.getloadavg()
-        except Exception as e:
-            self.logger.error(f"Failed to get load average: {e}")
+        except Exception:
+            # Avoid spamming logs every 5s; return zeros silently
             return (0.0, 0.0, 0.0)
             
     def get_uptime(self) -> float:

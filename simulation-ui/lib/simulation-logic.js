@@ -6,6 +6,9 @@ import {
   autoAssignStreetMapUsers
 } from "./street-map-users";
 import { updateTrafficLights } from "./road-network";
+import { useCallback, useRef } from "react";
+import { calculateDistance } from "./helper";
+import { calculateLatency } from "./placement-algorithms";
 
 // Simulation Functions
 export const useSimulationLogic = (state, actions) => {
@@ -23,6 +26,15 @@ export const useSimulationLogic = (state, actions) => {
   } = state;
 
   const { setUsers, setRoadNetwork } = actions;
+    simulationMode,
+    edgeNodes,
+    centralNodes,
+  } = state;
+
+  const { setUsers, setTotalLatency } = actions;
+
+  // Step counter for periodic operations in demo mode
+  const stepCounterRef = useRef(0);
 
   // Simulation step
   const simulationStep = useCallback(() => {
