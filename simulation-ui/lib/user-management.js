@@ -18,13 +18,11 @@ export const runPlacementAlgorithm = (
   setUsers
 ) => {
   if (users.length === 0) {
-    alert("No users available for placement algorithm");
     return;
   }
 
   const k = edgeNodes.length;
   if (k === 0) {
-    alert("No edge nodes available for placement");
     return;
   }
 

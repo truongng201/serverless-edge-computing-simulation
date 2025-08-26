@@ -1,6 +1,6 @@
-import { 
-  updateStreetMapUsers, 
-  spawnNewStreetMapUsers, 
+import {
+  updateStreetMapUsers,
+  spawnNewStreetMapUsers,
   simulateServerlessFunctions,
   autoAssignStreetMapUsers
 } from "./street-map-users";
@@ -24,7 +24,7 @@ export const useSimulationLogic = (state, actions) => {
   } = state;
 
   const { setUsers, setRoadNetwork, setTotalLatency } = actions;
-  const {userSpeed} = useSimulationStore();
+  const { userSpeed } = useSimulationStore();
 
   // Step counter for periodic operations in demo mode
   const stepCounterRef = useRef(0);
@@ -45,11 +45,11 @@ export const useSimulationLogic = (state, actions) => {
       // Update street map users
       setUsers(prevUsers => {
         let updatedUsers = updateStreetMapUsers(
-          prevUsers, 
-          { ...roadNetwork, trafficLights: updatedTrafficLights }, 
+          prevUsers,
+          { ...roadNetwork, trafficLights: updatedTrafficLights },
           simulationSpeed[0]
         );
-        
+
         // Auto-assign unassigned users to nodes
         updatedUsers = autoAssignStreetMapUsers(
           updatedUsers,
@@ -57,14 +57,14 @@ export const useSimulationLogic = (state, actions) => {
           centralNodes,
           assignmentAlgorithm
         );
-        
+
         // Simulate serverless function execution
         updatedUsers = simulateServerlessFunctions(
           updatedUsers,
           edgeNodes,
           centralNodes
         );
-        
+
         // Spawn new users with controlled rate
         updatedUsers = spawnNewStreetMapUsers(
           updatedUsers,
@@ -74,10 +74,10 @@ export const useSimulationLogic = (state, actions) => {
           userSpeed[0],
           10 // user size
         );
-        
+
         return updatedUsers;
       });
-      
+
       return;
     }
 
@@ -92,7 +92,7 @@ export const useSimulationLogic = (state, actions) => {
 };
 
 export const getEditModeDescription = () => {
-  const {editMode}= useSimulationStore();
+  const { editMode } = useSimulationStore();
   switch (editMode) {
     case "nodes":
       return "Node Edit: Drag nodes to move • Click to select";
