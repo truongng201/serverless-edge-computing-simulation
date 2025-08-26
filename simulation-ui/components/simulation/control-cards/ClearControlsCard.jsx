@@ -2,12 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users, Server, Database, Trash2 } from "lucide-react";
 
-export default function ClearControlsCard({
-  clearAllUsers,
-  clearAllEdgeNodes,
-  clearAllCentralNodes,
-  clearEverything,
-}) {
+export default function ClearControlsCard({ clearAllUsers }) {
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -19,12 +14,12 @@ export default function ClearControlsCard({
             <Users className="w-4 h-4 mr-1" />
             Users
           </Button>
-          <Button onClick={clearAllEdgeNodes} size="sm" variant="outline">
+          {/* <Button onClick={clearAllEdgeNodes} size="sm" variant="outline">
             <Server className="w-4 h-4 mr-1" />
             Edges
-          </Button>
+          </Button> */}
         </div>
-        <div className="grid grid-cols-2 gap-2">
+        {/* <div className="grid grid-cols-2 gap-2">
           <Button
             onClick={clearAllCentralNodes}
             size="sm"
@@ -37,7 +32,7 @@ export default function ClearControlsCard({
             <Trash2 className="w-4 h-4 mr-1" />
             All
           </Button>
-        </div>
+        </div> */}
       </CardContent>
     </Card>
   );
