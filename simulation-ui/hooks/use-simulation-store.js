@@ -9,9 +9,24 @@ const useSimulationStore = create((set) => ({
   users: [],
   edgeNodes: [],
   centralNodes: [],
-  setUsers: (users) => set({ users }),
-  setEdgeNodes: (edgeNodes) => set({ edgeNodes }),
-  setCentralNodes: (centralNodes) => set({ centralNodes }),
+  setUsers: (updater) =>
+    set((state) => ({
+      users: typeof updater === "function"
+        ? updater(state.users)
+        : updater
+    })),
+  setEdgeNodes: (updater) =>
+    set((state) => ({
+      edgeNodes: typeof updater === "function"
+        ? updater(state.edgeNodes)
+        : updater
+    })),
+  setCentralNodes: (updater) =>
+    set((state) => ({
+      centralNodes: typeof updater === "function"
+        ? updater(state.centralNodes)
+        : updater
+    })),
 
   // Simulation state
   isSimulating: false,
@@ -19,10 +34,30 @@ const useSimulationStore = create((set) => ({
   predictionEnabled: true,
   totalLatency: 0,
   isDragging: false,
-  setIsSimulating: (isSimulating) => set({ isSimulating }),
-  setSimulationSpeed: (simulationSpeed) => set({ simulationSpeed }),
-  setPredictionEnabled: (predictionEnabled) => set({ predictionEnabled }),
-  setTotalLatency: (totalLatency) => set({ totalLatency }),
+  setIsSimulating: (updater) =>
+    set((state) => ({
+      isSimulating: typeof updater === "function"
+        ? updater(state.isSimulating)
+        : updater
+    })),
+  setSimulationSpeed: (updater) =>
+    set((state) => ({
+      simulationSpeed: typeof updater === "function"
+        ? updater(state.simulationSpeed)
+        : updater
+    })),
+  setPredictionEnabled: (updater) =>
+    set((state) => ({
+      predictionEnabled: typeof updater === "function"
+        ? updater(state.predictionEnabled)
+        : updater
+    })),
+  setTotalLatency: (updater) =>
+    set((state) => ({
+      totalLatency: typeof updater === "function"
+        ? updater(state.totalLatency)
+        : updater
+    })),
   setIsDragging: (updater) =>
     set((state) => ({
       isDragging: typeof updater === "function"
@@ -37,26 +72,81 @@ const useSimulationStore = create((set) => ({
   selectedUser: null,
   selectedEdge: null,
   selectedCentral: null,
-  setLeftPanelOpen: (leftPanelOpen) => set({ leftPanelOpen }),
-  setRightPanelOpen: (rightPanelOpen) => set({ rightPanelOpen }),
-  setSelectedModel: (selectedModel) => set({ selectedModel }),
-  setSelectedUser: (selectedUser) => set({ selectedUser }),
-  setSelectedEdge: (selectedEdge) => set({ selectedEdge }),
-  setSelectedCentral: (selectedCentral) => set({ selectedCentral }),
+  setLeftPanelOpen: (updater) =>
+    set((state) => ({
+      leftPanelOpen: typeof updater === "function"
+        ? updater(state.leftPanelOpen)
+        : updater
+    })),
+  setRightPanelOpen: (updater) =>
+    set((state) => ({
+      rightPanelOpen: typeof updater === "function"
+        ? updater(state.rightPanelOpen)
+        : updater
+    })),
+  setSelectedModel: (updater) =>
+    set((state) => ({
+      selectedModel: typeof updater === "function"
+        ? updater(state.selectedModel)
+        : updater
+    })),
+  setSelectedUser: (updater) =>
+    set((state) => ({
+      selectedUser: typeof updater === "function"
+        ? updater(state.selectedUser)
+        : updater
+    })),
+  setSelectedEdge: (updater) =>
+    set((state) => ({
+      selectedEdge: typeof updater === "function"
+        ? updater(state.selectedEdge)
+        : updater
+    })),
+  setSelectedCentral: (updater) =>
+    set((state) => ({
+      selectedCentral: typeof updater === "function"
+        ? updater(state.selectedCentral)
+        : updater
+    })),
 
   // User settings
   userSpeed: [5],
   userSize: [10],
   predictionSteps: [10],
-  setUserSpeed: (userSpeed) => set({ userSpeed }),
-  setUserSize: (userSize) => set({ userSize }),
-  setPredictionSteps: (predictionSteps) => set({ predictionSteps }),
+  setUserSpeed: (updater) =>
+    set((state) => ({
+      userSpeed: typeof updater === "function"
+        ? updater(state.userSpeed)
+        : updater
+    })),
+  setUserSize: (updater) =>
+    set((state) => ({
+      userSize: typeof updater === "function"
+        ? updater(state.userSize)
+        : updater
+    })),
+  setPredictionSteps: (updater) =>
+    set((state) => ({
+      predictionSteps: typeof updater === "function"
+        ? updater(state.predictionSteps)
+        : updater
+    })),
 
   // Node settings
   edgeCoverage: [500],
   centralCoverage: [0],
-  setEdgeCoverage: (edgeCoverage) => set({ edgeCoverage }),
-  setCentralCoverage: (centralCoverage) => set({ centralCoverage }),
+  setEdgeCoverage: (updater) =>
+    set((state) => ({
+      edgeCoverage: typeof updater === "function"
+        ? updater(state.edgeCoverage)
+        : updater
+    })),
+  setCentralCoverage: (updater) =>
+    set((state) => ({
+      centralCoverage: typeof updater === "function"
+        ? updater(state.centralCoverage)
+        : updater
+    })),
 
   // Zoom and Pan state
   zoomLevel: 1,
@@ -90,7 +180,12 @@ const useSimulationStore = create((set) => ({
   draggedNode: null,
   draggedUser: null,
   dragOffset: { x: 0, y: 0 },
-  setEditMode: (editMode) => set({ editMode }),
+  setEditMode: (updater) =>
+    set((state) => ({
+      editMode: typeof updater === "function"
+        ? updater(state.editMode)
+        : updater
+    })),
   setIsDraggingNode: (updater) =>
     set((state) => ({
       isDraggingNode: typeof updater === "function"
@@ -125,44 +220,109 @@ const useSimulationStore = create((set) => ({
   // Manual connection state
   manualConnectionMode: false,
   autoAssignment: true,
-  setManualConnectionMode: (manualConnectionMode) => set({ manualConnectionMode }),
-  setAutoAssignment: (autoAssignment) => set({ autoAssignment }),
+  setManualConnectionMode: (updater) =>
+    set((state) => ({
+      manualConnectionMode: typeof updater === "function"
+        ? updater(state.manualConnectionMode)
+        : updater
+    })),
+  setAutoAssignment: (updater) =>
+    set((state) => ({
+      autoAssignment: typeof updater === "function"
+        ? updater(state.autoAssignment)
+        : updater
+    })),
 
   // Live data state
   liveData: null,
-  setLiveData: (liveData) => set({ liveData }),
+  setLiveData: (updater) =>
+    set((state) => ({
+      liveData: typeof updater === "function"
+        ? updater(state.liveData)
+        : updater
+    })),
 
   // Auto Placement state
   placementAlgorithm: "topk-demand",
   maxCoverageDistance: [100],
-  setPlacementAlgorithm: (placementAlgorithm) => set({ placementAlgorithm }),
-  setMaxCoverageDistance: (maxCoverageDistance) => set({ maxCoverageDistance }),
+  setPlacementAlgorithm: (updater) =>
+    set((state) => ({
+      placementAlgorithm: typeof updater === "function"
+        ? updater(state.placementAlgorithm)
+        : updater
+    })),
+  setMaxCoverageDistance: (updater) =>
+    set((state) => ({
+      maxCoverageDistance: typeof updater === "function"
+        ? updater(state.maxCoverageDistance)
+        : updater
+    })),
 
   // User Assignment state
   assignmentAlgorithm: "nearest-distance",
-  setAssignmentAlgorithm: (assignmentAlgorithm) => set({ assignmentAlgorithm }),
+  setAssignmentAlgorithm: (updater) =>
+    set((state) => ({
+      assignmentAlgorithm: typeof updater === "function"
+        ? updater(state.assignmentAlgorithm)
+        : updater
+    })),
 
   // Road Network state
   roadNetwork: null,
-  setRoadNetwork: (roadNetwork) => set({ roadNetwork }),
+  setRoadNetwork: (updater) =>
+    set((state) => ({
+      roadNetwork: typeof updater === "function"
+        ? updater(state.roadNetwork)
+        : updater
+    })),
   showRoads: false,
-  setShowRoads: (showRoads) => set({ showRoads }),
+  setShowRoads: (updater) =>
+    set((state) => ({
+      showRoads: typeof updater === "function"
+        ? updater(state.showRoads)
+        : updater
+    })),
   roads: [],
-  setRoads: (roads) => set({ roads }),
+  setRoads: (updater) =>
+    set((state) => ({
+      roads: typeof updater === "function"
+        ? updater(state.roads)
+        : updater
+    })),
   roadMode: false,
-  setRoadMode: (roadMode) => set({ roadMode }),
+  setRoadMode: (updater) =>
+    set((state) => ({
+      roadMode: typeof updater === "function"
+        ? updater(state.roadMode)
+        : updater
+    })),
 
   // Scenario selection state
   selectedScenario: "none",
-  setSelectedScenario: (selectedScenario) => set({ selectedScenario }),
+  setSelectedScenario: (updater) =>
+    set((state) => ({
+      selectedScenario: typeof updater === "function"
+        ? updater(state.selectedScenario)
+        : updater
+    })),
 
   // Simulation data
   simulationData: null,
-  setSimulationData: (simulationData) => set({ simulationData }),
+  setSimulationData: (updater) =>
+    set((state) => ({
+      simulationData: typeof updater === "function"
+        ? updater(state.simulationData)
+        : updater
+    })),
 
   // Real mode data
   realModeData: null,
-  setRealModeData: (realModeData) => set({ realModeData }),
+  setRealModeData: (updater) =>
+    set((state) => ({
+      realModeData: typeof updater === "function"
+        ? updater(state.realModeData)
+        : updater
+    })),
 
 
 }));
