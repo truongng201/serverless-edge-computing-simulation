@@ -13,7 +13,8 @@ export const useCanvasDrawing = (state) => {
     selectedCentral,
     selectedEdge,
     selectedUser,
-    editMode
+    editMode,
+    roadNetwork
   } = state;
 
   // Drawing function with zoom and pan support
@@ -46,6 +47,11 @@ export const useCanvasDrawing = (state) => {
       drawRoads(ctx, roads, visibleLeft, visibleTop, visibleRight, visibleBottom, zoomLevel);
     }
 
+    // Draw road network (for street map scenario)
+    if (roadNetwork) {
+      drawRoadNetwork(ctx, roadNetwork, visibleLeft, visibleTop, visibleRight, visibleBottom, zoomLevel);
+    }
+
     // Draw connections
     drawConnections(ctx, centralNodes, edgeNodes, zoomLevel);
 
@@ -74,7 +80,8 @@ export const useCanvasDrawing = (state) => {
     selectedCentral,
     selectedEdge,
     selectedUser,
-    editMode
+    editMode,
+    roadNetwork
   ]);
 
   return { draw };
@@ -394,6 +401,14 @@ const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visibleTop, 
       return;
     }
 
+    const isSelected = selectedUser && selectedUser.id === user.id;
+
+    // Use special drawing for street map users
+    if (user.type === 'street_map') {
+      drawStreetMapUser(ctx, user, isSelected, editMode, zoomLevel);
+      return;
+    }
+
     // Apply transition properties if they exist
     const opacity = user.opacity !== undefined ? user.opacity : 1;
     const scale = user.scale !== undefined ? user.scale : 1;
@@ -413,8 +428,7 @@ const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visibleTop, 
       ctx.translate(-user.x, -user.y);
     }
 
-    // User
-    const isSelected = selectedUser && selectedUser.id === user.id;
+    // User (isSelected already defined above)
     ctx.fillStyle = isSelected
       ? "#8b5cf6"
       : user.manualConnection
@@ -473,4 +487,309 @@ const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visibleTop, 
     
     ctx.restore();
   });
+};
+
+// Draw road network for street map scenario
+const drawRoadNetwork = (ctx, roadNetwork, visibleLeft, visibleTop, visibleRight, visibleBottom, zoomLevel) => {
+  const { roads, intersections, trafficLights } = roadNetwork;
+  
+  // Draw roads with bidirectional lanes
+  ctx.save();
+  roads.forEach(road => {
+    const from = intersections.find(int => int.id === road.from);
+    const to = intersections.find(int => int.id === road.to);
+    
+    if (!from || !to) return;
+    
+    // Check if road is in visible area
+    if (
+      Math.max(from.x, to.x) < visibleLeft ||
+      Math.min(from.x, to.x) > visibleRight ||
+      Math.max(from.y, to.y) < visibleTop ||
+      Math.min(from.y, to.y) > visibleBottom
+    ) return;
+    
+    // Calculate road direction and perpendicular offset for lanes
+    const dx = to.x - from.x;
+    const dy = to.y - from.y;
+    const length = Math.sqrt(dx * dx + dy * dy);
+    const unitX = dx / length;
+    const unitY = dy / length;
+    const perpX = -unitY; // Perpendicular for lane separation
+    const perpY = unitX;
+    
+    const roadWidth = road.type === 'major' ? 8 / zoomLevel : 4 / zoomLevel;
+    const laneOffset = roadWidth / 4;
+    
+    // Draw road background (asphalt)
+    ctx.strokeStyle = '#2D3748'; // Dark gray asphalt
+    ctx.lineWidth = roadWidth;
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    ctx.moveTo(from.x, from.y);
+    ctx.lineTo(to.x, to.y);
+    ctx.stroke();
+    
+    // Draw lane dividers for bidirectional roads
+    if (road.direction === 'bidirectional' && zoomLevel > 0.8) {
+      // Center line (dashed yellow)
+      ctx.strokeStyle = '#F59E0B';
+      ctx.lineWidth = 1 / zoomLevel;
+      ctx.setLineDash([8 / zoomLevel, 8 / zoomLevel]);
+      
+      ctx.beginPath();
+      ctx.moveTo(from.x, from.y);
+      ctx.lineTo(to.x, to.y);
+      ctx.stroke();
+      
+      ctx.setLineDash([]); // Reset line dash
+      
+      // Lane edges (solid white)
+      if (road.type === 'major' && zoomLevel > 1.2) {
+        ctx.strokeStyle = '#FFFFFF';
+        ctx.lineWidth = 0.8 / zoomLevel;
+        
+        // Left edge
+        ctx.beginPath();
+        ctx.moveTo(from.x + perpX * laneOffset * 2, from.y + perpY * laneOffset * 2);
+        ctx.lineTo(to.x + perpX * laneOffset * 2, to.y + perpY * laneOffset * 2);
+        ctx.stroke();
+        
+        // Right edge
+        ctx.beginPath();
+        ctx.moveTo(from.x - perpX * laneOffset * 2, from.y - perpY * laneOffset * 2);
+        ctx.lineTo(to.x - perpX * laneOffset * 2, to.y - perpY * laneOffset * 2);
+        ctx.stroke();
+      }
+    }
+  });
+  ctx.restore();
+  
+  // Draw intersections
+  ctx.save();
+  intersections.forEach(intersection => {
+    // Check if intersection is in visible area
+    if (
+      intersection.x < visibleLeft || intersection.x > visibleRight ||
+      intersection.y < visibleTop || intersection.y > visibleBottom
+    ) return;
+    
+    // Draw intersection area (lighter asphalt for intersection)
+    const intersectionSize = intersection.type === 'major' ? 16 / zoomLevel : 10 / zoomLevel;
+    ctx.fillStyle = '#4A5568'; // Slightly lighter than road
+    ctx.fillRect(
+      intersection.x - intersectionSize/2, 
+      intersection.y - intersectionSize/2, 
+      intersectionSize, 
+      intersectionSize
+    );
+    
+    // Draw crosswalk stripes for major intersections
+    if (intersection.type === 'major' && zoomLevel > 1) {
+      ctx.strokeStyle = '#FFFFFF';
+      ctx.lineWidth = 1 / zoomLevel;
+      
+      // Horizontal crosswalk
+      for (let i = -2; i <= 2; i++) {
+        const y = intersection.y + i * 2 / zoomLevel;
+        ctx.beginPath();
+        ctx.moveTo(intersection.x - intersectionSize/2, y);
+        ctx.lineTo(intersection.x + intersectionSize/2, y);
+        ctx.stroke();
+      }
+      
+      // Vertical crosswalk  
+      for (let i = -2; i <= 2; i++) {
+        const x = intersection.x + i * 2 / zoomLevel;
+        ctx.beginPath();
+        ctx.moveTo(x, intersection.y - intersectionSize/2);
+        ctx.lineTo(x, intersection.y + intersectionSize/2);
+        ctx.stroke();
+      }
+    }
+    
+    // Draw intersection name for major intersections when zoomed in
+    if (intersection.type === 'major' && zoomLevel > 1.8) {
+      const fontSize = Math.max(8, 12 / zoomLevel);
+      ctx.fillStyle = '#1F2937';
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText(intersection.name, intersection.x, intersection.y - intersectionSize/2 - 8);
+    }
+  });
+  ctx.restore();
+  
+  // Draw traffic lights
+  ctx.save();
+  trafficLights.forEach(light => {
+    // Check if traffic light is in visible area
+    if (
+      light.x < visibleLeft || light.x > visibleRight ||
+      light.y < visibleTop || light.y > visibleBottom
+    ) return;
+    
+    const lightSize = Math.max(4, 10 / zoomLevel);
+    const poleHeight = lightSize * 2.5;
+    const poleWidth = lightSize * 0.3;
+    
+    // Draw traffic light pole
+    ctx.fillStyle = '#2D3748';
+    ctx.fillRect(
+      light.x - poleWidth/2, 
+      light.y - poleHeight, 
+      poleWidth, 
+      poleHeight * 1.5
+    );
+    
+    // Draw traffic light box
+    const boxWidth = lightSize * 1.4;
+    const boxHeight = lightSize * 2.8;
+    ctx.fillStyle = '#1A202C';
+    ctx.fillRect(
+      light.x - boxWidth/2,
+      light.y - poleHeight - boxHeight/2,
+      boxWidth,
+      boxHeight
+    );
+    
+    // Draw individual lights (red, yellow, green from top to bottom)
+    const lightPositions = [
+      { y: light.y - poleHeight - boxHeight/2 + boxHeight/6, color: '#DC2626', active: light.state === 'red' },     // Red
+      { y: light.y - poleHeight - boxHeight/2 + boxHeight/2, color: '#D97706', active: light.state === 'yellow' },  // Yellow  
+      { y: light.y - poleHeight - boxHeight/2 + boxHeight*5/6, color: '#059669', active: light.state === 'green' }   // Green
+    ];
+    
+    lightPositions.forEach(lightPos => {
+      const radius = lightSize * 0.3;
+      
+      // Light background (dark when inactive)
+      ctx.fillStyle = lightPos.active ? lightPos.color : '#374151';
+      ctx.beginPath();
+      ctx.arc(light.x, lightPos.y, radius, 0, 2 * Math.PI);
+      ctx.fill();
+      
+      // Light glow effect when active
+      if (lightPos.active) {
+        ctx.save();
+        ctx.shadowColor = lightPos.color;
+        ctx.shadowBlur = 8;
+        ctx.globalAlpha = 0.8;
+        ctx.fillStyle = lightPos.color;
+        ctx.beginPath();
+        ctx.arc(light.x, lightPos.y, radius * 0.8, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.restore();
+        
+        // Extra bright center
+        ctx.fillStyle = '#FFFFFF';
+        ctx.globalAlpha = 0.6;
+        ctx.beginPath();
+        ctx.arc(light.x, lightPos.y, radius * 0.4, 0, 2 * Math.PI);
+        ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+      
+      // Light rim
+      ctx.strokeStyle = '#000000';
+      ctx.lineWidth = 0.5;
+      ctx.beginPath();
+      ctx.arc(light.x, lightPos.y, radius, 0, 2 * Math.PI);
+      ctx.stroke();
+    });
+    
+    // Draw state indicator text when zoomed in
+    if (zoomLevel > 1.5) {
+      const fontSize = Math.max(6, 8 / zoomLevel);
+      ctx.fillStyle = '#1F2937';
+      ctx.font = `bold ${fontSize}px sans-serif`;
+      ctx.textAlign = 'center';
+      
+      // Show state and current direction
+      const stateText = light.state.toUpperCase();
+      const directionText = light.currentDirection === 'north-south' ? 'N-S' : 'E-W';
+      
+      ctx.fillText(
+        `${stateText}`, 
+        light.x, 
+        light.y + poleHeight/2 + fontSize
+      );
+      
+      // Show which direction is green when zoomed in more
+      if (zoomLevel > 2 && light.state === 'green') {
+        ctx.fillStyle = '#059669';
+        ctx.font = `${fontSize * 0.8}px sans-serif`;
+        ctx.fillText(
+          directionText, 
+          light.x, 
+          light.y + poleHeight/2 + fontSize * 2
+        );
+      }
+    }
+  });
+  ctx.restore();
+};
+
+// Enhanced user drawing for street map users
+const drawStreetMapUser = (ctx, user, isSelected, editMode, zoomLevel) => {
+  if (user.type !== 'street_map') return;
+  
+  ctx.save();
+  
+  // Vehicle body (rectangular for cars)
+  const width = user.size * 1.5;
+  const height = user.size;
+  
+  ctx.translate(user.x, user.y);
+  ctx.rotate(user.direction || 0);
+  
+  // Vehicle shadow
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.2)';
+  ctx.fillRect(-width/2 + 1, -height/2 + 1, width, height);
+  
+  // Vehicle body
+  ctx.fillStyle = user.color || '#3B82F6';
+  ctx.fillRect(-width/2, -height/2, width, height);
+  
+  // Vehicle outline
+  ctx.strokeStyle = '#1F2937';
+  ctx.lineWidth = 1 / zoomLevel;
+  ctx.strokeRect(-width/2, -height/2, width, height);
+  
+  // Vehicle details (when zoomed in)
+  if (zoomLevel > 1.5) {
+    // Windows
+    ctx.fillStyle = '#87CEEB';
+    ctx.fillRect(-width/2 + 2, -height/2 + 1, width - 4, height/3);
+    
+    // Headlights
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillRect(width/2 - 1, -height/2 + 1, 1, 2);
+    ctx.fillRect(width/2 - 1, height/2 - 3, 1, 2);
+  }
+  
+  ctx.restore();
+  
+  // Selection ring
+  if (isSelected) {
+    ctx.strokeStyle = "#8b5cf6";
+    ctx.lineWidth = 2 / zoomLevel;
+    ctx.beginPath();
+    ctx.arc(user.x, user.y, Math.max(width, height) / 2 + 4, 0, 2 * Math.PI);
+    ctx.stroke();
+  }
+  
+  // Status indicator
+  if (user.isWaitingAtLight) {
+    // Red dot for waiting at traffic light
+    ctx.fillStyle = '#EF4444';
+    ctx.beginPath();
+    ctx.arc(user.x + width/2 + 5, user.y - height/2 - 5, 3, 0, 2 * Math.PI);
+    ctx.fill();
+  } else if (user.isMoving) {
+    // Green dot for moving
+    ctx.fillStyle = '#10B981';
+    ctx.beginPath();
+    ctx.arc(user.x + width/2 + 5, user.y - height/2 - 5, 3, 0, 2 * Math.PI);
+    ctx.fill();
+  }
 };

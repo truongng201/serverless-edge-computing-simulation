@@ -12,12 +12,14 @@ from enum import Enum
 from config import Config
 
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
+from central_node.control_layer.scheduler_module.gap_solver import GAPSolver, GAPConfig
 
 class SchedulingStrategy(Enum):
     ROUND_ROBIN = "round_robin"
     LEAST_LOADED = "least_loaded"
     GEOGRAPHIC = "geographic"
     PREDICTIVE = "predictive"
+    GAP_BASELINE = "gap_baseline"
 
 @dataclass
 class Latency:
@@ -69,9 +71,21 @@ class Scheduler:
         self.user_nodes: Dict[str, UserNodeInfo] = {}
         self.round_robin_index = 0
         self.logger = logging.getLogger(__name__)
+        
+        # Initialize GAP solver
+        self.gap_solver = GAPSolver(GAPConfig(debug_logging=True))
 
     def get_central_node_info(self) -> Dict[str, Any]:
         return self.central_node
+    
+    def set_scheduling_strategy(self, strategy: SchedulingStrategy):
+        """Change the scheduling strategy"""
+        self.strategy = strategy
+        self.logger.info(f"Scheduling strategy changed to: {strategy.value}")
+        
+    def get_scheduling_strategy(self) -> str:
+        """Get current scheduling strategy"""
+        return self.strategy.value
     
     def create_user_node(self, user_node: UserNodeInfo):
         self.user_nodes[user_node.user_id] = user_node
@@ -118,6 +132,8 @@ class Scheduler:
             return self._schedule_geographic(available_nodes, request_data)
         elif self.strategy == SchedulingStrategy.PREDICTIVE:
             return self._schedule_predictive(available_nodes, request_data)
+        elif self.strategy == SchedulingStrategy.GAP_BASELINE:
+            return self._schedule_gap_baseline(available_nodes, request_data)
         else:
             return self._schedule_round_robin(available_nodes, request_data)
 
@@ -259,3 +275,53 @@ class Scheduler:
         dx = location1["x"] - location2["x"]
         dy = location1["y"] - location2["y"]
         return (dx ** 2 + dy ** 2) ** 0.5
+    
+    def _schedule_gap_baseline(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
+        """GAP-based scheduling using utility optimization"""
+        user_id = request_data.get('user_id', 'unknown_user')
+        user_location = request_data.get('user_location', {'x': 0, 'y': 0})
+        
+        try:
+            # Prepare data for GAP solver
+            users = {
+                user_id: {
+                    'location': user_location,
+                    'data_size': request_data.get('data_size', 300)  # MB
+                }
+            }
+            
+            # Convert edge nodes to GAP format
+            edge_nodes = {}
+            for node in nodes:
+                edge_nodes[node.node_id] = {
+                    'node_id': node.node_id,
+                    'location': node.location,
+                    'endpoint': node.endpoint,
+                    'metrics': node.metrics_info.__dict__ if node.metrics_info else {}
+                }
+            
+            # Run GAP solver
+            assignments = self.gap_solver.solve_gap(users, edge_nodes, self.central_node)
+            
+            if assignments and len(assignments) > 0:
+                assignment = assignments[0]  # Get assignment for our user
+                
+                # Log GAP statistics
+                stats = self.gap_solver.get_assignment_stats(assignments)
+                self.logger.info(f"GAP assignment stats: {stats}")
+                
+                return SchedulingDecision(
+                    target_node_id=assignment.target_node_id,
+                    execution_time_estimate=assignment.estimated_latency / 1000.0,  # Convert to seconds
+                    confidence=0.9,  # High confidence in GAP optimization
+                    reasoning=assignment.reasoning
+                )
+            else:
+                # Fallback to round robin if GAP fails
+                self.logger.warning("GAP assignment failed, falling back to round robin")
+                return self._schedule_round_robin(nodes, request_data)
+                
+        except Exception as e:
+            self.logger.error(f"GAP scheduling error: {e}")
+            # Fallback to round robin
+            return self._schedule_round_robin(nodes, request_data)

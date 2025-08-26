@@ -158,6 +158,28 @@ def stop_simulation():
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
+@central_route.route('/set_scheduling_strategy', methods=['POST'])
+def set_scheduling_strategy():
+    """Set the scheduling strategy"""
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    
+    data = request.get_json()
+    strategy = data.get('strategy', 'round_robin')
+    
+    result = central_core_controller.set_scheduling_strategy(strategy)
+    status_code = 200 if result["success"] else 400
+    return jsonify(result), status_code
+
+@central_route.route('/get_scheduling_strategy', methods=['GET'])
+def get_scheduling_strategy():
+    """Get current scheduling strategy"""
+    if not central_core_controller:
+        return jsonify({"success": False, "error": "Central node not initialized"}), 500
+    
+    result = central_core_controller.get_scheduling_strategy()
+    return jsonify(result), 200
+
 @central_route.route('/health', methods=['GET'])
 def health_check():
     return jsonify({

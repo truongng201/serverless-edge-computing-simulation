@@ -38,6 +38,8 @@ import {
 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
+import { generateSaigonRoadNetwork } from "../../lib/road-network";
+import { generateStreetMapUsers, convertToStreetMapUsers } from "../../lib/street-map-users";
 
 export default function ControlPanelContent({
   users,
@@ -92,19 +94,54 @@ export default function ControlPanelContent({
   maxCoverageDistance,
   setMaxCoverageDistance,
   runPlacementAlgorithm,
-  simulationMode,
-  setSimulationMode,
-  realModeData,
-  setRealModeData,
+  assignmentAlgorithm,
+  setAssignmentAlgorithm,
+  runAssignmentAlgorithm,
+  runGAPAssignment,
+  liveData,
+  setLiveData,
   selectedScenario = "none",
   setSelectedScenario = () => {},
+  roadNetwork,
+  setRoadNetwork,
 }) {
   const [loadingData, setLoadingData] = useState(false);
   const [dataError, setDataError] = useState("");
   const [simulationLoading, setSimulationLoading] = useState(false);
   const intervalRef = useRef(null);
-  const realModeIntervalRef = useRef(null);
-  const transitionTimeoutRef = useRef(null);
+
+  // Helper function to clear all users from backend
+  const clearAllUsersFromBackend = async () => {
+    try {
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/delete_all_users`, {
+          method: 'DELETE'
+        });
+        
+        if (response.ok) {
+          console.log("All users cleared from backend");
+        } else {
+          console.warn("Failed to clear users from backend:", response.status);
+        }
+      }
+    } catch (error) {
+      console.error("Error clearing users from backend:", error);
+    }
+  };
+
+  // Function to run GAP batch assignment
+  const runGAPBatch = () => {
+    if (typeof runGAPAssignment === 'function') {
+      runGAPAssignment(users, edgeNodes, centralNodes, setUsers, {
+        method: 'greedy',
+        enableMemoryConstraints: false,
+        debug: true
+      });
+    } else {
+      console.error("runGAPAssignment not available");
+      alert("GAP batch assignment not available. Please use regular assignment.");
+    }
+  };
 
   // Function to fetch DACT sample data
   const fetchDACTSample = async () => {
@@ -126,7 +163,7 @@ export default function ControlPanelContent({
           assignedEdge: user.assigned_edge || null,
           assignedCentral: user.assigned_central || null,
           assignedNodeID: user.assigned_node_id || null,
-          latency: user.latency || 0,
+        latency: user.latency || 0,
           size: user.size || userSize[0] || 10,
           last_executed_period: user.last_executed_period || null,
         }));
@@ -174,8 +211,39 @@ export default function ControlPanelContent({
     }
   };
 
-  // Function to fetch real cluster status
-  const fetchRealClusterStatus = async () => {
+  // Function to initialize Street Map scenario
+  const initializeStreetMapScenario = async () => {
+    try {
+      setLoadingData(true);
+      setDataError("");
+
+      // Clear existing users from backend first
+      await clearAllUsersFromBackend();
+
+      // Generate Saigon road network
+      const newRoadNetwork = generateSaigonRoadNetwork(1200, 800); // Adjust to canvas size
+      setRoadNetwork(newRoadNetwork);
+
+      // Generate initial street map users
+      const streetUsers = generateStreetMapUsers(
+        newRoadNetwork, 
+        8, // initial user count (reduced for better performance)
+        userSpeed[0], 
+        userSize[0]
+      );
+      setUsers(streetUsers);
+
+      console.log("Street map scenario initialized with", streetUsers.length, "users");
+    } catch (error) {
+      console.error("Error initializing street map scenario:", error);
+      setDataError(`Failed to initialize street map: ${error.message}`);
+    } finally {
+      setLoadingData(false);
+    }
+  };
+
+  // Function to fetch live cluster status
+  const fetchLiveClusterStatus = async () => {
     try {
       setLoadingData(true);
       setDataError("");
@@ -191,7 +259,7 @@ export default function ControlPanelContent({
       ]);
 
       if (clusterResponse.data && clusterResponse.data.success) {
-        setRealModeData(clusterResponse.data);
+        setLiveData(clusterResponse.data);
 
         const realCentralNode = {
           id: clusterResponse.data.central_node.id || "central_node",
@@ -257,37 +325,38 @@ export default function ControlPanelContent({
     } else if (scenario === "scenario3") {
       // Load Vehicle sample data
       await fetchVehicleSample();
+    } else if (scenario === "scenario4") {
+      // Load Street Map scenario
+      await initializeStreetMapScenario();
     } else if (scenario === "none") {
-      // Clear users for manual adding
+      // Clear users for manual adding and from backend
+      await clearAllUsersFromBackend();
       clearAllUsers();
+      setRoadNetwork(null); // Clear road network
     }
   };
 
-  // Handle simulation mode change
-  const handleSimulationModeChange = async (mode) => {
-    setSimulationMode(mode);
+  // Start live data polling
+  const startLiveDataPolling = async () => {
+    // Fetch initial data
+    await fetchLiveClusterStatus();
 
-    if (mode === "real") {
-      // Fetch initial real data
-      await fetchRealClusterStatus();
-
-      // Start real-time polling with interval based on simulation speed
-      if (realModeIntervalRef.current) {
-        clearInterval(realModeIntervalRef.current);
+    // Start real-time polling with interval based on simulation speed
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
       }
+      
+    // Calculate interval: 1x = 5000ms, 5x = 1000ms
+    const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
+    intervalRef.current = setInterval(fetchLiveClusterStatus, intervalMs);
+  };
 
-      // Calculate interval: 1x = 5000ms, 5x = 1000ms
-      // Formula: 5000 / simulationSpeed[0]
-      const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
-      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, intervalMs);
-    } else {
-      // Stop real-time polling
-      if (realModeIntervalRef.current) {
-        clearInterval(realModeIntervalRef.current);
-        realModeIntervalRef.current = null;
+  // Stop live data polling
+  const stopLiveDataPolling = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
       }
-      setRealModeData(null);
-    }
   };
 
   useEffect(() => {
@@ -296,23 +365,21 @@ export default function ControlPanelContent({
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
-      if (realModeIntervalRef.current) {
-        clearInterval(realModeIntervalRef.current);
-      }
+
     };
   }, [isSimulating, simulationSpeed]);
 
-  // Handle simulation speed changes in real mode
+  // Handle simulation speed changes for live data polling
   useEffect(() => {
-    if (simulationMode === "real" && realModeIntervalRef.current) {
+    if (intervalRef.current) {
       // Clear existing interval
-      clearInterval(realModeIntervalRef.current);
+      clearInterval(intervalRef.current);
       
       // Calculate new interval based on simulation speed
       const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
-      realModeIntervalRef.current = setInterval(fetchRealClusterStatus, intervalMs);
+      intervalRef.current = setInterval(fetchLiveClusterStatus, intervalMs);
     }
-  }, [simulationSpeed, simulationMode]);
+  }, [simulationSpeed]);
 
   // Function to start simulation via API
   const handleStartSimulation = async () => {
@@ -380,19 +447,12 @@ export default function ControlPanelContent({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-    if (realModeIntervalRef.current) {
-      clearInterval(realModeIntervalRef.current);
-      realModeIntervalRef.current = null;
-    }
-    if (transitionTimeoutRef.current) {
-      clearTimeout(transitionTimeoutRef.current);
-      transitionTimeoutRef.current = null;
-    }
+
+
     
     // Reset states
     setIsSimulating(false);
-    setSimulationMode("demo");
-    setRealModeData(null);
+    setLiveData(null);
     setDataError("");
     setSimulationLoading(false);
     resetSimulation();
@@ -445,9 +505,9 @@ export default function ControlPanelContent({
                   </>
                 ) : (
                   <>
-                    <div>• Drag to move elements</div>
-                    <div>• Click to select elements</div>
-                    <div>• Dashed rings show editable items</div>
+                <div>• Drag to move elements</div>
+                <div>• Click to select elements</div>
+                <div>• Dashed rings show editable items</div>
                   </>
                 )}
               </div>
@@ -482,61 +542,49 @@ export default function ControlPanelContent({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Clear Controls</CardTitle>
           </CardHeader>
-          {simulationMode === "real" && (
-            <CardContent className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <Button onClick={clearAllUsers} size="sm" variant="outline">
-                  <Users className="w-4 h-4 mr-1" />
-                  Users
-                </Button>
-              </div>
-            </CardContent>
-          )}
-          {simulationMode === "demo" && (
-            <CardContent className="space-y-2">
-              <div className="grid grid-cols-2 gap-2">
-                <Button onClick={clearAllUsers} size="sm" variant="outline">
-                  <Users className="w-4 h-4 mr-1" />
-                  Users
-                </Button>
-                <Button onClick={clearAllEdgeNodes} size="sm" variant="outline">
-                  <Server className="w-4 h-4 mr-1" />
-                  Edges
-                </Button>
-              </div>
-              <div className="grid grid-cols-2 gap-2">
+          <CardContent className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <Button onClick={clearAllUsers} size="sm" variant="outline">
+                <Users className="w-4 h-4 mr-1" />
+                Users
+              </Button>
+              <Button onClick={clearAllEdgeNodes} size="sm" variant="outline">
+                <Server className="w-4 h-4 mr-1" />
+                Edges
+              </Button>
+            </div>
+            <div className="grid grid-cols-2 gap-2">
                 <Button
                   onClick={clearAllCentralNodes}
                   size="sm"
                   variant="outline"
                 >
-                  <Database className="w-4 h-4 mr-1" />
-                  Central
-                </Button>
+                <Database className="w-4 h-4 mr-1" />
+                Central
+              </Button>
                 <Button
                   onClick={clearEverything}
                   size="sm"
                   variant="destructive"
                 >
-                  <Trash2 className="w-4 h-4 mr-1" />
-                  All
-                </Button>
-              </div>
-            </CardContent>
-          )}
+                <Trash2 className="w-4 h-4 mr-1" />
+                All
+              </Button>
+            </div>
+          </CardContent>
         </Card>
 
-        {/* Auto Placement Controls */}
+        {/* Node Placement Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
               <Target className="w-4 h-4" />
-              Auto Placement
+              Node Placement
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label className="text-xs">Algorithm</Label>
+              <Label className="text-xs">Placement Algorithm</Label>
               <Select
                 value={placementAlgorithm}
                 onValueChange={setPlacementAlgorithm}
@@ -552,107 +600,165 @@ export default function ControlPanelContent({
                 </SelectContent>
               </Select>
             </div>
-
+            
             <div className="space-y-2">
               <Label className="text-xs">
                 Max Coverage Distance: {maxCoverageDistance[0]}px
               </Label>
-              <Slider
-                value={maxCoverageDistance}
-                onValueChange={setMaxCoverageDistance}
-                max={200}
-                min={50}
-                step={10}
-                className="h-4"
+              <Slider 
+                value={maxCoverageDistance} 
+                onValueChange={setMaxCoverageDistance} 
+                max={200} 
+                min={50} 
+                step={10} 
+                className="h-4" 
               />
             </div>
-
-            <div className="text-xs text-gray-600 mb-2">
-              <div>Edge Servers: {edgeNodes.length}</div>
-              <div>Users: {users?.length || 0}</div>
-            </div>
-
-            <Button
-              onClick={runPlacementAlgorithm}
-              size="sm"
-              variant="default"
+            
+            <Button 
+              onClick={runPlacementAlgorithm} 
+              size="sm" 
+              variant="default" 
               className="w-full"
               disabled={!users?.length || !edgeNodes.length}
             >
               <MapPin className="w-4 h-4 mr-1" />
-              Run Placement
+              Run Node Placement
             </Button>
           </CardContent>
         </Card>
 
-        {/* Simulation Mode Selector */}
+        {/* User Assignment Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Server className="w-4 h-4" />
-              Simulation Mode
+              <Target className="w-4 h-4" />
+              User Assignment
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="space-y-2">
-              <Label className="text-xs">Mode</Label>
+              <Label className="text-xs">Assignment Algorithm</Label>
               <Select
-                value={simulationMode}
-                onValueChange={handleSimulationModeChange}
+                value={assignmentAlgorithm}
+                onValueChange={setAssignmentAlgorithm}
               >
                 <SelectTrigger className="h-8">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="demo">Demo Mode</SelectItem>
-                  <SelectItem value="real">Real Mode (Live Data)</SelectItem>
+                  <SelectItem value="nearest-distance">Nearest Distance</SelectItem>
+                  <SelectItem value="nearest-latency">Nearest Latency</SelectItem>
+                  <SelectItem value="gap-baseline">GAP Baseline</SelectItem>
+                  <SelectItem value="random">Random Assignment</SelectItem>
                 </SelectContent>
               </Select>
             </div>
 
-            {simulationMode === "real" && (
-              <div className="space-y-2">
-                <div className="text-xs text-green-600 font-medium">
-                  Real Mode Active - Live data from API
-                </div>
+            <div className="text-xs text-gray-600 mb-2">
+              <div>Edge Servers: {edgeNodes.length}</div>
+              <div>Central Servers: {centralNodes.length}</div>
+              <div>Users: {users?.length || 0}</div>
+            </div>
 
-                <div className="bg-green-50 p-2 rounded text-xs">
-                  <div className="flex items-center justify-between">
-                    <span>Status:</span>
-                    <Badge variant="default" className="text-xs bg-green-600">
-                      Connected
-                    </Badge>
-                  </div>
-                  <div className="mt-1 text-gray-600">
-                    <div className="mt-1 text-gray-600">
-                      📊 View detailed metrics in the right panel →
-                      {loadingData && (
-                        <span className="ml-1 text-xs text-blue-600">
-                          Fetching real data...
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {realModeData && (
-                    <div className="mt-2 text-gray-700">
-                      <div>
-                        Central CPU:{" "}
-                        {realModeData.central_node?.cpu_usage?.toFixed(1)}%
-                      </div>
-                    </div>
+            <div className="grid grid-cols-1 gap-2">
+              <Button
+                onClick={runAssignmentAlgorithm}
+                size="sm"
+                variant="outline"
+                className="w-full"
+                disabled={!users?.length || (!edgeNodes.length && !centralNodes.length)}
+              >
+                <MapPin className="w-4 h-4 mr-1" />
+                Run User Assignment
+              </Button>
+              
+              {assignmentAlgorithm === "gap-baseline" && (
+                <Button
+                  onClick={() => runGAPBatch()}
+                  size="sm"
+                  variant="default"
+                  className="w-full bg-blue-600 hover:bg-blue-700"
+                  disabled={!users?.length || (!edgeNodes.length && !centralNodes.length)}
+                >
+                  <Target className="w-4 h-4 mr-1" />
+                  Run GAP Batch (Optimal)
+                </Button>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Live System Status */}
+        <Card className="mb-4">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Server className="w-4 h-4" />
+              Live System Status
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="space-y-2">
+              <div className="text-xs text-green-600 font-medium">
+                Live Data - Connected to backend cluster
+              </div>
+
+              <div className="bg-green-50 p-2 rounded text-xs">
+                <div className="flex items-center justify-between">
+                  <span>Status:</span>
+                  <Badge variant="default" className="text-xs bg-green-600">
+                    Connected
+                  </Badge>
+                </div>
+                <div className="mt-1 text-gray-600">
+                  📊 View detailed metrics in the right panel →
+                  {loadingData && (
+                    <span className="ml-1 text-xs text-blue-600">
+                      Fetching live data...
+                    </span>
                   )}
                 </div>
+                {liveData && (
+                  <div className="mt-2 text-gray-700">
+                    <div>
+                      Central CPU:{" "}
+                      {liveData.central_node?.cpu_usage?.toFixed(1)}%
+                    </div>
+                    <div>
+                      Edge Nodes: {liveData.edge_nodes?.length || 0}
+                    </div>
+                  </div>
+                )}
               </div>
-            )}
 
-            {simulationMode === "demo" && (
-              <div className="text-xs text-gray-600">
-                Demo mode - manual control of nodes and users
+              <div className="grid grid-cols-2 gap-2">
+                <Button
+                  onClick={fetchLiveClusterStatus}
+                  size="sm"
+                  variant="outline"
+                  disabled={loadingData}
+                  className="text-xs"
+                >
+                  <Database className="w-3 h-3 mr-1" />
+                  Refresh
+                </Button>
+                
+                <Button
+                  onClick={startLiveDataPolling}
+                  size="sm"
+                  variant="default"
+                  className="text-xs bg-green-600 hover:bg-green-700"
+                >
+                  <Play className="w-3 h-3 mr-1" />
+                  Auto Poll
+                </Button>
               </div>
-            )}
+            </div>
 
             {dataError && (
-              <div className="text-xs text-red-600">{dataError}</div>
+              <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
+                {dataError}
+              </div>
             )}
           </CardContent>
         </Card>
@@ -676,6 +782,7 @@ export default function ControlPanelContent({
                   <SelectItem value="none">None (Self adding user)</SelectItem>
                   <SelectItem value="scenario2">Scenario 2: DACT Sample</SelectItem>
                   <SelectItem value="scenario3">Scenario 3: Vehicle Sample</SelectItem>
+                  <SelectItem value="scenario4">Scenario 4: Street Map (Saigon)</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -690,13 +797,13 @@ export default function ControlPanelContent({
           <CardHeader className="pb-2">
             <CardTitle className="text-sm">Simulation</CardTitle>
           </CardHeader>
-
+          
           <CardContent className="space-y-3">
             <div className="flex gap-2">
-              <Button
+              <Button 
                 onClick={handleToggleSimulation}
-                variant={isSimulating ? "destructive" : "default"}
-                size="sm"
+                variant={isSimulating ? "destructive" : "default"} 
+                size="sm" 
                 className="flex-1"
                 disabled={users?.length === 0 || simulationLoading} // Disable if no users or loading
               >
@@ -741,7 +848,7 @@ export default function ControlPanelContent({
             </div>
           </CardContent>
         </Card>
-
+      
         {/* Zoom Controls */}
         <Card className="mb-4">
           <CardHeader className="pb-2">
@@ -864,33 +971,9 @@ export default function ControlPanelContent({
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {simulationMode !== "real" && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={addCentralNode}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add
-                </Button>
-                <Button
-                  onClick={removeCentralNode}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Minus className="w-4 h-4" />
-                  Remove
-                </Button>
-              </div>
-            )}
-            {simulationMode === "real" && (
-              <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
-                Central Node managed by real system
-              </div>
-            )}
+            <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
+              Central Node managed by live backend system
+            </div>
 
             <div className="space-y-2">
               <Label className="text-xs">
@@ -903,7 +986,7 @@ export default function ControlPanelContent({
                 min={0}
                 step={20}
               />
-            </div>
+              </div>
           </CardContent>
         </Card>
 
@@ -913,33 +996,9 @@ export default function ControlPanelContent({
             <CardTitle className="text-sm">Edge Nodes</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            {simulationMode !== "real" && (
-              <div className="flex gap-2">
-                <Button
-                  onClick={addEdgeNode}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Plus className="w-4 h-4" />
-                  Add
-                </Button>
-                <Button
-                  onClick={removeEdgeNode}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1"
-                >
-                  <Minus className="w-4 h-4" />
-                  Remove
-                </Button>
-              </div>
-            )}
-            {simulationMode === "real" && (
-              <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
-                Edge Nodes managed by real system
-              </div>
-            )}
+                        <div className="text-xs text-blue-600 p-2 bg-blue-50 rounded">
+              Edge Nodes managed by live backend system
+            </div>
 
             <div className="space-y-2">
               <Label className="text-xs">Coverage: {edgeCoverage[0]}px</Label>
@@ -950,10 +1009,11 @@ export default function ControlPanelContent({
                 min={0}
                 step={10}
               />
-            </div>
+              </div>
           </CardContent>
         </Card>
       </div>
     </>
   );
 }
+

@@ -480,3 +480,57 @@ class CentralCoreController:
                 "success": False,
                 "error": str(e)
             }
+    
+    def set_scheduling_strategy(self, strategy_name: str):
+        """Set the scheduling strategy"""
+        try:
+            from central_node.control_layer.scheduler_module.scheduler import SchedulingStrategy
+            
+            # Map string to enum
+            strategy_map = {
+                'round_robin': SchedulingStrategy.ROUND_ROBIN,
+                'least_loaded': SchedulingStrategy.LEAST_LOADED,
+                'geographic': SchedulingStrategy.GEOGRAPHIC,
+                'predictive': SchedulingStrategy.PREDICTIVE,
+                'gap_baseline': SchedulingStrategy.GAP_BASELINE
+            }
+            
+            if strategy_name not in strategy_map:
+                return {
+                    "success": False,
+                    "error": f"Unknown strategy: {strategy_name}. Available: {list(strategy_map.keys())}"
+                }
+            
+            self.scheduler.set_scheduling_strategy(strategy_map[strategy_name])
+            
+            return {
+                "success": True,
+                "message": f"Scheduling strategy set to: {strategy_name}",
+                "strategy": strategy_name
+            }
+            
+        except Exception as e:
+            self.logger.error(f"Error setting scheduling strategy: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
+    
+    def get_scheduling_strategy(self):
+        """Get current scheduling strategy"""
+        try:
+            current_strategy = self.scheduler.get_scheduling_strategy()
+            return {
+                "success": True,
+                "strategy": current_strategy,
+                "available_strategies": [
+                    "round_robin", "least_loaded", "geographic", 
+                    "predictive", "gap_baseline"
+                ]
+            }
+        except Exception as e:
+            self.logger.error(f"Error getting scheduling strategy: {e}")
+            return {
+                "success": False,
+                "error": str(e)
+            }
