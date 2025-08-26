@@ -11,7 +11,6 @@ export function useSimulationState() {
   const [totalLatency, setTotalLatency] = useState(0);
 
   // UI State
-  const [selectedModel, setSelectedModel] = useState("lstm");
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [selectedCentral, setSelectedCentral] = useState(null);
@@ -137,8 +136,6 @@ export function useSimulationState() {
     setPredictionEnabled,
     totalLatency,
     setTotalLatency,
-    selectedModel,
-    setSelectedModel,
     selectedUser,
     setSelectedUser,
     selectedEdge,

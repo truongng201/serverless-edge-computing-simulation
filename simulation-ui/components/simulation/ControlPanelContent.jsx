@@ -30,8 +30,6 @@ export default function ControlPanelContent({
   setSimulationSpeed,
   predictionEnabled,
   setPredictionEnabled,
-  selectedModel,
-  setSelectedModel,
   selectedUser,
   selectedEdge,
   setSelectedEdge,
@@ -42,7 +40,6 @@ export default function ControlPanelContent({
   setEdgeCoverage,
   centralCoverage,
   setCentralCoverage,
-  models,
   deleteSelectedUser,
   resetSimulation,
   addCentralNode,
@@ -716,11 +713,8 @@ export default function ControlPanelContent({
         />
 
         <ModelSelectionCard
-          selectedModel={selectedModel}
-          setSelectedModel={setSelectedModel}
           predictionSteps={predictionSteps}
           setPredictionSteps={setPredictionSteps}
-          models={models}
         />
 
         <UserSettingsCard />

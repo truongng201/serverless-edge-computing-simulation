@@ -8,14 +8,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function ModelSelectionCard({
-  selectedModel,
-  setSelectedModel,
   predictionSteps,
   setPredictionSteps,
-  models,
 }) {
+  const { selectedModel, setSelectedModel, models } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

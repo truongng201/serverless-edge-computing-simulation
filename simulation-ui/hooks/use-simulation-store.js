@@ -68,6 +68,11 @@ const useSimulationStore = create((set) => ({
   // UI State
   leftPanelOpen: false,
   rightPanelOpen: false,
+  models: {
+    lstm: "Long Short-Term Memory (LSTM)",
+    cnn: "Convolutional Neural Network (CNN)",
+    rnn: "Recurrent Neural Network (RNN)",
+  },
   selectedModel: "lstm",
   selectedUser: null,
   selectedEdge: null,

@@ -41,10 +41,6 @@ export default function Component() {
   // Get canvas drawing
   const { draw } = useCanvasDrawing(state);
 
-  // Models for user expectancy calculation
-  const models = {
-    lstm: "LSTM",
-  };
 
   // Create action objects for easier prop passing
   const nodeActions = {
@@ -167,8 +163,6 @@ export default function Component() {
           setPredictionEnabled={state.setPredictionEnabled}
           totalLatency={state.totalLatency}
           setTotalLatency={state.setTotalLatency}
-          selectedModel={state.selectedModel}
-          setSelectedModel={state.setSelectedModel}
           selectedUser={state.selectedUser}
           setSelectedUser={state.setSelectedUser}
           selectedEdge={state.selectedEdge}
@@ -187,7 +181,6 @@ export default function Component() {
           autoAssignment={state.autoAssignment}
           setAutoAssignment={state.setAutoAssignment}
           simulationData={state.simulationData}
-          models={models}
           deleteSelectedUser={userActions.deleteSelectedUser}
           simulationStep={simulationStep}
           handleCanvasClick={eventHandlers.handleCanvasClick}
@@ -239,8 +232,6 @@ export default function Component() {
           setSelectedEdge={state.setSelectedEdge}
           selectedCentral={state.selectedCentral}
           setSelectedCentral={state.setSelectedCentral}
-          models={models}
-          selectedModel={state.selectedModel}
           liveData={state.liveData}
           roadNetwork={state.roadNetwork}
           selectedScenario={state.selectedScenario}

@@ -13,9 +13,6 @@ export default function MetricsPanelContent({
   totalLatency,
   selectedUser,
   setSelectedUser,
-  models,
-  selectedModel,
-  setSelectedModel,
   liveData,
   roadNetwork,
   selectedScenario,
@@ -58,8 +55,6 @@ export default function MetricsPanelContent({
         />
 
         <CurrentAlgorithmCard
-          models={models}
-          selectedModel={selectedModel}
         />
       </div>
     </>
