@@ -195,8 +195,6 @@ export default function Component() {
           setSelectedEdge={state.setSelectedEdge}
           selectedCentral={state.selectedCentral}
           setSelectedCentral={state.setSelectedCentral}
-          userSize={state.userSize}
-          setUserSize={state.setUserSize}
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
