@@ -53,8 +53,6 @@ export default function ControlPanelContent({
   setAssignmentAlgorithm,
   runAssignmentAlgorithm,
   runGAPAssignment,
-  liveData,
-  setLiveData,
   setRoadNetwork,
   simulationMode,
   setRealModeData,
@@ -74,6 +72,7 @@ export default function ControlPanelContent({
     setIsSimulating,
     setSelectedScenario,
     simulationSpeed,
+    setLiveData,
   } = useSimulationStore();
 
   // Helper function to clear all users from backend
@@ -459,26 +458,6 @@ export default function ControlPanelContent({
     intervalRef.current = setInterval(fetchLiveClusterStatus, intervalMs);
   };
 
-  // Stop live data polling
-  const stopLiveDataPolling = () => {
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-      // Calculate interval: 1x = 5000ms, 5x = 1000ms
-      // Formula: 5000 / simulationSpeed[0]
-      const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
-      realModeIntervalRef.current = setInterval(
-        fetchLiveClusterStatus,
-        intervalMs
-      );
-    } else {
-      // Stop real-time polling
-      if (realModeIntervalRef.current) {
-        clearInterval(realModeIntervalRef.current);
-        realModeIntervalRef.current = null;
-      }
-    }
-  };
   useEffect(() => {
     // Cleanup on unmount
     return () => {
@@ -683,7 +662,6 @@ export default function ControlPanelContent({
         />
 
         <LiveSystemStatusCard
-          liveData={liveData}
           loadingData={loadingData}
           dataError={dataError}
           fetchLiveClusterStatus={fetchLiveClusterStatus}

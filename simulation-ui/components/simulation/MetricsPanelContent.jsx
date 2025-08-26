@@ -13,7 +13,6 @@ export default function MetricsPanelContent({
   totalLatency,
   selectedUser,
   setSelectedUser,
-  liveData,
   roadNetwork,
 }) {
   const { rightPanelOpen, setRightPanelOpen } = useSimulationStore();
@@ -34,7 +33,6 @@ export default function MetricsPanelContent({
         <SystemStatusCard
           users={users}
           totalLatency={totalLatency}
-          liveData={liveData}
         />
 
         <StreetMapMetricsCard
@@ -43,7 +41,6 @@ export default function MetricsPanelContent({
         />
 
         <LiveSystemMetricsCard
-          liveData={liveData}
         />
 
         <ConnectionStatusCard

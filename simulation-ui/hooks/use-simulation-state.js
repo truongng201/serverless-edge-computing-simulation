@@ -22,9 +22,6 @@ export function useSimulationState() {
   // Manual connection state
   const [autoAssignment, setAutoAssignment] = useState(true);
 
-  // Live data state (only real mode now)
-  const [liveData, setLiveData] = useState(null);
-
   // Auto Placement state
   const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
   
@@ -136,8 +133,6 @@ export function useSimulationState() {
     setCentralCoverage,
     autoAssignment,
     setAutoAssignment,
-    liveData,
-    setLiveData,
     placementAlgorithm,
     setPlacementAlgorithm,
     assignmentAlgorithm,

@@ -2,8 +2,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Database, Server } from "lucide-react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
-export default function LiveSystemMetricsCard({ liveData }) {
+export default function LiveSystemMetricsCard() {
+  const { liveData } = useSimulationStore();
+
   if (!liveData) {
     return null;
   }
