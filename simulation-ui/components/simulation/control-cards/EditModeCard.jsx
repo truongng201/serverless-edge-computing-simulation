@@ -12,14 +12,11 @@ import { Edit3, Trash2 } from "lucide-react";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function EditModeCard({
-  deleteSelectedNode,
   deleteSelectedUser,
 }) {
   const {
     editMode,
     setEditMode,
-    selectedEdge,
-    selectedCentral,
     selectedUser
   } = useSimulationStore();
   return (
@@ -63,17 +60,7 @@ export default function EditModeCard({
             )}
           </div>
         )}
-        {(selectedEdge || selectedCentral) && (
-          <Button
-            onClick={deleteSelectedNode}
-            size="sm"
-            variant="destructive"
-            className="w-full"
-          >
-            <Trash2 className="w-4 h-4 mr-2" />
-            Delete Selected Node
-          </Button>
-        )}
+        
         {selectedUser && (
           <Button
             onClick={deleteSelectedUser}
