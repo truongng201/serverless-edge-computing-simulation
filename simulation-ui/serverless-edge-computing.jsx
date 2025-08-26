@@ -188,8 +188,6 @@ export default function Component() {
           setEdgeCoverage={state.setEdgeCoverage}
           centralCoverage={state.centralCoverage}
           setCentralCoverage={state.setCentralCoverage}
-          manualConnectionMode={state.manualConnectionMode}
-          setManualConnectionMode={state.setManualConnectionMode}
           autoAssignment={state.autoAssignment}
           setAutoAssignment={state.setAutoAssignment}
           simulationData={state.simulationData}

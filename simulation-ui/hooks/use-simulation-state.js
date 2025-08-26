@@ -29,7 +29,6 @@ export function useSimulationState() {
   const [centralCoverage, setCentralCoverage] = useState([0]);
 
   // Manual connection state
-  const [manualConnectionMode, setManualConnectionMode] = useState(false);
   const [autoAssignment, setAutoAssignment] = useState(true);
 
   // Live data state (only real mode now)
@@ -162,8 +161,6 @@ export function useSimulationState() {
     setEdgeCoverage,
     centralCoverage,
     setCentralCoverage,
-    manualConnectionMode,
-    setManualConnectionMode,
     autoAssignment,
     setAutoAssignment,
     liveData,

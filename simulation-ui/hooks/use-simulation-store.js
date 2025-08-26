@@ -218,14 +218,7 @@ const useSimulationStore = create((set) => ({
     })),
 
   // Manual connection state
-  manualConnectionMode: false,
   autoAssignment: true,
-  setManualConnectionMode: (updater) =>
-    set((state) => ({
-      manualConnectionMode: typeof updater === "function"
-        ? updater(state.manualConnectionMode)
-        : updater
-    })),
   setAutoAssignment: (updater) =>
     set((state) => ({
       autoAssignment: typeof updater === "function"
