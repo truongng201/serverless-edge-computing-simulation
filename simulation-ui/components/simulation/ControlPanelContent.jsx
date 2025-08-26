@@ -10,15 +10,13 @@ import {
   LiveSystemStatusCard,
   ScenarioSelectionCard,
   ZoomControlsCard,
-  ModelSelectionCard
+  ModelSelectionCard,
 } from "./control-cards/ControlCards";
 import { ChevronLeft } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { generateSaigonRoadNetwork } from "../../lib/road-network";
-import {
-  generateStreetMapUsers
-} from "../../lib/street-map-users";
+import { generateStreetMapUsers } from "../../lib/street-map-users";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function ControlPanelContent({
@@ -59,8 +57,6 @@ export default function ControlPanelContent({
   zoomIn,
   zoomOut,
   resetZoom,
-  leftPanelOpen,
-  setLeftPanelOpen,
   placementAlgorithm,
   setPlacementAlgorithm,
   runPlacementAlgorithm,
@@ -82,7 +78,8 @@ export default function ControlPanelContent({
   const [simulationLoading, setSimulationLoading] = useState(false);
   const intervalRef = useRef(null);
   const realModeIntervalRef = useRef(null);
-  const {userSpeed, userSize} = useSimulationStore();
+  const { userSpeed, userSize, leftPanelOpen, setLeftPanelOpen } =
+    useSimulationStore();
 
   // Helper function to clear all users from backend
   const clearAllUsersFromBackend = async () => {

@@ -12,7 +12,6 @@ export function useSimulationState() {
   const [totalLatency, setTotalLatency] = useState(0);
 
   // UI State
-  const [leftPanelOpen, setLeftPanelOpen] = useState(false);
   const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState("lstm");
   const [selectedUser, setSelectedUser] = useState(null);
@@ -142,8 +141,6 @@ export function useSimulationState() {
     setPredictionEnabled,
     totalLatency,
     setTotalLatency,
-    leftPanelOpen,
-    setLeftPanelOpen,
     rightPanelOpen,
     setRightPanelOpen,
     selectedModel,
