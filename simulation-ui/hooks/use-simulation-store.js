@@ -1,8 +1,6 @@
 import { create } from 'zustand';
-import { calculateLatency } from '../lib/placement-algorithms';
-import { calculateDistance } from '../lib/helper';
 
-const useSimulationStore = create((set, get) => ({
+const useSimulationStore = create((set) => ({
   // Canvas ref
   canvasRef: null,
   setCanvasRef: (ref) => set({ canvasRef: ref }),
@@ -117,102 +115,11 @@ const useSimulationStore = create((set, get) => ({
   simulationData: null,
   setSimulationData: (simulationData) => set({ simulationData }),
 
-  // Simulation mode
-  simulationMode: "normal",
-  setSimulationMode: (simulationMode) => set({ simulationMode }),
-
   // Real mode data
   realModeData: null,
   setRealModeData: (realModeData) => set({ realModeData }),
 
-  // Actions
-  updateTotalLatency: () => {
-    const { users } = get();
-    if (!users || users.length === 0) {
-      set({ totalLatency: 0 });
-      return;
-    }
-    const sum = users.reduce((acc, u) => acc + (Number(u.latency) || 0), 0);
-    set({ totalLatency: Math.round(sum / users.length) });
-  },
 
-  // Auto-assignment logic
-  performAutoAssignment: () => {
-    const { users, edgeNodes, centralNodes, autoAssignment } = get();
-    
-    if (!autoAssignment) return;
-    if ((edgeNodes?.length || 0) + (centralNodes?.length || 0) === 0) return;
-    if (!users || users.length === 0) return;
-
-    const updatedUsers = users.map((u) => {
-      let bestLatency = Number.POSITIVE_INFINITY;
-      let bestType = null;
-      let bestId = null;
-
-      // Evaluate all edges
-      for (let i = 0; i < edgeNodes.length; i++) {
-        const n = edgeNodes[i];
-        const lat = calculateLatency(u, n.id, "edge", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
-        if (lat < bestLatency) { 
-          bestLatency = lat; 
-          bestType = "edge"; 
-          bestId = n.id; 
-        }
-      }
-
-      // Evaluate all centrals
-      for (let i = 0; i < centralNodes.length; i++) {
-        const c = centralNodes[i];
-        const lat = calculateLatency(u, c.id, "central", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
-        if (lat < bestLatency) { 
-          bestLatency = lat; 
-          bestType = "central"; 
-          bestId = c.id; 
-        }
-      }
-
-      if (!bestType || !bestId || !isFinite(bestLatency)) return u;
-
-      return {
-        ...u,
-        assignedEdge: bestType === "edge" ? bestId : null,
-        assignedCentral: bestType === "central" ? bestId : null,
-        latency: bestLatency,
-      };
-    });
-
-    set({ users: updatedUsers });
-  },
-
-  // Container timeout management
-  resetWarmContainers: () => {
-    const { edgeNodes, centralNodes } = get();
-    const currentTime = Date.now();
-    const timeoutDuration = 30000; // 30 seconds
-
-    // Reset warm state for edge nodes
-    const updatedEdgeNodes = edgeNodes.map(edge => {
-      if (edge.isWarm && edge.lastAccessTime && 
-          (currentTime - edge.lastAccessTime) > timeoutDuration) {
-        return { ...edge, isWarm: false, lastAccessTime: null };
-      }
-      return edge;
-    });
-
-    // Reset warm state for central nodes
-    const updatedCentralNodes = centralNodes.map(central => {
-      if (central.isWarm && central.lastAccessTime && 
-          (currentTime - central.lastAccessTime) > timeoutDuration) {
-        return { ...central, isWarm: false, lastAccessTime: null };
-      }
-      return central;
-    });
-
-    set({ 
-      edgeNodes: updatedEdgeNodes, 
-      centralNodes: updatedCentralNodes 
-    });
-  },
 }));
 
 export default useSimulationStore;

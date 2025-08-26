@@ -13,6 +13,7 @@ import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 // Import custom hooks and utilities
 import { useSimulationState } from "@/hooks/use-simulation-state";
 import { useEventHandlers } from "@/lib/event-handlers";
+import useSimulationStore from "@/hooks/use-simulation-store"
 import { useSimulationLogic, getEditModeDescription } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
 import { runPlacementAlgorithm, runAssignmentAlgorithm, runGAPAssignment } from "@/lib/user-management";
@@ -22,6 +23,7 @@ import * as UserManagement from "@/lib/user-management";
 export default function Component() {
   // Get all state from the custom hook
   const state = useSimulationState();
+  const {editMode} = useSimulationStore();
 
   // Get event handlers
   const eventHandlers = useEventHandlers(state, state);
@@ -151,32 +153,7 @@ export default function Component() {
     draw();
   }, [draw]);
 
-  // Initial data fetch when component mounts (only if not simulating)
-  useEffect(() => {
-    const fetchInitialData = async () => {
-      if (!state.isSimulating && state.simulationData?.jumpToTimestep) {
-        try {
-          console.log('Fetching initial simulation data...');
-          await state.simulationData.jumpToTimestep(28800.00);
-        } catch (error) {
-          console.error('Error fetching initial sample:', error);
-        }
-      }
-    };
-
-    fetchInitialData();
-  }, []); // Only run once on mount
-
-  // Debug simulation state changes
-  useEffect(() => {
-    console.log('Simulation state changed:', {
-      isSimulating: state.isSimulating,
-      currentStep: state.simulationData?.currentStep,
-      status: state.simulationData?.simulationStatus,
-      usersCount: state.users.length
-    });
-  }, [state.isSimulating, state.simulationData?.currentStep, state.simulationData?.simulationStatus, state.users.length]);
-
+  
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gray-50">
       {/* Full Screen Canvas */}
@@ -242,8 +219,6 @@ export default function Component() {
           setIsPanning={state.setIsPanning}
           lastPanPoint={state.lastPanPoint}
           setLastPanPoint={state.setLastPanPoint}
-          editMode={state.editMode}
-          setEditMode={state.setEditMode}
           isDraggingNode={state.isDraggingNode}
           setIsDraggingNode={state.setIsDraggingNode}
           isDraggingUser={state.isDraggingUser}
@@ -282,7 +257,6 @@ export default function Component() {
           clearAllEdgeNodes={nodeActions.clearAllEdgeNodes}
           clearAllCentralNodes={nodeActions.clearAllCentralNodes}
           clearEverything={nodeActions.clearEverything}
-          getEditModeDescription={() => getEditModeDescription(state.editMode)}
           getCursorStyle={eventHandlers.getCursorStyle}
           updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
           placementAlgorithm={state.placementAlgorithm}
@@ -300,8 +274,6 @@ export default function Component() {
           setSelectedScenario={state.setSelectedScenario}
           roadNetwork={state.roadNetwork}
           setRoadNetwork={state.setRoadNetwork}
-          simulationMode={state.simulationMode}
-          setSimulationMode={state.setSimulationMode}
           realModeData={state.realModeData}
           setRealModeData={state.setRealModeData}
         />
@@ -351,7 +323,7 @@ export default function Component() {
       )}
 
       {/* Instructions */}
-      <EditModeDescription description={getEditModeDescription(state.editMode)} />
+      <EditModeDescription description={getEditModeDescription()} />
     </div>
   );
 }

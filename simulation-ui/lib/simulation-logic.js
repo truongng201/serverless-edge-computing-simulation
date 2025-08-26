@@ -5,9 +5,8 @@ import {
   autoAssignStreetMapUsers
 } from "./street-map-users";
 import { updateTrafficLights } from "./road-network";
-import { useCallback, useRef } from "react";
-import { calculateDistance } from "./helper";
-import { calculateLatency } from "./placement-algorithms";
+import { use, useCallback, useRef } from "react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 // Simulation Functions
 export const useSimulationLogic = (state, actions) => {
@@ -93,7 +92,8 @@ export const useSimulationLogic = (state, actions) => {
   };
 };
 
-export const getEditModeDescription = (editMode) => {
+export const getEditModeDescription = () => {
+  const {editMode}= useSimulationStore();
   switch (editMode) {
     case "nodes":
       return "Node Edit: Drag nodes to move • Click to select";

@@ -50,8 +50,6 @@ export default function ControlPanelContent({
   centralCoverage,
   setCentralCoverage,
   zoomLevel,
-  editMode,
-  setEditMode,
   models,
   deleteSelectedUser,
   resetSimulation,
@@ -80,11 +78,8 @@ export default function ControlPanelContent({
   runGAPAssignment,
   liveData,
   setLiveData,
-  roadNetwork,
   setRoadNetwork,
   simulationMode,
-  setSimulationMode,
-  realModeData,
   setRealModeData,
   selectedScenario,
   setSelectedScenario,
@@ -670,8 +665,6 @@ export default function ControlPanelContent({
       </div>
       <div className="pt-8">
         <EditModeCard
-          editMode={editMode}
-          setEditMode={setEditMode}
           selectedEdge={selectedEdge}
           selectedCentral={selectedCentral}
           selectedUser={selectedUser}
@@ -746,12 +739,7 @@ export default function ControlPanelContent({
           models={models}
         />
 
-        <UserSettingsCard
-          userSpeed={userSpeed}
-          setUserSpeed={setUserSpeed}
-          userSize={userSize}
-          setUserSize={setUserSize}
-        />
+        <UserSettingsCard />
 
         <CentralNodeSettingsCard
           simulationMode={simulationMode}

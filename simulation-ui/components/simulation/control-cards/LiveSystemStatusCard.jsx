@@ -46,7 +46,6 @@ export default function LiveSystemStatusCard({
                   Central CPU:{" "}
                   {liveData.central_node?.cpu_usage?.toFixed(1)}%
                 </div>
-                <div>Edge Nodes: {liveData.edge_nodes?.length || 0}</div>
               </div>
             )}
           </div>

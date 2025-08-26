@@ -1,13 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
-export default function UserSettingsCard({
-  userSpeed,
-  setUserSpeed,
-  userSize,
-  setUserSize,
-}) {
+export default function UserSettingsCard() {
+  const { userSpeed, setUserSpeed, userSize, setUserSize } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

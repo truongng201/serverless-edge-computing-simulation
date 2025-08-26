@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 import { calculateDistance } from "./helper";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 // Event Handlers
 export const useEventHandlers = (state, actions) => {
@@ -11,7 +12,6 @@ export const useEventHandlers = (state, actions) => {
     isPanning,
     isDraggingNode,
     isDraggingUser,
-    editMode,
     edgeNodes,
     centralNodes,
     users,
@@ -27,6 +27,8 @@ export const useEventHandlers = (state, actions) => {
     draggedUser,
     lastPanPoint
   } = state;
+
+  const {editMode} = useSimulationStore();
 
   const {
     setIsDragging,

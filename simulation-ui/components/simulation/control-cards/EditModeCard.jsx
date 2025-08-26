@@ -9,16 +9,19 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Edit3, Trash2 } from "lucide-react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function EditModeCard({
-  editMode,
-  setEditMode,
-  selectedEdge,
-  selectedCentral,
-  selectedUser,
   deleteSelectedNode,
   deleteSelectedUser,
 }) {
+  const {
+    editMode,
+    setEditMode,
+    selectedEdge,
+    selectedCentral,
+    selectedUser
+  } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

@@ -1,4 +1,5 @@
 import { useCallback } from "react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export const useCanvasDrawing = (state) => {
   const {
@@ -13,9 +14,9 @@ export const useCanvasDrawing = (state) => {
     selectedCentral,
     selectedEdge,
     selectedUser,
-    editMode,
     roadNetwork
   } = state;
+  const {editMode} = useSimulationStore();
 
   // Drawing function with zoom and pan support
   const draw = useCallback(() => {
