@@ -23,7 +23,12 @@ const useSimulationStore = create((set) => ({
   setSimulationSpeed: (simulationSpeed) => set({ simulationSpeed }),
   setPredictionEnabled: (predictionEnabled) => set({ predictionEnabled }),
   setTotalLatency: (totalLatency) => set({ totalLatency }),
-  setIsDragging: (isDragging) => set({ isDragging }),
+  setIsDragging: (updater) =>
+    set((state) => ({
+      isDragging: typeof updater === "function"
+        ? updater(state.isDragging)
+        : updater
+    })),
 
   // UI State
   leftPanelOpen: false,
@@ -81,8 +86,18 @@ const useSimulationStore = create((set) => ({
   draggedUser: null,
   dragOffset: { x: 0, y: 0 },
   setEditMode: (editMode) => set({ editMode }),
-  setIsDraggingNode: (isDraggingNode) => set({ isDraggingNode }),
-  setIsDraggingUser: (isDraggingUser) => set({ isDraggingUser }),
+  setIsDraggingNode: (updater) =>
+    set((state) => ({
+      isDraggingNode: typeof updater === "function"
+        ? updater(state.isDraggingNode)
+        : updater
+    })),
+  setIsDraggingUser: (updater) =>
+    set((state) => ({
+      isDraggingUser: typeof updater === "function"
+        ? updater(state.isDraggingUser)
+        : updater
+    })),
   setDraggedNode: (draggedNode) => set({ draggedNode }),
   setDraggedUser: (draggedUser) => set({ draggedUser }),
   setDragOffset: (dragOffset) => set({ dragOffset }),

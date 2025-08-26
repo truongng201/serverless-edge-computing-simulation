@@ -183,8 +183,6 @@ export default function Component() {
           setPredictionEnabled={state.setPredictionEnabled}
           totalLatency={state.totalLatency}
           setTotalLatency={state.setTotalLatency}
-          isDragging={state.isDragging}
-          setIsDragging={state.setIsDragging}
           leftPanelOpen={state.leftPanelOpen}
           setLeftPanelOpen={state.setLeftPanelOpen}
           rightPanelOpen={state.rightPanelOpen}
@@ -212,10 +210,6 @@ export default function Component() {
           setCentralCoverage={state.setCentralCoverage}
           lastPanPoint={state.lastPanPoint}
           setLastPanPoint={state.setLastPanPoint}
-          isDraggingNode={state.isDraggingNode}
-          setIsDraggingNode={state.setIsDraggingNode}
-          isDraggingUser={state.isDraggingUser}
-          setIsDraggingUser={state.setIsDraggingUser}
           draggedNode={state.draggedNode}
           setDraggedNode={state.setDraggedNode}
           draggedUser={state.draggedUser}

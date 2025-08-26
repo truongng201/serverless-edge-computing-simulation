@@ -10,7 +10,6 @@ export function useSimulationState() {
   const [simulationSpeed, setSimulationSpeed] = useState([1]);
   const [predictionEnabled, setPredictionEnabled] = useState(true);
   const [totalLatency, setTotalLatency] = useState(0);
-  const [isDragging, setIsDragging] = useState(false);
 
   // UI State
   const [leftPanelOpen, setLeftPanelOpen] = useState(false);
@@ -36,8 +35,6 @@ export function useSimulationState() {
 
   // Edit mode states
   const [editMode, setEditMode] = useState("none"); // "none", "nodes", "users", "both"
-  const [isDraggingNode, setIsDraggingNode] = useState(false);
-  const [isDraggingUser, setIsDraggingUser] = useState(false);
   const [draggedNode, setDraggedNode] = useState(null);
   const [draggedUser, setDraggedUser] = useState(null);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
@@ -158,8 +155,6 @@ export function useSimulationState() {
     setPredictionEnabled,
     totalLatency,
     setTotalLatency,
-    isDragging,
-    setIsDragging,
     leftPanelOpen,
     setLeftPanelOpen,
     rightPanelOpen,
@@ -186,10 +181,6 @@ export function useSimulationState() {
     setLastPanPoint,
     editMode,
     setEditMode,
-    isDraggingNode,
-    setIsDraggingNode,
-    isDraggingUser,
-    setIsDraggingUser,
     draggedNode,
     setDraggedNode,
     draggedUser,
