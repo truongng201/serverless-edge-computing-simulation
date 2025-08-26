@@ -11,7 +11,6 @@ export const useEventHandlers = (state, actions) => {
     selectedUser,
     selectedEdge,
     selectedCentral,
-    userSpeed,
     userSize,
     roadMode,
     roads,
@@ -36,6 +35,7 @@ export const useEventHandlers = (state, actions) => {
     editMode,
     zoomLevel,
     setZoomLevel,
+    userSpeed,
   } = useSimulationStore();
 
   const {

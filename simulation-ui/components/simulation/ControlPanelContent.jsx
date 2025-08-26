@@ -19,6 +19,7 @@ import { generateSaigonRoadNetwork } from "../../lib/road-network";
 import {
   generateStreetMapUsers
 } from "../../lib/street-map-users";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function ControlPanelContent({
   users,
@@ -39,7 +40,6 @@ export default function ControlPanelContent({
   selectedEdge,
   setSelectedEdge,
   selectedCentral,
-  userSpeed,
   userSize,
   predictionSteps,
   setPredictionSteps,
@@ -85,6 +85,7 @@ export default function ControlPanelContent({
   const [simulationLoading, setSimulationLoading] = useState(false);
   const intervalRef = useRef(null);
   const realModeIntervalRef = useRef(null);
+  const {userSpeed} = useSimulationStore();
 
   // Helper function to clear all users from backend
   const clearAllUsersFromBackend = async () => {

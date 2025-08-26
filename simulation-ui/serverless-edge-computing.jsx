@@ -195,8 +195,6 @@ export default function Component() {
           setSelectedEdge={state.setSelectedEdge}
           selectedCentral={state.selectedCentral}
           setSelectedCentral={state.setSelectedCentral}
-          userSpeed={state.userSpeed}
-          setUserSpeed={state.setUserSpeed}
           userSize={state.userSize}
           setUserSize={state.setUserSize}
           zoomIn={eventHandlers.zoomIn}

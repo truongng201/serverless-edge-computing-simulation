@@ -20,7 +20,6 @@ export function useSimulationState() {
   const [selectedCentral, setSelectedCentral] = useState(null);
 
   // User settings
-  const [userSpeed, setUserSpeed] = useState([5]);
   const [userSize, setUserSize] = useState([10]);
   const [predictionSteps, setPredictionSteps] = useState([10]);
 
@@ -167,8 +166,6 @@ export function useSimulationState() {
     setSelectedEdge,
     selectedCentral,
     setSelectedCentral,
-    userSpeed,
-    setUserSpeed,
     userSize,
     setUserSize,
     predictionSteps,
