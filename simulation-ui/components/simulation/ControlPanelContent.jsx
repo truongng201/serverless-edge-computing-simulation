@@ -26,8 +26,6 @@ export default function ControlPanelContent({
   setEdgeNodes,
   centralNodes,
   setCentralNodes,
-  predictionEnabled,
-  setPredictionEnabled,
   selectedUser,
   selectedEdge,
   setSelectedEdge,
@@ -693,8 +691,6 @@ export default function ControlPanelContent({
         <SimulationControlsCard
           handleToggleSimulation={handleToggleSimulation}
           handleResetSimulation={handleResetSimulation}
-          predictionEnabled={predictionEnabled}
-          setPredictionEnabled={setPredictionEnabled}
           users={users}
           simulationLoading={simulationLoading}
         />

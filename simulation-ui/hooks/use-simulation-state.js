@@ -6,7 +6,6 @@ export function useSimulationState() {
   const [edgeNodes, setEdgeNodes] = useState([]);
   const [centralNodes, setCentralNodes] = useState([]);
 
-  const [predictionEnabled, setPredictionEnabled] = useState(true);
   const [totalLatency, setTotalLatency] = useState(0);
 
   // UI State
@@ -126,8 +125,6 @@ export function useSimulationState() {
     setEdgeNodes,
     centralNodes,
     setCentralNodes,
-    predictionEnabled,
-    setPredictionEnabled,
     totalLatency,
     setTotalLatency,
     selectedUser,

@@ -9,12 +9,16 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export default function SimulationControlsCard({
   handleToggleSimulation,
   handleResetSimulation,
-  predictionEnabled,
-  setPredictionEnabled,
   users,
   simulationLoading,
 }) {
-  const { isSimulating, simulationSpeed, setSimulationSpeed } = useSimulationStore();
+  const {
+    isSimulating,
+    simulationSpeed,
+    setSimulationSpeed,
+    predictionEnabled,
+    setPredictionEnabled,
+  } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -35,11 +39,7 @@ export default function SimulationControlsCard({
             ) : (
               <Play className="w-4 h-4" />
             )}
-            {simulationLoading
-              ? "Loading..."
-              : isSimulating
-              ? "Stop"
-              : "Start"}
+            {simulationLoading ? "Loading..." : isSimulating ? "Stop" : "Start"}
           </Button>
           <Button
             onClick={handleResetSimulation}
