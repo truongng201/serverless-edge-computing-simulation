@@ -52,7 +52,6 @@ export default function Component() {
     users,
     setUsers,
     simulationData,
-    setSimulationData,
   } = useSimulationStore();
 
   // Get event handlers
@@ -167,7 +166,6 @@ export default function Component() {
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
-          simulationData={state.simulationData}
           deleteSelectedUser={userActions.deleteSelectedUser}
           simulationStep={simulationStep}
           handleCanvasClick={eventHandlers.handleCanvasClick}
