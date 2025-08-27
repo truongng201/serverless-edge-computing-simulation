@@ -18,10 +18,9 @@ import axios from "axios";
 import { generateSaigonRoadNetwork } from "../../lib/road-network";
 import { generateStreetMapUsers } from "../../lib/street-map-users";
 import useSimulationStore from "@/hooks/use-simulation-store";
+import {calculateLatency} from "../../lib/helper"
 
 export default function ControlPanelContent({
-  users,
-  setUsers,
   deleteSelectedUser,
   resetSimulation,
   addCentralNode,
@@ -47,6 +46,8 @@ export default function ControlPanelContent({
   const intervalRef = useRef(null);
   const realModeIntervalRef = useRef(null);
   const {
+    users,
+    setUsers,
     userSpeed,
     userSize,
     leftPanelOpen,
@@ -677,13 +678,11 @@ export default function ControlPanelContent({
 
         <NodePlacementCard
           runPlacementAlgorithm={runPlacementAlgorithm}
-          users={users}
         />
 
         <UserAssignmentCard
           runAssignmentAlgorithm={runAssignmentAlgorithm}
           runGAPBatch={runGAPBatch}
-          users={users}
         />
 
         <LiveSystemStatusCard
@@ -698,7 +697,6 @@ export default function ControlPanelContent({
         <SimulationControlsCard
           handleToggleSimulation={handleToggleSimulation}
           handleResetSimulation={handleResetSimulation}
-          users={users}
           simulationLoading={simulationLoading}
         />
 

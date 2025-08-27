@@ -4,20 +4,20 @@ import {
   StreetMapMetricsCard,
   LiveSystemMetricsCard,
   ConnectionStatusCard,
-  CurrentAlgorithmCard
+  CurrentAlgorithmCard,
 } from "./metric-cards/MetricCards";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
-export default function MetricsPanelContent({
-  users,
-}) {
+export default function MetricsPanelContent() {
   const { rightPanelOpen, setRightPanelOpen } = useSimulationStore();
   return (
     <>
       {/* Close panel - small right arrow button at the very top, outside all cards */}
       <div className="relative w-full">
         <button
-          onClick={() => setRightPanelOpen && setRightPanelOpen(!rightPanelOpen)}
+          onClick={() =>
+            setRightPanelOpen && setRightPanelOpen(!rightPanelOpen)
+          }
           className="absolute left-2 z-30 p-1 rounded hover:bg-gray-200 focus:outline-none"
           aria-label="Close panel"
           type="button"
@@ -26,23 +26,15 @@ export default function MetricsPanelContent({
         </button>
       </div>
       <div className="pt-8">
-        <SystemStatusCard
-          users={users}
-        />
+        <SystemStatusCard />
 
-        <StreetMapMetricsCard
-          users={users}
-        />
+        <StreetMapMetricsCard />
 
-        <LiveSystemMetricsCard
-        />
+        <LiveSystemMetricsCard />
 
-        <ConnectionStatusCard
-          users={users}
-        />
+        <ConnectionStatusCard />
 
-        <CurrentAlgorithmCard
-        />
+        <CurrentAlgorithmCard />
       </div>
     </>
   );

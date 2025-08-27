@@ -9,7 +9,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export default function SimulationControlsCard({
   handleToggleSimulation,
   handleResetSimulation,
-  users,
   simulationLoading,
 }) {
   const {
@@ -18,6 +17,7 @@ export default function SimulationControlsCard({
     setSimulationSpeed,
     predictionEnabled,
     setPredictionEnabled,
+    users
   } = useSimulationStore();
   return (
     <Card className="mb-4">

@@ -4,10 +4,8 @@ import { Car } from "lucide-react";
 import { getStreetMapStats } from "../../../lib/street-map-users";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
-export default function StreetMapMetricsCard({
-  users,
-}) {
-  const { selectedScenario, roadNetwork } = useSimulationStore();
+export default function StreetMapMetricsCard() {
+  const { selectedScenario, roadNetwork, users } = useSimulationStore();
   if (selectedScenario !== "scenario4" || !roadNetwork) {
     return null;
   }

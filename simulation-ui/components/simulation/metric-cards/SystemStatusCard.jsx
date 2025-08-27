@@ -4,10 +4,8 @@ import { Progress } from "@/components/ui/progress";
 import { Users, Timer } from "lucide-react";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
-export default function SystemStatusCard({
-  users,
-}) {
-  const { liveData, totalLatency } = useSimulationStore();
+export default function SystemStatusCard() {
+  const { liveData, totalLatency, users } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

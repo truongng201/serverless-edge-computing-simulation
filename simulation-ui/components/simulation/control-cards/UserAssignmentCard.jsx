@@ -14,10 +14,14 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export default function UserAssignmentCard({
   runAssignmentAlgorithm,
   runGAPBatch,
-  users,
 }) {
-  const { edgeNodes, assignmentAlgorithm, setAssignmentAlgorithm, centralNodes } =
-    useSimulationStore();
+  const {
+    edgeNodes,
+    assignmentAlgorithm,
+    setAssignmentAlgorithm,
+    centralNodes,
+    users,
+  } = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

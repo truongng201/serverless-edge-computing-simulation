@@ -48,7 +48,11 @@ export default function Component() {
     selectedEdge,
     setSelectedEdge,
     selectedCentral,
-    setSelectedCentral
+    setSelectedCentral,
+    users,
+    setUsers,
+    simulationData,
+    setSimulationData,
   } = useSimulationStore();
 
   // Get event handlers
@@ -88,12 +92,12 @@ export default function Component() {
         setSelectedCentral
       ),
     clearAllUsers: async () =>
-      await NodeManagement.clearAllUsers(state.setUsers, setSelectedUser),
+      await NodeManagement.clearAllUsers(setUsers, setSelectedUser),
     resetSimulation: () => {
       NodeManagement.resetSimulation(() => nodeActions.clearEverything());
       // Also reset the simulation data if available
-      if (state.simulationData?.resetSimulation) {
-        state.simulationData.resetSimulation();
+      if (simulationData?.resetSimulation) {
+        simulationData.resetSimulation();
       }
     },
   };
@@ -102,25 +106,25 @@ export default function Component() {
     deleteSelectedUser: async () =>
       await UserManagement.deleteSelectedUser(
         selectedUser,
-        state.setUsers,
+        setUsers,
         setSelectedUser
       ),
     runPlacementAlgorithm: () =>
       runPlacementAlgorithm(
-        state.users,
+        users,
         edgeNodes,
         placementAlgorithm,
         setEdgeNodes,
-        state.setUsers
+        setUsers
       ),
     runAssignmentAlgorithm: () =>
       runAssignmentAlgorithm(
-        state.users,
+        users,
         edgeNodes,
         centralNodes,
         assignmentAlgorithm,
         setEdgeNodes,
-        state.setUsers
+        setUsers
       ),
     runGAPAssignment: runGAPAssignment,
   };
@@ -160,8 +164,6 @@ export default function Component() {
       {/* Left Control Panel */}
       <ControlPanel>
         <ControlPanelContent
-          users={state.users}
-          setUsers={state.setUsers}
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
@@ -194,9 +196,7 @@ export default function Component() {
 
       {/* Right Metrics Panel */}
       <MetricsPanel>
-        <MetricsPanelContent
-          users={state.users}
-        />
+        <MetricsPanelContent />
       </MetricsPanel>
 
       {/* Toggle Buttons for Panels */}

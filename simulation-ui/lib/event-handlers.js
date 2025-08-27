@@ -5,7 +5,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 // Event Handlers
 export const useEventHandlers = (state, actions) => {
   const {
-    users,
     roadMode,
     roads,
   } = state;
@@ -44,12 +43,10 @@ export const useEventHandlers = (state, actions) => {
     selectedEdge,
     setSelectedEdge,
     selectedCentral,
-    setSelectedCentral
+    setSelectedCentral,
+    users,
+    setUsers
   } = useSimulationStore();
-
-  const {
-    setUsers,
-  } = actions;
 
   // Handle canvas click to add users or select nodes
   const handleCanvasClick = useCallback(
