@@ -1,5 +1,4 @@
-import { useState, useRef, useEffect } from "react";
-import { calculateLatency } from "../lib/placement-algorithms";
+import { useState } from "react";
 
 export function useSimulationState() {
   const [users, setUsers] = useState([]);
