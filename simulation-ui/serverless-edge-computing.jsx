@@ -48,20 +48,16 @@ export default function Component() {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gray-50">
-      {/* Full Screen Canvas */}
       <SimulationCanvas />
 
-      {/* Left Control Panel */}
       <ControlPanel>
         <ControlPanelContent />
       </ControlPanel>
 
-      {/* Right Metrics Panel */}
       <MetricsPanel>
         <MetricsPanelContent />
       </MetricsPanel>
 
-      {/* Toggle Buttons for Panels */}
       {!leftPanelOpen && (
         <Button
           className="absolute left-4 top-4 z-20"
@@ -81,7 +77,6 @@ export default function Component() {
         </Button>
       )}
 
-      {/* Instructions */}
       <EditModeDescription />
     </div>
   );
