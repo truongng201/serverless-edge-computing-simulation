@@ -40,7 +40,9 @@ export default function Component() {
     edgeCoverage,
     placementAlgorithm,
     assignmentAlgorithm,
-    centralCoverage
+    centralCoverage,
+    centralNodes,
+    setCentralNodes
   } = useSimulationStore();
 
   // Get event handlers
@@ -59,15 +61,15 @@ export default function Component() {
     removeEdgeNode: () => NodeManagement.removeEdgeNode(),
     addCentralNode: () =>
       NodeManagement.addCentralNode(
-        state.centralNodes,
+        centralNodes,
         centralCoverage,
-        state.setCentralNodes
+        setCentralNodes
       ),
     removeCentralNode: () =>
       NodeManagement.removeCentralNode(
-        state.centralNodes,
+        centralNodes,
         state.selectedCentral,
-        state.setCentralNodes,
+        setCentralNodes,
         state.setSelectedCentral
       ),
     deleteSelectedNode: () =>
@@ -75,7 +77,7 @@ export default function Component() {
         state.selectedEdge,
         state.selectedCentral,
         setEdgeNodes,
-        state.setCentralNodes,
+        setCentralNodes,
         state.setSelectedEdge,
         state.setSelectedCentral
       ),
@@ -109,7 +111,7 @@ export default function Component() {
       runAssignmentAlgorithm(
         state.users,
         edgeNodes,
-        state.centralNodes,
+        centralNodes,
         assignmentAlgorithm,
         setEdgeNodes,
         state.setUsers
@@ -154,8 +156,6 @@ export default function Component() {
         <ControlPanelContent
           users={state.users}
           setUsers={state.setUsers}
-          centralNodes={state.centralNodes}
-          setCentralNodes={state.setCentralNodes}
           selectedUser={state.selectedUser}
           setSelectedUser={state.setSelectedUser}
           selectedEdge={state.selectedEdge}
@@ -196,7 +196,6 @@ export default function Component() {
       <MetricsPanel>
         <MetricsPanelContent
           users={state.users}
-          centralNodes={state.centralNodes}
           selectedUser={state.selectedUser}
           setSelectedUser={state.setSelectedUser}
           selectedEdge={state.selectedEdge}

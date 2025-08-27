@@ -15,9 +15,8 @@ export default function UserAssignmentCard({
   runAssignmentAlgorithm,
   runGAPBatch,
   users,
-  centralNodes,
 }) {
-  const { edgeNodes, assignmentAlgorithm, setAssignmentAlgorithm } =
+  const { edgeNodes, assignmentAlgorithm, setAssignmentAlgorithm, centralNodes } =
     useSimulationStore();
   return (
     <Card className="mb-4">

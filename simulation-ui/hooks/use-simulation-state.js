@@ -2,7 +2,6 @@ import { useState } from "react";
 
 export function useSimulationState() {
   const [users, setUsers] = useState([]);
-  const [centralNodes, setCentralNodes] = useState([]);
 
 
   // UI State
@@ -14,8 +13,6 @@ export function useSimulationState() {
   return {
     users,
     setUsers,
-    centralNodes,
-    setCentralNodes,
     selectedUser,
     setSelectedUser,
     selectedEdge,

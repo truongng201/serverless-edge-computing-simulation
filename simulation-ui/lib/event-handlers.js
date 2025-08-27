@@ -5,7 +5,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 // Event Handlers
 export const useEventHandlers = (state, actions) => {
   const {
-    centralNodes,
     users,
     selectedUser,
     selectedEdge,
@@ -40,7 +39,9 @@ export const useEventHandlers = (state, actions) => {
     lastPanPoint,
     setLastPanPoint,
     edgeNodes,
-    setEdgeNodes
+    setEdgeNodes,
+    centralNodes,
+    setCentralNodes
   } = useSimulationStore();
 
   const {
@@ -48,7 +49,6 @@ export const useEventHandlers = (state, actions) => {
     setSelectedEdge,
     setSelectedCentral,
     setUsers,
-    setCentralNodes,
   } = actions;
 
   // Handle canvas click to add users or select nodes

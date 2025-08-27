@@ -22,8 +22,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export default function ControlPanelContent({
   users,
   setUsers,
-  centralNodes,
-  setCentralNodes,
   selectedUser,
   selectedEdge,
   setSelectedEdge,
@@ -69,7 +67,9 @@ export default function ControlPanelContent({
     setEdgeCoverage,
     centralCoverage,
     setCentralCoverage,
-    setSelectedCentral
+    setSelectedCentral,
+    centralNodes,
+    setCentralNodes
   } = useSimulationStore();
 
   // Helper function to clear all users from backend
@@ -688,7 +688,6 @@ export default function ControlPanelContent({
           runAssignmentAlgorithm={runAssignmentAlgorithm}
           runGAPBatch={runGAPBatch}
           users={users}
-          centralNodes={centralNodes}
         />
 
         <LiveSystemStatusCard
