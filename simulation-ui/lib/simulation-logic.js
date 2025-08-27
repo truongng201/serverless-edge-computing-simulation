@@ -26,9 +26,6 @@ export const useSimulationLogic = (state, actions) => {
     roads
   } = useGlobalState();
 
-  // Step counter for periodic operations in demo mode
-  const stepCounterRef = useRef(0);
-
   // Simulation step
   const simulationStep = useCallback(() => {
     if (!isSimulating) return;
@@ -104,20 +101,4 @@ export const useSimulationLogic = (state, actions) => {
   return {
     simulationStep,
   };
-};
-
-export const getEditModeDescription = () => {
-  const { editMode } = useGlobalState();
-  switch (editMode) {
-    case "nodes":
-      return "Node Edit: Drag nodes to move • Click to select";
-    case "users":
-      return "User Edit: Drag users to move • Click to select";
-    case "both":
-      return "Full Edit: Drag nodes and users • Click to select";
-    case "drag":
-      return "Drag Mode: Drag to pan the map • Mouse wheel to zoom";
-    default:
-      return "Click to add users • Mouse wheel to zoom";
-  }
 };

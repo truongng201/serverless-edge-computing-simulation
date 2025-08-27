@@ -12,10 +12,7 @@ import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 
 // Import custom hooks and utilities
 import useGlobalState from "@/hooks/use-global-state";
-import {
-  useSimulationLogic,
-  getEditModeDescription,
-} from "@/lib/simulation-logic";
+import { useSimulationLogic } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
 
 export default function Component() {
@@ -85,7 +82,7 @@ export default function Component() {
       )}
 
       {/* Instructions */}
-      <EditModeDescription description={getEditModeDescription()} />
+      <EditModeDescription />
     </div>
   );
 }
