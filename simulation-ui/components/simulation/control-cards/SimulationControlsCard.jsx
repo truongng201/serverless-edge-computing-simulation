@@ -8,7 +8,6 @@ import useGlobalState from "@/hooks/use-global-state";
 
 export default function SimulationControlsCard({
   handleToggleSimulation,
-  handleResetSimulation,
   simulationLoading,
 }) {
   const {
@@ -40,14 +39,6 @@ export default function SimulationControlsCard({
               <Play className="w-4 h-4" />
             )}
             {simulationLoading ? "Loading..." : isSimulating ? "Stop" : "Start"}
-          </Button>
-          <Button
-            onClick={handleResetSimulation}
-            variant="outline"
-            size="sm"
-            disabled={simulationLoading}
-          >
-            <RotateCcw className="w-4 h-4" />
           </Button>
         </div>
         {isSimulating && (

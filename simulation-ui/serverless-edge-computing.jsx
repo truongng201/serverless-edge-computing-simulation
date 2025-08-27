@@ -80,15 +80,7 @@ export default function Component() {
       ),
     clearAllUsers: async () =>
       await NodeManagement.clearAllUsers(setUsers, setSelectedUser),
-    resetSimulation: () => {
-      NodeManagement.resetSimulation(() => nodeActions.clearEverything());
-      // Also reset the simulation data if available
-      if (simulationData?.resetSimulation) {
-        simulationData.resetSimulation();
-      }
-    },
   };
-  
 
   // Animation loop
   useEffect(() => {
@@ -135,16 +127,12 @@ export default function Component() {
           handleMouseUp={eventHandlers.handleMouseUp}
           handleWheel={eventHandlers.handleWheel}
           draw={draw}
-          resetSimulation={nodeActions.resetSimulation}
           addEdgeNode={nodeActions.addEdgeNode}
           removeEdgeNode={nodeActions.removeEdgeNode}
           addCentralNode={nodeActions.addCentralNode}
           removeCentralNode={nodeActions.removeCentralNode}
           deleteSelectedNode={nodeActions.deleteSelectedNode}
           clearAllUsers={nodeActions.clearAllUsers}
-          clearAllEdgeNodes={nodeActions.clearAllEdgeNodes}
-          clearAllCentralNodes={nodeActions.clearAllCentralNodes}
-          clearEverything={nodeActions.clearEverything}
           getCursorStyle={eventHandlers.getCursorStyle}
           updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
         />

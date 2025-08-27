@@ -22,14 +22,10 @@ import {calculateLatency} from "@/lib/helper"
 import { runGAPAssignment } from "@/lib/user-management";
 
 export default function ControlPanelContent({
-  resetSimulation,
   addCentralNode,
   removeCentralNode,
   deleteSelectedNode,
   clearAllUsers,
-  clearAllEdgeNodes,
-  clearAllCentralNodes,
-  clearEverything,
   zoomIn,
   zoomOut,
   resetZoom,
@@ -609,39 +605,6 @@ export default function ControlPanelContent({
     }
   };
 
-  // Override resetSimulation to stop intervals and API simulation
-  const handleResetSimulation = async () => {
-    // First, stop any running simulation via API
-    if (isSimulating) {
-      try {
-        await axios.post(`${process.env.NEXT_PUBLIC_API_URL}/stop_simulation`);
-      } catch (error) {
-        console.error("Error stopping simulation during reset:", error);
-      }
-    }
-
-    // Clean up intervals
-    if (intervalRef.current) {
-      clearInterval(intervalRef.current);
-      intervalRef.current = null;
-    }
-
-    if (realModeIntervalRef.current) {
-      clearInterval(realModeIntervalRef.current);
-      realModeIntervalRef.current = null;
-    }
-    if (transitionTimeoutRef.current) {
-      clearTimeout(transitionTimeoutRef.current);
-      transitionTimeoutRef.current = null;
-    }
-
-    // Reset states
-    setIsSimulating(false);
-    setLiveData(null);
-    setDataError("");
-    setSimulationLoading(false);
-    resetSimulation();
-  };
   return (
     <>
       {/* Close panel - small left arrow button at the very top, outside all cards */}
@@ -662,9 +625,7 @@ export default function ControlPanelContent({
 
         <ClearControlsCard
           clearAllUsers={clearAllUsers}
-          clearAllEdgeNodes={clearAllEdgeNodes}
           clearAllCentralNodes={clearAllCentralNodes}
-          clearEverything={clearEverything}
         />
 
         <NodePlacementCard
@@ -685,7 +646,6 @@ export default function ControlPanelContent({
 
         <SimulationControlsCard
           handleToggleSimulation={handleToggleSimulation}
-          handleResetSimulation={handleResetSimulation}
           simulationLoading={simulationLoading}
         />
 

@@ -88,8 +88,3 @@ export const clearAllUsers = async (setUsers, setSelectedUser) => {
   setUsers([]);
   setSelectedUser(null);
 };
-
-
-export const resetSimulation = (clearEverything) => {
-  clearEverything();
-};
