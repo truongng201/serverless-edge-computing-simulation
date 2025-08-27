@@ -5,17 +5,16 @@ import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Play, Pause } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
+import { stopSimulation, startSimulation } from "@/lib/simulation-management";
 
-export default function SimulationControlsCard({
-  handleToggleSimulation,
-  simulationLoading,
-}) {
+export default function SimulationControlsCard() {
   const {
     isSimulating,
     simulationSpeed,
     setSimulationSpeed,
     predictionEnabled,
     setPredictionEnabled,
+    simulationLoading,
     users
   } = useGlobalState();
   return (
@@ -27,7 +26,13 @@ export default function SimulationControlsCard({
       <CardContent className="space-y-3">
         <div className="flex gap-2">
           <Button
-            onClick={handleToggleSimulation}
+            onClick={async () => {
+              if (isSimulating) {
+                await stopSimulation();
+              } else {
+                await startSimulation();
+              }
+            }}
             variant={isSimulating ? "destructive" : "default"}
             size="sm"
             className="flex-1"

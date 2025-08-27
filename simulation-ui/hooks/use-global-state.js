@@ -297,16 +297,30 @@ const useGlobalState = create((set) => ({
         : updater
     })),
 
-  // Real mode data
-  realModeData: null,
-  setRealModeData: (updater) =>
+  
+
+  // Loading and error request
+  loadingData: false,
+  setLoadingData: (updater) =>
     set((state) => ({
-      realModeData: typeof updater === "function"
-        ? updater(state.realModeData)
+      loadingData: typeof updater === "function"
+        ? updater(state.loadingData)
         : updater
     })),
-
-
+  dataError: "",
+  setDataError: (updater) =>
+    set((state) => ({
+      dataError: typeof updater === "function"
+        ? updater(state.dataError)
+        : updater
+    })),
+  loadingSimulation: false,
+  setLoadingSimulation: (updater) =>
+    set((state) => ({
+      loadingSimulation: typeof updater === "function"
+        ? updater(state.loadingSimulation)
+        : updater
+    }))
 }));
 
 export default useGlobalState;
