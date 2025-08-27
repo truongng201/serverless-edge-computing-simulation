@@ -13,9 +13,6 @@ export function useSimulationState() {
   // Central node settings
   const [centralCoverage, setCentralCoverage] = useState([0]);
 
-  // Auto Placement state
-  const [placementAlgorithm, setPlacementAlgorithm] = useState("topk-demand");
-  
   // User Assignment state
   const [assignmentAlgorithm, setAssignmentAlgorithm] = useState("nearest-distance");
 
@@ -33,8 +30,6 @@ export function useSimulationState() {
     setSelectedCentral,
     centralCoverage,
     setCentralCoverage,
-    placementAlgorithm,
-    setPlacementAlgorithm,
     assignmentAlgorithm,
     setAssignmentAlgorithm,
   };

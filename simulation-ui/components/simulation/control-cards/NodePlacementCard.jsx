@@ -12,13 +12,9 @@ import {
 import { Target, MapPin } from "lucide-react";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
-export default function NodePlacementCard({
-  placementAlgorithm,
-  setPlacementAlgorithm,
-  runPlacementAlgorithm,
-  users,
-}) {
-  const {edgeNodes} = useSimulationStore();
+export default function NodePlacementCard({ runPlacementAlgorithm, users }) {
+  const { edgeNodes, placementAlgorithm, setPlacementAlgorithm } =
+    useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

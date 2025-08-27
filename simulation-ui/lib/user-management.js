@@ -107,8 +107,6 @@ export const runPlacementAlgorithm = (
       }
     });
   });
-
-  console.log(`Placement algorithm ${placementAlgorithm} completed with ${selectedPositions.length} positions`);
 };
 
 // Run user assignment algorithm

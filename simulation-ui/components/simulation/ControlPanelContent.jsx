@@ -42,8 +42,6 @@ export default function ControlPanelContent({
   zoomIn,
   zoomOut,
   resetZoom,
-  placementAlgorithm,
-  setPlacementAlgorithm,
   runPlacementAlgorithm,
   assignmentAlgorithm,
   setAssignmentAlgorithm,
@@ -72,7 +70,7 @@ export default function ControlPanelContent({
     edgeNodes,
     setEdgeNodes,
     edgeCoverage,
-    setEdgeCoverage
+    setEdgeCoverage,
   } = useSimulationStore();
 
   // Helper function to clear all users from backend
@@ -683,8 +681,6 @@ export default function ControlPanelContent({
         />
 
         <NodePlacementCard
-          placementAlgorithm={placementAlgorithm}
-          setPlacementAlgorithm={setPlacementAlgorithm}
           runPlacementAlgorithm={runPlacementAlgorithm}
           users={users}
         />
