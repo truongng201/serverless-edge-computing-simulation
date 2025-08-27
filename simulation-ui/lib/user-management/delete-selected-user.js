@@ -1,7 +1,7 @@
 import useGlobalState from "@/hooks/use-global-state";
 
 export const deleteSelectedUser = async () => {
-  const { selectedUser, setUsers, setSelectedUser } = useGlobalState;
+  const { selectedUser, setUsers, setSelectedUser } = useGlobalState.getState() ;
   if (!selectedUser) return;
   try {
     // Call API to delete user if API URL is available

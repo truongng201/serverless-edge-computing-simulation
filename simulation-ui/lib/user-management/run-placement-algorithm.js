@@ -9,7 +9,7 @@ import {
 
 export const runPlacementAlgorithm = () => {
   const { users, edgeNodes, placementAlgorithm, setEdgeNodes, setUsers } =
-    useGlobalState();
+    useGlobalState.getState();
   if (users.length === 0) {
     return;
   }

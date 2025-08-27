@@ -1,8 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Users } from "lucide-react";
+import { clearAllUsers } from "@/lib/user-management";
 
-export default function ClearControlsCard({ clearAllUsers }) {
+export default function ClearControlsCard() {
+
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

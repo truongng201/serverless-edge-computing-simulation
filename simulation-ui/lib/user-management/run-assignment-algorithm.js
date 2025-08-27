@@ -3,7 +3,7 @@ import { calculateDistance } from "../helper";
 
 export const runAssignmentAlgorithm = () => {
   const { users, edgeNodes, centralNodes, assignmentAlgorithm, setUsers } =
-    useGlobalState();
+    useGlobalState.getState();
   if (users.length === 0) {
     return;
   }

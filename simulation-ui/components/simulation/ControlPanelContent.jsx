@@ -19,13 +19,12 @@ import { generateSaigonRoadNetwork } from "@/lib/road-network";
 import { generateStreetMapUsers } from "@/lib/street-map-users";
 import useGlobalState from "@/hooks/use-global-state";
 import { calculateLatency } from "@/lib/helper";
-import { runGAPAssignment } from "@/lib/user-management";
+import { runGAPAssignment, clearAllUsers } from "@/lib/user-management";
 
 export default function ControlPanelContent({
   addCentralNode,
   removeCentralNode,
   deleteSelectedNode,
-  clearAllUsers,
   zoomIn,
   zoomOut,
   resetZoom,
@@ -65,27 +64,6 @@ export default function ControlPanelContent({
     setSelectedEdge,
   } = useGlobalState();
 
-  // Helper function to clear all users from backend
-  const clearAllUsersFromBackend = async () => {
-    try {
-      if (process.env.NEXT_PUBLIC_API_URL) {
-        const response = await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/delete_all_users`,
-          {
-            method: "DELETE",
-          }
-        );
-
-        if (response.ok) {
-          console.log("All users cleared from backend");
-        } else {
-          console.warn("Failed to clear users from backend:", response.status);
-        }
-      }
-    } catch (error) {
-      console.error("Error clearing users from backend:", error);
-    }
-  };
 
   // Function to run GAP batch assignment
   const runGAPBatch = () => {
@@ -237,7 +215,7 @@ export default function ControlPanelContent({
       setDataError("");
 
       // Clear existing users from backend first
-      await clearAllUsersFromBackend();
+      await clearAllUsers();
 
       // Generate Saigon road network
       const newRoadNetwork = generateSaigonRoadNetwork(1200, 800); // Adjust to canvas size
@@ -422,8 +400,7 @@ export default function ControlPanelContent({
       await initializeStreetMapScenario();
     } else if (scenario === "none") {
       // Clear users for manual adding and from backend
-      await clearAllUsersFromBackend();
-      clearAllUsers();
+      await clearAllUsers();
       setRoadNetwork(null); // Clear road network
     }
   };
@@ -645,7 +622,7 @@ export default function ControlPanelContent({
       <div className="pt-8">
         <EditModeCard deleteSelectedNode={deleteSelectedNode} />
 
-        <ClearControlsCard clearAllUsers={clearAllUsers} />
+        <ClearControlsCard />
 
         <NodePlacementCard />
 

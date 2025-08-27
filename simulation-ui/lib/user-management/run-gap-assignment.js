@@ -3,7 +3,7 @@ import { solveGAP, getGAPStats } from "./gap-solver";
 
 // Run GAP assignment for all users (more efficient than per-user)
 export const runGAPAssignment = () => {
-  const { users, edgeNodes, centralNodes, setUsers } = useGlobalState();
+  const { users, edgeNodes, centralNodes, setUsers } = useGlobalState.getState();
   if (users.length === 0) {
     return;
   }

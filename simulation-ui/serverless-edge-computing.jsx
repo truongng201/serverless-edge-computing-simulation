@@ -78,8 +78,6 @@ export default function Component() {
         setSelectedEdge,
         setSelectedCentral
       ),
-    clearAllUsers: async () =>
-      await NodeManagement.clearAllUsers(setUsers, setSelectedUser),
   };
 
   // Animation loop
@@ -132,7 +130,6 @@ export default function Component() {
           addCentralNode={nodeActions.addCentralNode}
           removeCentralNode={nodeActions.removeCentralNode}
           deleteSelectedNode={nodeActions.deleteSelectedNode}
-          clearAllUsers={nodeActions.clearAllUsers}
           getCursorStyle={eventHandlers.getCursorStyle}
           updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
         />
