@@ -4,12 +4,8 @@ import { Progress } from "@/components/ui/progress";
 import { Plus, Minus, RotateCcw } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
 
-export default function ZoomControlsCard({
-  zoomIn,
-  zoomOut,
-  resetZoom,
-}) {
-  const {zoomLevel} = useGlobalState();
+export default function ZoomControlsCard() {
+  const { zoomLevel, setZoomLevel } = useGlobalState();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -18,7 +14,7 @@ export default function ZoomControlsCard({
       <CardContent className="space-y-3">
         <div className="flex gap-2">
           <Button
-            onClick={zoomIn}
+            onClick={() => setZoomLevel((prev) => Math.min(prev * 1.2, 5))}
             size="sm"
             variant="outline"
             className="flex-1"
@@ -27,7 +23,7 @@ export default function ZoomControlsCard({
             Zoom In
           </Button>
           <Button
-            onClick={zoomOut}
+            onClick={() => setZoomLevel((prev) => Math.max(prev / 1.2, 0.2))}
             size="sm"
             variant="outline"
             className="flex-1"
@@ -36,15 +32,6 @@ export default function ZoomControlsCard({
             Zoom Out
           </Button>
         </div>
-        <Button
-          onClick={resetZoom}
-          size="sm"
-          variant="outline"
-          className="w-full"
-        >
-          <RotateCcw className="w-4 h-4 mr-2" />
-          Reset View
-        </Button>
         <div className="space-y-2">
           <div className="flex justify-between text-xs">
             <span>Zoom Level</span>

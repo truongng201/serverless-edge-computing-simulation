@@ -21,12 +21,8 @@ import { useCanvasDrawing } from "@/lib/canvas-drawing";
 
 export default function Component() {
   // Get all state from the custom hook
-  const {
-    leftPanelOpen,
-    setLeftPanelOpen,
-    rightPanelOpen,
-    setRightPanelOpen,
-  } = useGlobalState();
+  const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } =
+    useGlobalState();
 
   // Get event handlers
   const eventHandlers = useEventHandlers();
@@ -36,7 +32,6 @@ export default function Component() {
 
   // Get canvas drawing
   const { draw } = useCanvasDrawing();
-
 
   // Animation loop
   useEffect(() => {
@@ -72,11 +67,7 @@ export default function Component() {
 
       {/* Left Control Panel */}
       <ControlPanel>
-        <ControlPanelContent
-          zoomIn={eventHandlers.zoomIn}
-          zoomOut={eventHandlers.zoomOut}
-          resetZoom={eventHandlers.resetZoom}
-        />
+        <ControlPanelContent />
       </ControlPanel>
 
       {/* Right Metrics Panel */}

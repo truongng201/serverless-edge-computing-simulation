@@ -22,9 +22,6 @@ import { calculateLatency } from "@/lib/helper";
 import { runGAPAssignment, clearAllUsers } from "@/lib/user-management";
 
 export default function ControlPanelContent({
-  zoomIn,
-  zoomOut,
-  resetZoom,
   simulationMode,
   setRealModeData,
 }) {
@@ -577,9 +574,6 @@ export default function ControlPanelContent({
         />
 
         <ZoomControlsCard
-          zoomIn={zoomIn}
-          zoomOut={zoomOut}
-          resetZoom={resetZoom}
         />
 
         <ModelSelectionCard />

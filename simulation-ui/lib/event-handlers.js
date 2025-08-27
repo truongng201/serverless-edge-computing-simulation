@@ -518,19 +518,7 @@ export const useEventHandlers = (state) => {
     setIsDragging,
   ]);
 
-  // Zoom functions
-  const zoomIn = useCallback(
-    () => setZoomLevel((prev) => Math.min(prev * 1.2, 5)),
-    [setZoomLevel]
-  );
-  const zoomOut = useCallback(
-    () => setZoomLevel((prev) => Math.max(prev / 1.2, 0.2)),
-    [setZoomLevel]
-  );
-  const resetZoom = useCallback(() => {
-    setZoomLevel(1);
-    setPanOffset({ x: 0, y: 0 });
-  }, [setZoomLevel, setPanOffset]);
+  
 
   const handleWheel = useCallback(
     (event) => {
@@ -570,9 +558,6 @@ export const useEventHandlers = (state) => {
     handleMouseMove,
     handleMouseUp,
     handleWheel,
-    zoomIn,
-    zoomOut,
-    resetZoom,
     getCursorStyle,
   };
 };
