@@ -21,15 +21,11 @@ import useGlobalState from "@/hooks/use-global-state";
 import { calculateLatency } from "@/lib/helper";
 import { runGAPAssignment, clearAllUsers } from "@/lib/user-management";
 
-export default function ControlPanelContent({
-  simulationMode,
-  setRealModeData,
-}) {
+export default function ControlPanelContent() {
   const [loadingData, setLoadingData] = useState(false);
   const [dataError, setDataError] = useState("");
   const [simulationLoading, setSimulationLoading] = useState(false);
   const intervalRef = useRef(null);
-  const realModeIntervalRef = useRef(null);
   const {
     users,
     setUsers,
@@ -51,6 +47,7 @@ export default function ControlPanelContent({
     selectedCentral,
     centralNodes,
     setCentralNodes,
+    setRealModeData,
   } = useGlobalState();
 
   // Function to run GAP batch assignment
@@ -423,30 +420,9 @@ export default function ControlPanelContent({
     return () => clearInterval(interval);
   }, [edgeNodes, centralNodes, users]);
 
-  // Handle simulation speed changes in real mode - this should run continuously when in real mode
-  useEffect(() => {
-    if (simulationMode === "real") {
-      // Clear any existing interval first
-      if (realModeIntervalRef.current) {
-        clearInterval(realModeIntervalRef.current);
-      }
-
-      // Set up new interval for real mode - this runs regardless of simulation state
-      const intervalMs = Math.max(1000, 5000 / simulationSpeed[0]);
-      realModeIntervalRef.current = setInterval(
-        fetchRealClusterStatus,
-        intervalMs
-      );
-    } else if (realModeIntervalRef.current) {
-      // Only clear interval if we're switching away from real mode
-      clearInterval(realModeIntervalRef.current);
-      realModeIntervalRef.current = null;
-    }
-  }, [simulationSpeed]);
-
   // Handle simulation state changes - start/stop data polling when simulation starts/stops
   useEffect(() => {
-    if (isSimulating && simulationMode !== "real") {
+    if (isSimulating) {
       // Start polling for simulation updates when simulation is running (but not in real mode)
       // Real mode has its own polling mechanism above
       if (intervalRef.current) {
@@ -461,7 +437,7 @@ export default function ControlPanelContent({
       clearInterval(intervalRef.current);
       intervalRef.current = null;
     }
-  }, [isSimulating, simulationSpeed, simulationMode]);
+  }, [isSimulating, simulationSpeed]);
 
   // Function to start simulation via API
   const handleStartSimulation = async () => {
@@ -573,8 +549,7 @@ export default function ControlPanelContent({
           simulationLoading={simulationLoading}
         />
 
-        <ZoomControlsCard
-        />
+        <ZoomControlsCard />
 
         <ModelSelectionCard />
 
