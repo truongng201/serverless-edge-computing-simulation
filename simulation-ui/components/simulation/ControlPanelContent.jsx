@@ -22,16 +22,12 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export default function ControlPanelContent({
   users,
   setUsers,
-  edgeNodes,
-  setEdgeNodes,
   centralNodes,
   setCentralNodes,
   selectedUser,
   selectedEdge,
   setSelectedEdge,
   selectedCentral,
-  edgeCoverage,
-  setEdgeCoverage,
   centralCoverage,
   setCentralCoverage,
   deleteSelectedUser,
@@ -72,7 +68,11 @@ export default function ControlPanelContent({
     setSelectedScenario,
     simulationSpeed,
     setLiveData,
-    setRoadNetwork
+    setRoadNetwork,
+    edgeNodes,
+    setEdgeNodes,
+    edgeCoverage,
+    setEdgeCoverage
   } = useSimulationStore();
 
   // Helper function to clear all users from backend
@@ -467,6 +467,45 @@ export default function ControlPanelContent({
     };
   }, []);
 
+  // Periodic auto (re)assignment every 10s: pick min latency among all edges and centrals
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if ((edgeNodes?.length || 0) + (centralNodes?.length || 0) === 0) return;
+      if (!users || users.length === 0) return;
+
+      setUsers((prev) => prev.map((u) => {
+        let bestLatency = Number.POSITIVE_INFINITY;
+        let bestType = null;
+        let bestId = null;
+
+        // Evaluate all edges
+        for (let i = 0; i < edgeNodes.length; i++) {
+          const n = edgeNodes[i];
+          const lat = calculateLatency(u, n.id, "edge", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
+          if (lat < bestLatency) { bestLatency = lat; bestType = "edge"; bestId = n.id; }
+        }
+
+        // Evaluate all centrals
+        for (let i = 0; i < centralNodes.length; i++) {
+          const c = centralNodes[i];
+          const lat = calculateLatency(u, c.id, "central", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
+          if (lat < bestLatency) { bestLatency = lat; bestType = "central"; bestId = c.id; }
+        }
+
+        if (!bestType || !bestId || !isFinite(bestLatency)) return u;
+
+        return {
+          ...u,
+          assignedEdge: bestType === "edge" ? bestId : null,
+          assignedCentral: bestType === "central" ? bestId : null,
+          latency: bestLatency,
+        };
+      }));
+    }, 10000);
+
+    return () => clearInterval(interval);
+  }, [edgeNodes, centralNodes, users]);
+
   // Handle simulation speed changes in real mode - this should run continuously when in real mode
   useEffect(() => {
     if (simulationMode === "real") {
@@ -648,7 +687,6 @@ export default function ControlPanelContent({
           setPlacementAlgorithm={setPlacementAlgorithm}
           runPlacementAlgorithm={runPlacementAlgorithm}
           users={users}
-          edgeNodes={edgeNodes}
         />
 
         <UserAssignmentCard
@@ -657,7 +695,6 @@ export default function ControlPanelContent({
           runAssignmentAlgorithm={runAssignmentAlgorithm}
           runGAPBatch={runGAPBatch}
           users={users}
-          edgeNodes={edgeNodes}
           centralNodes={centralNodes}
         />
 

@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Target, MapPin } from "lucide-react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function UserAssignmentCard({
   assignmentAlgorithm,
@@ -16,9 +17,9 @@ export default function UserAssignmentCard({
   runAssignmentAlgorithm,
   runGAPBatch,
   users,
-  edgeNodes,
   centralNodes,
 }) {
+  const {edgeNodes} = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

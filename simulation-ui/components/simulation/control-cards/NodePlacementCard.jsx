@@ -10,14 +10,15 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Target, MapPin } from "lucide-react";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function NodePlacementCard({
   placementAlgorithm,
   setPlacementAlgorithm,
   runPlacementAlgorithm,
   users,
-  edgeNodes,
 }) {
+  const {edgeNodes} = useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

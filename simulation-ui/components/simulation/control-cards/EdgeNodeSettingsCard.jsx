@@ -1,11 +1,13 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
+import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function EdgeNodeSettingsCard({
-  edgeCoverage,
   handleEdgeCoverageChange,
 }) {
+  const {edgeCoverage} = useSimulationStore()
+  console.log(edgeCoverage)
   return (
     <Card>
       <CardHeader className="pb-2">

@@ -2,25 +2,27 @@ import {
   updateStreetMapUsers,
   spawnNewStreetMapUsers,
   simulateServerlessFunctions,
-  autoAssignStreetMapUsers
+  autoAssignStreetMapUsers,
 } from "./street-map-users";
 import { updateTrafficLights } from "./road-network";
-import { use, useCallback, useRef } from "react";
+import { useCallback, useRef } from "react";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
 // Simulation Functions
 export const useSimulationLogic = (state, actions) => {
-  const {
-    roadMode,
-    roads,
-    edgeNodes,
-    centralNodes,
-    assignmentAlgorithm,
-    simulationMode,
-  } = state;
+  const { roadMode, roads, centralNodes, assignmentAlgorithm, simulationMode } =
+    state;
 
   const { setUsers } = actions;
-  const { userSpeed, isSimulating, selectedScenario, simulationSpeed, roadNetwork, setRoadNetwork } = useSimulationStore();
+  const {
+    userSpeed,
+    isSimulating,
+    selectedScenario,
+    simulationSpeed,
+    roadNetwork,
+    setRoadNetwork,
+    edgeNodes,
+  } = useSimulationStore();
 
   // Step counter for periodic operations in demo mode
   const stepCounterRef = useRef(0);
@@ -32,14 +34,16 @@ export const useSimulationLogic = (state, actions) => {
     // Handle street map scenario client-side simulation
     if (selectedScenario === "scenario4" && roadNetwork) {
       // Update traffic lights
-      const updatedTrafficLights = updateTrafficLights(roadNetwork.trafficLights);
-      setRoadNetwork(prevNetwork => ({
+      const updatedTrafficLights = updateTrafficLights(
+        roadNetwork.trafficLights
+      );
+      setRoadNetwork((prevNetwork) => ({
         ...prevNetwork,
-        trafficLights: updatedTrafficLights
+        trafficLights: updatedTrafficLights,
       }));
 
       // Update street map users
-      setUsers(prevUsers => {
+      setUsers((prevUsers) => {
         let updatedUsers = updateStreetMapUsers(
           prevUsers,
           { ...roadNetwork, trafficLights: updatedTrafficLights },
@@ -80,10 +84,23 @@ export const useSimulationLogic = (state, actions) => {
     // For other scenarios, backend manages the simulation
     // Client-side simulation logic is disabled to avoid conflicts
     return;
-  }, [isSimulating, simulationSpeed, roadMode, roads, userSpeed, setUsers, selectedScenario, roadNetwork, setRoadNetwork, edgeNodes, centralNodes, assignmentAlgorithm]);
+  }, [
+    isSimulating,
+    simulationSpeed,
+    roadMode,
+    roads,
+    userSpeed,
+    setUsers,
+    selectedScenario,
+    roadNetwork,
+    setRoadNetwork,
+    edgeNodes,
+    centralNodes,
+    assignmentAlgorithm,
+  ]);
 
   return {
-    simulationStep
+    simulationStep,
   };
 };
 

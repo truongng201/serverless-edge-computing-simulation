@@ -30,7 +30,16 @@ import * as UserManagement from "@/lib/user-management";
 export default function Component() {
   // Get all state from the custom hook
   const state = useSimulationState();
-  const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } = useSimulationStore();
+  const {
+    leftPanelOpen,
+    setLeftPanelOpen,
+    rightPanelOpen,
+    setRightPanelOpen,
+    edgeNodes,
+    setEdgeNodes,
+    edgeCoverage,
+    setEdgeCoverage
+  } = useSimulationStore();
 
   // Get event handlers
   const eventHandlers = useEventHandlers(state, state);
@@ -41,22 +50,11 @@ export default function Component() {
   // Get canvas drawing
   const { draw } = useCanvasDrawing(state);
 
-
   // Create action objects for easier prop passing
   const nodeActions = {
     addEdgeNode: () =>
-      NodeManagement.addEdgeNode(
-        state.edgeNodes,
-        state.edgeCoverage,
-        state.setEdgeNodes
-      ),
-    removeEdgeNode: () =>
-      NodeManagement.removeEdgeNode(
-        state.edgeNodes,
-        state.selectedEdge,
-        state.setEdgeNodes,
-        state.setSelectedEdge
-      ),
+      NodeManagement.addEdgeNode(edgeNodes, edgeCoverage, setEdgeNodes),
+    removeEdgeNode: () => NodeManagement.removeEdgeNode(),
     addCentralNode: () =>
       NodeManagement.addCentralNode(
         state.centralNodes,
@@ -74,7 +72,7 @@ export default function Component() {
       NodeManagement.deleteSelectedNode(
         state.selectedEdge,
         state.selectedCentral,
-        state.setEdgeNodes,
+        setEdgeNodes,
         state.setCentralNodes,
         state.setSelectedEdge,
         state.setSelectedCentral
@@ -100,17 +98,18 @@ export default function Component() {
     runPlacementAlgorithm: () =>
       runPlacementAlgorithm(
         state.users,
-        state.edgeNodes,
+        edgeNodes,
         state.placementAlgorithm,
-        state.setEdgeNodes,
+        setEdgeNodes,
         state.setUsers
       ),
     runAssignmentAlgorithm: () =>
       runAssignmentAlgorithm(
         state.users,
-        state.edgeNodes,
+        edgeNodes,
         state.centralNodes,
         state.assignmentAlgorithm,
+        setEdgeNodes,
         state.setUsers
       ),
     runGAPAssignment: runGAPAssignment,
@@ -153,8 +152,6 @@ export default function Component() {
         <ControlPanelContent
           users={state.users}
           setUsers={state.setUsers}
-          edgeNodes={state.edgeNodes}
-          setEdgeNodes={state.setEdgeNodes}
           centralNodes={state.centralNodes}
           setCentralNodes={state.setCentralNodes}
           selectedUser={state.selectedUser}
@@ -166,8 +163,6 @@ export default function Component() {
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
-          edgeCoverage={state.edgeCoverage}
-          setEdgeCoverage={state.setEdgeCoverage}
           centralCoverage={state.centralCoverage}
           setCentralCoverage={state.setCentralCoverage}
           simulationData={state.simulationData}
@@ -205,7 +200,6 @@ export default function Component() {
       <MetricsPanel>
         <MetricsPanelContent
           users={state.users}
-          edgeNodes={state.edgeNodes}
           centralNodes={state.centralNodes}
           selectedUser={state.selectedUser}
           setSelectedUser={state.setSelectedUser}
