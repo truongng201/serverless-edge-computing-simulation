@@ -1,8 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export default function CurrentAlgorithmCard() {
-  const { selectedModel, models } = useSimulationStore();
+  const { selectedModel, models } = useGlobalState();
   return (
     <Card>
       <CardHeader className="pb-2">

@@ -1,9 +1,9 @@
 import React from "react";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 // MetricsPanel: Right side panel with system metrics, node/user status, algorithm info
 export default function MetricsPanel(props) {
-  const { rightPanelOpen } = useSimulationStore();
+  const { rightPanelOpen } = useGlobalState();
   return (
     <div
       className={`absolute right-0 top-0 h-full bg-white shadow-lg transition-transform duration-300 ${

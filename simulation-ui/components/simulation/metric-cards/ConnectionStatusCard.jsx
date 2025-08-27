@@ -1,9 +1,9 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 import { Timer } from "lucide-react";
 
 export default function ConnectionStatusCard() {
-  const { selectedUser, setSelectedUser, users } = useSimulationStore();
+  const { selectedUser, setSelectedUser, users } = useGlobalState();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

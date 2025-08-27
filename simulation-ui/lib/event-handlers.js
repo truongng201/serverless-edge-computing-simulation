@@ -1,6 +1,6 @@
 import { useCallback } from "react";
 import { calculateDistance } from "./helper";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 // Event Handlers
 export const useEventHandlers = (state) => {
@@ -44,7 +44,7 @@ export const useEventHandlers = (state) => {
     setUsers,
     roads,
     roadMode
-  } = useSimulationStore();
+  } = useGlobalState();
 
   // Handle canvas click to add users or select nodes
   const handleCanvasClick = useCallback(

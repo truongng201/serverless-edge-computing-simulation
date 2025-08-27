@@ -1,10 +1,10 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export default function EdgeNodeSettingsCard({ handleEdgeCoverageChange }) {
-  const { edgeCoverage } = useSimulationStore();
+  const { edgeCoverage } = useGlobalState();
 
   return (
     <Card>

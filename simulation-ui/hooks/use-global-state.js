@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-const useSimulationStore = create((set) => ({
+const useGlobalState = create((set) => ({
   // Canvas ref
   canvasRef: { current: null },
   setCanvasRef: (ref) => set({ canvasRef: ref }),
@@ -309,4 +309,4 @@ const useSimulationStore = create((set) => ({
 
 }));
 
-export default useSimulationStore;
+export default useGlobalState;

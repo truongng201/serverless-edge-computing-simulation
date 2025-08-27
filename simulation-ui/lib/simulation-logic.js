@@ -6,7 +6,7 @@ import {
 } from "./street-map-users";
 import { updateTrafficLights } from "./road-network";
 import { useCallback, useRef } from "react";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 // Simulation Functions
 export const useSimulationLogic = (state, actions) => {
@@ -24,7 +24,7 @@ export const useSimulationLogic = (state, actions) => {
     setUsers,
     roadMode,
     roads
-  } = useSimulationStore();
+  } = useGlobalState();
 
   // Step counter for periodic operations in demo mode
   const stepCounterRef = useRef(0);
@@ -107,7 +107,7 @@ export const useSimulationLogic = (state, actions) => {
 };
 
 export const getEditModeDescription = () => {
-  const { editMode } = useSimulationStore();
+  const { editMode } = useGlobalState();
   switch (editMode) {
     case "nodes":
       return "Node Edit: Drag nodes to move • Click to select";

@@ -9,7 +9,7 @@ import {
   drawCentralNodes,
   drawEdgeNodes,
 } from "./draw";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export const useCanvasDrawing = () => {
   const {
@@ -26,7 +26,7 @@ export const useCanvasDrawing = () => {
     users,
     roads,
     showRoads,
-  } = useSimulationStore();
+  } = useGlobalState();
 
   // Drawing function with zoom and pan support
   const draw = useCallback(() => {

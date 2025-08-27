@@ -6,10 +6,10 @@ import {
   ConnectionStatusCard,
   CurrentAlgorithmCard,
 } from "./metric-cards/MetricCards";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export default function MetricsPanelContent() {
-  const { rightPanelOpen, setRightPanelOpen } = useSimulationStore();
+  const { rightPanelOpen, setRightPanelOpen } = useGlobalState();
   return (
     <>
       {/* Close panel - small right arrow button at the very top, outside all cards */}

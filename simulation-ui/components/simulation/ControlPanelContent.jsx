@@ -17,7 +17,7 @@ import { useState, useEffect, useRef } from "react";
 import axios from "axios";
 import { generateSaigonRoadNetwork } from "@/lib/road-network";
 import { generateStreetMapUsers } from "@/lib/street-map-users";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 import {calculateLatency} from "@/lib/helper"
 
 export default function ControlPanelContent({
@@ -70,7 +70,7 @@ export default function ControlPanelContent({
     setCentralNodes,
     selectedEdge,
     setSelectedEdge
-  } = useSimulationStore();
+  } = useGlobalState();
 
   // Helper function to clear all users from backend
   const clearAllUsersFromBackend = async () => {

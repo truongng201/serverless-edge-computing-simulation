@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Target, MapPin } from "lucide-react";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export default function UserAssignmentCard({
   runAssignmentAlgorithm,
@@ -21,7 +21,7 @@ export default function UserAssignmentCard({
     setAssignmentAlgorithm,
     centralNodes,
     users,
-  } = useSimulationStore();
+  } = useGlobalState();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

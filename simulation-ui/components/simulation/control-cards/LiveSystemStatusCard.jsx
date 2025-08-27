@@ -2,7 +2,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Server, Database, Play } from "lucide-react";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export default function LiveSystemStatusCard({
   loadingData,
@@ -10,7 +10,7 @@ export default function LiveSystemStatusCard({
   fetchLiveClusterStatus,
   startLiveDataPolling,
 }) {
-  const { liveData } = useSimulationStore();
+  const { liveData } = useGlobalState();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

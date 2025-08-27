@@ -9,7 +9,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Edit3, Trash2 } from "lucide-react";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export default function EditModeCard({
   deleteSelectedUser,
@@ -18,7 +18,7 @@ export default function EditModeCard({
     editMode,
     setEditMode,
     selectedUser
-  } = useSimulationStore();
+  } = useGlobalState();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

@@ -4,7 +4,7 @@ import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
 import { Play, Pause, RotateCcw } from "lucide-react";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export default function SimulationControlsCard({
   handleToggleSimulation,
@@ -18,7 +18,7 @@ export default function SimulationControlsCard({
     predictionEnabled,
     setPredictionEnabled,
     users
-  } = useSimulationStore();
+  } = useGlobalState();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

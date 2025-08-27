@@ -2,10 +2,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Database, Server } from "lucide-react";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 export default function LiveSystemMetricsCard() {
-  const { liveData } = useSimulationStore();
+  const { liveData } = useGlobalState();
 
   if (!liveData) {
     return null;

@@ -1,5 +1,5 @@
 import { React, useEffect } from "react";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 
 // SimulationCanvas: Handles the canvas drawing and interaction
 export default function SimulationCanvas({
@@ -10,7 +10,7 @@ export default function SimulationCanvas({
   handleWheel,
   getCursorStyle,
 }) {
-  const { canvasRef, setCanvasRef } = useSimulationStore();
+  const { canvasRef, setCanvasRef } = useGlobalState();
   useEffect(() => {
     const ref = { current: null };
     setCanvasRef(ref);

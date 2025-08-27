@@ -12,7 +12,7 @@ import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 
 // Import custom hooks and utilities
 import { useEventHandlers } from "@/lib/event-handlers";
-import useSimulationStore from "@/hooks/use-simulation-store";
+import useGlobalState from "@/hooks/use-global-state";
 import {
   useSimulationLogic,
   getEditModeDescription,
@@ -50,7 +50,7 @@ export default function Component() {
     users,
     setUsers,
     simulationData,
-  } = useSimulationStore();
+  } = useGlobalState();
 
   // Get event handlers
   const eventHandlers = useEventHandlers();
