@@ -555,52 +555,6 @@ export const useEventHandlers = (state) => {
     [canvasRef, zoomLevel, panOffset, setZoomLevel, setPanOffset]
   );
 
-  const updateEdgeCoverage = useCallback(
-    async (nodeId, newCoverage) => {
-      try {
-        const edgeNode = edgeNodes.find((node) => node.id === nodeId);
-        if (!edgeNode) {
-          console.error("Edge node not found:", nodeId);
-          return;
-        }
-
-        const payload = {
-          node_id: nodeId,
-          coverage: parseFloat(newCoverage),
-          location: {
-            x: Math.round(edgeNode.x),
-            y: Math.round(edgeNode.y),
-          },
-        };
-
-        // Only make API call if NEXT_PUBLIC_API_URL is available
-        if (process.env.NEXT_PUBLIC_API_URL) {
-          const response = await fetch(
-            `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_edge_node`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(payload),
-            }
-          );
-
-          if (!response.ok) {
-            console.error(
-              "Failed to update edge node coverage:",
-              response.statusText
-            );
-            const errorText = await response.text();
-            console.error("Error response:", errorText);
-          }
-        }
-      } catch (error) {
-        console.error("Error updating edge node coverage:", error);
-      }
-    },
-    [edgeNodes]
-  );
 
   const getCursorStyle = useCallback(() => {
     if (isPanning) return "grabbing";
@@ -620,6 +574,5 @@ export const useEventHandlers = (state) => {
     zoomOut,
     resetZoom,
     getCursorStyle,
-    updateEdgeCoverage,
   };
 };

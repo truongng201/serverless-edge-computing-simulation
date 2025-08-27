@@ -2,8 +2,9 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import useGlobalState from "@/hooks/use-global-state";
+import { updateEdgeCoverage } from "@/lib/node-management";
 
-export default function EdgeNodeSettingsCard({ handleEdgeCoverageChange }) {
+export default function EdgeNodeSettingsCard() {
   const { edgeCoverage } = useGlobalState();
 
   return (
@@ -20,7 +21,7 @@ export default function EdgeNodeSettingsCard({ handleEdgeCoverageChange }) {
           <Label className="text-xs">Coverage: {edgeCoverage[0]}px</Label>
           <Slider
             value={edgeCoverage}
-            onValueChange={handleEdgeCoverageChange}
+            onValueChange={updateEdgeCoverage}
             max={1000}
             min={0}
             step={10}

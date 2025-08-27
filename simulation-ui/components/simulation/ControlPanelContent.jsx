@@ -27,7 +27,6 @@ export default function ControlPanelContent({
   resetZoom,
   simulationMode,
   setRealModeData,
-  updateEdgeCoverage,
 }) {
   const [loadingData, setLoadingData] = useState(false);
   const [dataError, setDataError] = useState("");
@@ -50,14 +49,11 @@ export default function ControlPanelContent({
     edgeNodes,
     setEdgeNodes,
     edgeCoverage,
-    setEdgeCoverage,
     centralCoverage,
     setCentralCoverage,
     selectedCentral,
     centralNodes,
     setCentralNodes,
-    selectedEdge,
-    setSelectedEdge,
   } = useGlobalState();
 
   // Function to run GAP batch assignment
@@ -71,44 +67,12 @@ export default function ControlPanelContent({
     }
   };
 
-  // Update coverage slider when selected edge changes
-  useEffect(() => {
-    if (selectedEdge && selectedEdge.coverage !== undefined) {
-      setEdgeCoverage([selectedEdge.coverage]);
-    }
-  }, [selectedEdge, setEdgeCoverage]);
-
   // Update coverage slider when selected central changes
   useEffect(() => {
     if (selectedCentral && selectedCentral.coverage !== undefined) {
       setCentralCoverage([selectedCentral.coverage]);
     }
   }, [selectedCentral, setCentralCoverage]);
-
-  // Handle edge coverage change
-  const handleEdgeCoverageChange = async (newCoverage) => {
-    // Update the slider state
-    setEdgeCoverage(newCoverage);
-
-    // If an edge is selected, update the local edge node coverage and call the API
-    if (selectedEdge) {
-      // Update the local edge node coverage
-      const updatedEdgeNodes = edgeNodes.map((node) =>
-        node.id === selectedEdge.id
-          ? { ...node, coverage: newCoverage[0] }
-          : node
-      );
-      setEdgeNodes(updatedEdgeNodes);
-
-      // Update the selected edge with new coverage
-      setSelectedEdge({ ...selectedEdge, coverage: newCoverage[0] });
-
-      // Call the API to update the backend if the function is available
-      if (updateEdgeCoverage) {
-        await updateEdgeCoverage(selectedEdge.id, newCoverage[0]);
-      }
-    }
-  };
 
   // Function to fetch DACT sample data
   const fetchDACTSample = async () => {
@@ -624,9 +588,7 @@ export default function ControlPanelContent({
 
         <CentralNodeSettingsCard />
 
-        <EdgeNodeSettingsCard
-          handleEdgeCoverageChange={handleEdgeCoverageChange}
-        />
+        <EdgeNodeSettingsCard />
       </div>
     </>
   );

@@ -76,7 +76,6 @@ export default function Component() {
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
-          updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
         />
       </ControlPanel>
 
