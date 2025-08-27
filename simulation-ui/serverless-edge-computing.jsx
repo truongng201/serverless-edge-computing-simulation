@@ -42,7 +42,9 @@ export default function Component() {
     assignmentAlgorithm,
     centralCoverage,
     centralNodes,
-    setCentralNodes
+    setCentralNodes,
+    setSelectedUser,
+    selectedUser
   } = useSimulationStore();
 
   // Get event handlers
@@ -82,7 +84,7 @@ export default function Component() {
         state.setSelectedCentral
       ),
     clearAllUsers: async () =>
-      await NodeManagement.clearAllUsers(state.setUsers, state.setSelectedUser),
+      await NodeManagement.clearAllUsers(state.setUsers, setSelectedUser),
     resetSimulation: () => {
       NodeManagement.resetSimulation(() => nodeActions.clearEverything());
       // Also reset the simulation data if available
@@ -95,9 +97,9 @@ export default function Component() {
   const userActions = {
     deleteSelectedUser: async () =>
       await UserManagement.deleteSelectedUser(
-        state.selectedUser,
+        selectedUser,
         state.setUsers,
-        state.setSelectedUser
+        setSelectedUser
       ),
     runPlacementAlgorithm: () =>
       runPlacementAlgorithm(
@@ -156,8 +158,6 @@ export default function Component() {
         <ControlPanelContent
           users={state.users}
           setUsers={state.setUsers}
-          selectedUser={state.selectedUser}
-          setSelectedUser={state.setSelectedUser}
           selectedEdge={state.selectedEdge}
           setSelectedEdge={state.setSelectedEdge}
           selectedCentral={state.selectedCentral}
@@ -196,8 +196,6 @@ export default function Component() {
       <MetricsPanel>
         <MetricsPanelContent
           users={state.users}
-          selectedUser={state.selectedUser}
-          setSelectedUser={state.setSelectedUser}
           selectedEdge={state.selectedEdge}
           setSelectedEdge={state.setSelectedEdge}
           selectedCentral={state.selectedCentral}

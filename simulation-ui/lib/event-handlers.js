@@ -6,7 +6,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export const useEventHandlers = (state, actions) => {
   const {
     users,
-    selectedUser,
     selectedEdge,
     selectedCentral,
     roadMode,
@@ -41,11 +40,12 @@ export const useEventHandlers = (state, actions) => {
     edgeNodes,
     setEdgeNodes,
     centralNodes,
-    setCentralNodes
+    setCentralNodes,
+    selectedUser,
+    setSelectedUser
   } = useSimulationStore();
 
   const {
-    setSelectedUser,
     setSelectedEdge,
     setSelectedCentral,
     setUsers,

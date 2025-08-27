@@ -5,7 +5,6 @@ export function useSimulationState() {
 
 
   // UI State
-  const [selectedUser, setSelectedUser] = useState(null);
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [selectedCentral, setSelectedCentral] = useState(null);
 
@@ -13,8 +12,6 @@ export function useSimulationState() {
   return {
     users,
     setUsers,
-    selectedUser,
-    setSelectedUser,
     selectedEdge,
     setSelectedEdge,
     selectedCentral,

@@ -10,8 +10,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function MetricsPanelContent({
   users,
-  selectedUser,
-  setSelectedUser,
 }) {
   const { rightPanelOpen, setRightPanelOpen } = useSimulationStore();
   return (
@@ -41,8 +39,6 @@ export default function MetricsPanelContent({
 
         <ConnectionStatusCard
           users={users}
-          selectedUser={selectedUser}
-          setSelectedUser={setSelectedUser}
         />
 
         <CurrentAlgorithmCard
