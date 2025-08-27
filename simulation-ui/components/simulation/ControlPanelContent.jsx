@@ -143,17 +143,17 @@ export default function ControlPanelContent() {
       <div className="pt-8">
         <EditModeCard />
 
+        <LiveSystemStatusCard startLiveDataPolling={startLiveDataPolling} />
+
+        <SimulationControlsCard />
+
         <ClearControlsCard />
+
+        <ScenarioSelectionCard />
 
         <NodePlacementCard />
 
         <UserAssignmentCard runGAPBatch={runGAPBatch} />
-
-        <LiveSystemStatusCard startLiveDataPolling={startLiveDataPolling} />
-
-        <ScenarioSelectionCard />
-
-        <SimulationControlsCard />
 
         <ZoomControlsCard />
 
