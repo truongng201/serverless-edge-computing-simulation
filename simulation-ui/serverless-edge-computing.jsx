@@ -30,8 +30,6 @@ export default function Component() {
     edgeNodes,
     setEdgeNodes,
     edgeCoverage,
-    placementAlgorithm,
-    assignmentAlgorithm,
     centralCoverage,
     centralNodes,
     setCentralNodes,
@@ -40,7 +38,6 @@ export default function Component() {
     setSelectedEdge,
     selectedCentral,
     setSelectedCentral,
-    users,
     setUsers,
     simulationData,
   } = useGlobalState();
