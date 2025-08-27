@@ -9,7 +9,7 @@ import { useCallback, useRef } from "react";
 import useGlobalState from "@/hooks/use-global-state";
 
 // Simulation Functions
-export const useSimulationLogic = (state, actions) => {
+export const useSimulationLogic = () => {
 
   const {
     userSpeed,
