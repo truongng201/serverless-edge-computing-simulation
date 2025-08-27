@@ -1,0 +1,1 @@
+// Handle canvas click to add users or select nodes

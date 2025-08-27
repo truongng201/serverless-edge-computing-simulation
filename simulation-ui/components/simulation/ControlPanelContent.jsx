@@ -22,9 +22,6 @@ import { calculateLatency } from "@/lib/helper";
 import { runGAPAssignment, clearAllUsers } from "@/lib/user-management";
 
 export default function ControlPanelContent({
-  addCentralNode,
-  removeCentralNode,
-  deleteSelectedNode,
   zoomIn,
   zoomOut,
   resetZoom,
@@ -57,13 +54,11 @@ export default function ControlPanelContent({
     centralCoverage,
     setCentralCoverage,
     selectedCentral,
-    setSelectedCentral,
     centralNodes,
     setCentralNodes,
     selectedEdge,
     setSelectedEdge,
   } = useGlobalState();
-
 
   // Function to run GAP batch assignment
   const runGAPBatch = () => {
@@ -112,31 +107,6 @@ export default function ControlPanelContent({
       if (updateEdgeCoverage) {
         await updateEdgeCoverage(selectedEdge.id, newCoverage[0]);
       }
-    }
-  };
-
-  // Handle central coverage change
-  const handleCentralCoverageChange = async (newCoverage) => {
-    // Update the slider state
-    setCentralCoverage(newCoverage);
-
-    // If a central node is selected, update the local central node coverage
-    if (selectedCentral) {
-      // Update the local central node coverage
-      const updatedCentralNodes = centralNodes.map((node) =>
-        node.id === selectedCentral.id
-          ? { ...node, coverage: newCoverage[0] }
-          : node
-      );
-      setCentralNodes(updatedCentralNodes);
-
-      // Update the selected central with new coverage
-      setSelectedCentral({ ...selectedCentral, coverage: newCoverage[0] });
-
-      // Note: Add API call here when central node coverage update API is available
-      // if (updateCentralCoverage) {
-      //   await updateCentralCoverage(selectedCentral.id, newCoverage[0]);
-      // }
     }
   };
 
@@ -620,7 +590,7 @@ export default function ControlPanelContent({
         </button>
       </div>
       <div className="pt-8">
-        <EditModeCard deleteSelectedNode={deleteSelectedNode} />
+        <EditModeCard />
 
         <ClearControlsCard />
 
@@ -652,15 +622,9 @@ export default function ControlPanelContent({
 
         <UserSettingsCard />
 
-        <CentralNodeSettingsCard
-          simulationMode={simulationMode}
-          addCentralNode={addCentralNode}
-          removeCentralNode={removeCentralNode}
-          handleCentralCoverageChange={handleCentralCoverageChange}
-        />
+        <CentralNodeSettingsCard />
 
         <EdgeNodeSettingsCard
-          edgeCoverage={edgeCoverage}
           handleEdgeCoverageChange={handleEdgeCoverageChange}
         />
       </div>

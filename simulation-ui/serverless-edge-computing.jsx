@@ -76,14 +76,6 @@ export default function Component() {
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
-          simulationStep={simulationStep}
-          handleCanvasClick={eventHandlers.handleCanvasClick}
-          handleMouseDown={eventHandlers.handleMouseDown}
-          handleMouseMove={eventHandlers.handleMouseMove}
-          handleMouseUp={eventHandlers.handleMouseUp}
-          handleWheel={eventHandlers.handleWheel}
-          draw={draw}
-          getCursorStyle={eventHandlers.getCursorStyle}
           updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
         />
       </ControlPanel>
