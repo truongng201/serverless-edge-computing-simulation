@@ -1,0 +1,1 @@
+export { getCursorStyle } from "./get-cursor-style";

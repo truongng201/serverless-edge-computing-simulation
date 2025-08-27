@@ -1,5 +1,6 @@
 import { React, useEffect } from "react";
 import useGlobalState from "@/hooks/use-global-state";
+import { getCursorStyle } from "@/lib/event-management";
 
 // SimulationCanvas: Handles the canvas drawing and interaction
 export default function SimulationCanvas({
@@ -8,13 +9,14 @@ export default function SimulationCanvas({
   handleMouseMove,
   handleMouseUp,
   handleWheel,
-  getCursorStyle,
 }) {
   const { canvasRef, setCanvasRef } = useGlobalState();
+
   useEffect(() => {
     const ref = { current: null };
     setCanvasRef(ref);
   }, [setCanvasRef]);
+
   return (
     <canvas
       ref={(el) => (canvasRef.current = el)}

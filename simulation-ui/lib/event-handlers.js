@@ -544,13 +544,6 @@ export const useEventHandlers = (state) => {
   );
 
 
-  const getCursorStyle = useCallback(() => {
-    if (isPanning) return "grabbing";
-    if (isDraggingNode || isDraggingUser) return "grabbing";
-    if (editMode === "drag") return "grab";
-    if (editMode !== "none") return "move";
-    return "crosshair";
-  }, [isPanning, isDraggingNode, isDraggingUser, editMode]);
 
   return {
     handleCanvasClick,
@@ -558,6 +551,5 @@ export const useEventHandlers = (state) => {
     handleMouseMove,
     handleMouseUp,
     handleWheel,
-    getCursorStyle,
   };
 };

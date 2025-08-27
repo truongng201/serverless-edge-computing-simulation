@@ -62,7 +62,6 @@ export default function Component() {
         handleMouseMove={eventHandlers.handleMouseMove}
         handleMouseUp={eventHandlers.handleMouseUp}
         handleWheel={eventHandlers.handleWheel}
-        getCursorStyle={eventHandlers.getCursorStyle}
       />
 
       {/* Left Control Panel */}
