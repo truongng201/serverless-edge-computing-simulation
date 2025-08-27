@@ -44,7 +44,9 @@ export default function Component() {
     centralNodes,
     setCentralNodes,
     setSelectedUser,
-    selectedUser
+    selectedUser,
+    selectedEdge,
+    setSelectedEdge
   } = useSimulationStore();
 
   // Get event handlers
@@ -76,11 +78,11 @@ export default function Component() {
       ),
     deleteSelectedNode: () =>
       NodeManagement.deleteSelectedNode(
-        state.selectedEdge,
+        selectedEdge,
         state.selectedCentral,
         setEdgeNodes,
         setCentralNodes,
-        state.setSelectedEdge,
+        setSelectedEdge,
         state.setSelectedCentral
       ),
     clearAllUsers: async () =>
@@ -158,8 +160,6 @@ export default function Component() {
         <ControlPanelContent
           users={state.users}
           setUsers={state.setUsers}
-          selectedEdge={state.selectedEdge}
-          setSelectedEdge={state.setSelectedEdge}
           selectedCentral={state.selectedCentral}
           setSelectedCentral={state.setSelectedCentral}
           zoomIn={eventHandlers.zoomIn}
@@ -196,8 +196,6 @@ export default function Component() {
       <MetricsPanel>
         <MetricsPanelContent
           users={state.users}
-          selectedEdge={state.selectedEdge}
-          setSelectedEdge={state.setSelectedEdge}
           selectedCentral={state.selectedCentral}
           setSelectedCentral={state.setSelectedCentral}
         />

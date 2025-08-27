@@ -22,8 +22,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export default function ControlPanelContent({
   users,
   setUsers,
-  selectedEdge,
-  setSelectedEdge,
   selectedCentral,
   deleteSelectedUser,
   resetSimulation,
@@ -68,7 +66,9 @@ export default function ControlPanelContent({
     setCentralCoverage,
     setSelectedCentral,
     centralNodes,
-    setCentralNodes
+    setCentralNodes,
+    selectedEdge,
+    setSelectedEdge
   } = useSimulationStore();
 
   // Helper function to clear all users from backend
@@ -664,7 +664,6 @@ export default function ControlPanelContent({
       </div>
       <div className="pt-8">
         <EditModeCard
-          selectedEdge={selectedEdge}
           selectedCentral={selectedCentral}
           deleteSelectedNode={deleteSelectedNode}
           deleteSelectedUser={deleteSelectedUser}
