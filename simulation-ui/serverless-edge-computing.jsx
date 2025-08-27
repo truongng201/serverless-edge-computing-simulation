@@ -18,13 +18,7 @@ import {
   getEditModeDescription,
 } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
-import {
-  runPlacementAlgorithm,
-  runAssignmentAlgorithm,
-  runGAPAssignment,
-} from "@/lib/user-management";
 import * as NodeManagement from "@/lib/node-management";
-import * as UserManagement from "@/lib/user-management";
 
 export default function Component() {
   // Get all state from the custom hook
@@ -42,7 +36,6 @@ export default function Component() {
     centralNodes,
     setCentralNodes,
     setSelectedUser,
-    selectedUser,
     selectedEdge,
     setSelectedEdge,
     selectedCentral,
@@ -98,33 +91,7 @@ export default function Component() {
       }
     },
   };
-
-  const userActions = {
-    deleteSelectedUser: async () =>
-      await UserManagement.deleteSelectedUser(
-        selectedUser,
-        setUsers,
-        setSelectedUser
-      ),
-    runPlacementAlgorithm: () =>
-      runPlacementAlgorithm(
-        users,
-        edgeNodes,
-        placementAlgorithm,
-        setEdgeNodes,
-        setUsers
-      ),
-    runAssignmentAlgorithm: () =>
-      runAssignmentAlgorithm(
-        users,
-        edgeNodes,
-        centralNodes,
-        assignmentAlgorithm,
-        setEdgeNodes,
-        setUsers
-      ),
-    runGAPAssignment: runGAPAssignment,
-  };
+  
 
   // Animation loop
   useEffect(() => {
@@ -164,7 +131,6 @@ export default function Component() {
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
-          deleteSelectedUser={userActions.deleteSelectedUser}
           simulationStep={simulationStep}
           handleCanvasClick={eventHandlers.handleCanvasClick}
           handleMouseDown={eventHandlers.handleMouseDown}
@@ -184,9 +150,6 @@ export default function Component() {
           clearEverything={nodeActions.clearEverything}
           getCursorStyle={eventHandlers.getCursorStyle}
           updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
-          runPlacementAlgorithm={userActions.runPlacementAlgorithm}
-          runAssignmentAlgorithm={userActions.runAssignmentAlgorithm}
-          runGAPAssignment={userActions.runGAPAssignment}
         />
       </ControlPanel>
 

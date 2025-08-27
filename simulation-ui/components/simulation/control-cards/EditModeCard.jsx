@@ -10,15 +10,10 @@ import {
 } from "@/components/ui/select";
 import { Edit3, Trash2 } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
+import { deleteSelectedUser } from "@/lib/user-management";
 
-export default function EditModeCard({
-  deleteSelectedUser,
-}) {
-  const {
-    editMode,
-    setEditMode,
-    selectedUser
-  } = useGlobalState();
+export default function EditModeCard() {
+  const { editMode, setEditMode, selectedUser } = useGlobalState();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -60,7 +55,7 @@ export default function EditModeCard({
             )}
           </div>
         )}
-        
+
         {selectedUser && (
           <Button
             onClick={deleteSelectedUser}

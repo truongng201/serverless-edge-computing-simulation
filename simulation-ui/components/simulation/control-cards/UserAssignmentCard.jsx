@@ -10,9 +10,9 @@ import {
 } from "@/components/ui/select";
 import { Target, MapPin } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
+import { runAssignmentAlgorithm } from "@/lib/user-management";
 
 export default function UserAssignmentCard({
-  runAssignmentAlgorithm,
   runGAPBatch,
 }) {
   const {

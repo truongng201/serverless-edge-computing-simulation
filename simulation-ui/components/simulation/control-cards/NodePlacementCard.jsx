@@ -11,8 +11,9 @@ import {
 } from "@/components/ui/select";
 import { Target, MapPin } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
+import { runPlacementAlgorithm } from "@/lib/user-management";
 
-export default function NodePlacementCard({ runPlacementAlgorithm }) {
+export default function NodePlacementCard() {
   const { users, edgeNodes, placementAlgorithm, setPlacementAlgorithm } =
     useGlobalState();
   return (

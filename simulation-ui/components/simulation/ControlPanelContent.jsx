@@ -19,9 +19,9 @@ import { generateSaigonRoadNetwork } from "@/lib/road-network";
 import { generateStreetMapUsers } from "@/lib/street-map-users";
 import useGlobalState from "@/hooks/use-global-state";
 import {calculateLatency} from "@/lib/helper"
+import { runGAPAssignment } from "@/lib/user-management";
 
 export default function ControlPanelContent({
-  deleteSelectedUser,
   resetSimulation,
   addCentralNode,
   removeCentralNode,
@@ -33,9 +33,6 @@ export default function ControlPanelContent({
   zoomIn,
   zoomOut,
   resetZoom,
-  runPlacementAlgorithm,
-  runAssignmentAlgorithm,
-  runGAPAssignment,
   simulationMode,
   setRealModeData,
   updateEdgeCoverage,
@@ -102,11 +99,6 @@ export default function ControlPanelContent({
         enableMemoryConstraints: false,
         debug: true,
       });
-    } else {
-      console.error("runGAPAssignment not available");
-      alert(
-        "GAP batch assignment not available. Please use regular assignment."
-      );
     }
   };
 
@@ -666,7 +658,6 @@ export default function ControlPanelContent({
       <div className="pt-8">
         <EditModeCard
           deleteSelectedNode={deleteSelectedNode}
-          deleteSelectedUser={deleteSelectedUser}
         />
 
         <ClearControlsCard
@@ -677,11 +668,9 @@ export default function ControlPanelContent({
         />
 
         <NodePlacementCard
-          runPlacementAlgorithm={runPlacementAlgorithm}
         />
 
         <UserAssignmentCard
-          runAssignmentAlgorithm={runAssignmentAlgorithm}
           runGAPBatch={runGAPBatch}
         />
 
