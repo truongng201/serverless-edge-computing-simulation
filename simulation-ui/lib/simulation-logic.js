@@ -10,7 +10,7 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 
 // Simulation Functions
 export const useSimulationLogic = (state, actions) => {
-  const { roadMode, roads, centralNodes, assignmentAlgorithm, simulationMode } =
+  const { roadMode, roads, centralNodes } =
     state;
 
   const { setUsers } = actions;
@@ -22,6 +22,7 @@ export const useSimulationLogic = (state, actions) => {
     roadNetwork,
     setRoadNetwork,
     edgeNodes,
+    assignmentAlgorithm
   } = useSimulationStore();
 
   // Step counter for periodic operations in demo mode

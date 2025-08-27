@@ -43,8 +43,6 @@ export default function ControlPanelContent({
   zoomOut,
   resetZoom,
   runPlacementAlgorithm,
-  assignmentAlgorithm,
-  setAssignmentAlgorithm,
   runAssignmentAlgorithm,
   runGAPAssignment,
   simulationMode,
@@ -686,8 +684,6 @@ export default function ControlPanelContent({
         />
 
         <UserAssignmentCard
-          assignmentAlgorithm={assignmentAlgorithm}
-          setAssignmentAlgorithm={setAssignmentAlgorithm}
           runAssignmentAlgorithm={runAssignmentAlgorithm}
           runGAPBatch={runGAPBatch}
           users={users}

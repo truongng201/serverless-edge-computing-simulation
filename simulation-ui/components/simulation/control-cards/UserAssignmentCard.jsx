@@ -12,14 +12,13 @@ import { Target, MapPin } from "lucide-react";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
 export default function UserAssignmentCard({
-  assignmentAlgorithm,
-  setAssignmentAlgorithm,
   runAssignmentAlgorithm,
   runGAPBatch,
   users,
   centralNodes,
 }) {
-  const {edgeNodes} = useSimulationStore();
+  const { edgeNodes, assignmentAlgorithm, setAssignmentAlgorithm } =
+    useSimulationStore();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -39,12 +38,8 @@ export default function UserAssignmentCard({
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="nearest-distance">
-                Nearest Distance
-              </SelectItem>
-              <SelectItem value="nearest-latency">
-                Nearest Latency
-              </SelectItem>
+              <SelectItem value="nearest-distance">Nearest Distance</SelectItem>
+              <SelectItem value="nearest-latency">Nearest Latency</SelectItem>
               <SelectItem value="gap-baseline">GAP Baseline</SelectItem>
               <SelectItem value="random">Random Assignment</SelectItem>
             </SelectContent>
@@ -78,8 +73,7 @@ export default function UserAssignmentCard({
               variant="default"
               className="w-full bg-blue-600 hover:bg-blue-700"
               disabled={
-                !users?.length ||
-                (!edgeNodes.length && !centralNodes.length)
+                !users?.length || (!edgeNodes.length && !centralNodes.length)
               }
             >
               <Target className="w-4 h-4 mr-1" />

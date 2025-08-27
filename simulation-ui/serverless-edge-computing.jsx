@@ -38,7 +38,8 @@ export default function Component() {
     edgeNodes,
     setEdgeNodes,
     edgeCoverage,
-    placementAlgorithm
+    placementAlgorithm,
+    assignmentAlgorithm,
   } = useSimulationStore();
 
   // Get event handlers
@@ -108,7 +109,7 @@ export default function Component() {
         state.users,
         edgeNodes,
         state.centralNodes,
-        state.assignmentAlgorithm,
+        assignmentAlgorithm,
         setEdgeNodes,
         state.setUsers
       ),
@@ -187,8 +188,6 @@ export default function Component() {
           getCursorStyle={eventHandlers.getCursorStyle}
           updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
           runPlacementAlgorithm={userActions.runPlacementAlgorithm}
-          assignmentAlgorithm={state.assignmentAlgorithm}
-          setAssignmentAlgorithm={state.setAssignmentAlgorithm}
           runAssignmentAlgorithm={userActions.runAssignmentAlgorithm}
           runGAPAssignment={userActions.runGAPAssignment}
         />

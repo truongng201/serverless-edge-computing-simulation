@@ -13,9 +13,6 @@ export function useSimulationState() {
   // Central node settings
   const [centralCoverage, setCentralCoverage] = useState([0]);
 
-  // User Assignment state
-  const [assignmentAlgorithm, setAssignmentAlgorithm] = useState("nearest-distance");
-
 
   return {
     users,
@@ -30,7 +27,5 @@ export function useSimulationState() {
     setSelectedCentral,
     centralCoverage,
     setCentralCoverage,
-    assignmentAlgorithm,
-    setAssignmentAlgorithm,
   };
 }
