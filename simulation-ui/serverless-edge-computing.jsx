@@ -18,7 +18,6 @@ import {
   getEditModeDescription,
 } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
-import * as NodeManagement from "@/lib/node-management";
 
 export default function Component() {
   // Get all state from the custom hook
@@ -27,19 +26,6 @@ export default function Component() {
     setLeftPanelOpen,
     rightPanelOpen,
     setRightPanelOpen,
-    edgeNodes,
-    setEdgeNodes,
-    edgeCoverage,
-    centralCoverage,
-    centralNodes,
-    setCentralNodes,
-    setSelectedUser,
-    selectedEdge,
-    setSelectedEdge,
-    selectedCentral,
-    setSelectedCentral,
-    setUsers,
-    simulationData,
   } = useGlobalState();
 
   // Get event handlers
@@ -51,34 +37,6 @@ export default function Component() {
   // Get canvas drawing
   const { draw } = useCanvasDrawing();
 
-  // Create action objects for easier prop passing
-  const nodeActions = {
-    addEdgeNode: () =>
-      NodeManagement.addEdgeNode(edgeNodes, edgeCoverage, setEdgeNodes),
-    removeEdgeNode: () => NodeManagement.removeEdgeNode(),
-    addCentralNode: () =>
-      NodeManagement.addCentralNode(
-        centralNodes,
-        centralCoverage,
-        setCentralNodes
-      ),
-    removeCentralNode: () =>
-      NodeManagement.removeCentralNode(
-        centralNodes,
-        selectedCentral,
-        setCentralNodes,
-        setSelectedCentral
-      ),
-    deleteSelectedNode: () =>
-      NodeManagement.deleteSelectedNode(
-        selectedEdge,
-        selectedCentral,
-        setEdgeNodes,
-        setCentralNodes,
-        setSelectedEdge,
-        setSelectedCentral
-      ),
-  };
 
   // Animation loop
   useEffect(() => {
@@ -125,11 +83,6 @@ export default function Component() {
           handleMouseUp={eventHandlers.handleMouseUp}
           handleWheel={eventHandlers.handleWheel}
           draw={draw}
-          addEdgeNode={nodeActions.addEdgeNode}
-          removeEdgeNode={nodeActions.removeEdgeNode}
-          addCentralNode={nodeActions.addCentralNode}
-          removeCentralNode={nodeActions.removeCentralNode}
-          deleteSelectedNode={nodeActions.deleteSelectedNode}
           getCursorStyle={eventHandlers.getCursorStyle}
           updateEdgeCoverage={eventHandlers.updateEdgeCoverage}
         />
