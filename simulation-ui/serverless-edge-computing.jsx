@@ -40,6 +40,7 @@ export default function Component() {
     edgeCoverage,
     placementAlgorithm,
     assignmentAlgorithm,
+    centralCoverage
   } = useSimulationStore();
 
   // Get event handlers
@@ -59,7 +60,7 @@ export default function Component() {
     addCentralNode: () =>
       NodeManagement.addCentralNode(
         state.centralNodes,
-        state.centralCoverage,
+        centralCoverage,
         state.setCentralNodes
       ),
     removeCentralNode: () =>
@@ -164,8 +165,6 @@ export default function Component() {
           zoomIn={eventHandlers.zoomIn}
           zoomOut={eventHandlers.zoomOut}
           resetZoom={eventHandlers.resetZoom}
-          centralCoverage={state.centralCoverage}
-          setCentralCoverage={state.setCentralCoverage}
           simulationData={state.simulationData}
           deleteSelectedUser={userActions.deleteSelectedUser}
           simulationStep={simulationStep}

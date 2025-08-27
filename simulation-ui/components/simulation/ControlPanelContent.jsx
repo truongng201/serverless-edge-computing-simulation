@@ -28,8 +28,6 @@ export default function ControlPanelContent({
   selectedEdge,
   setSelectedEdge,
   selectedCentral,
-  centralCoverage,
-  setCentralCoverage,
   deleteSelectedUser,
   resetSimulation,
   addCentralNode,
@@ -69,6 +67,9 @@ export default function ControlPanelContent({
     setEdgeNodes,
     edgeCoverage,
     setEdgeCoverage,
+    centralCoverage,
+    setCentralCoverage,
+    setSelectedCentral
   } = useSimulationStore();
 
   // Helper function to clear all users from backend
@@ -720,7 +721,6 @@ export default function ControlPanelContent({
           simulationMode={simulationMode}
           addCentralNode={addCentralNode}
           removeCentralNode={removeCentralNode}
-          centralCoverage={centralCoverage}
           handleCentralCoverageChange={handleCentralCoverageChange}
         />
 

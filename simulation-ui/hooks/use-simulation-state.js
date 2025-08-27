@@ -10,9 +10,6 @@ export function useSimulationState() {
   const [selectedEdge, setSelectedEdge] = useState(null);
   const [selectedCentral, setSelectedCentral] = useState(null);
 
-  // Central node settings
-  const [centralCoverage, setCentralCoverage] = useState([0]);
-
 
   return {
     users,
@@ -25,7 +22,5 @@ export function useSimulationState() {
     setSelectedEdge,
     selectedCentral,
     setSelectedCentral,
-    centralCoverage,
-    setCentralCoverage,
   };
 }
