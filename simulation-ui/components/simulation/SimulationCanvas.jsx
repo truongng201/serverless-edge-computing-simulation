@@ -1,6 +1,6 @@
 import { React, useEffect } from "react";
 import useGlobalState from "@/hooks/use-global-state";
-import { getCursorStyle } from "@/lib/event-management";
+import { getCursorStyle, useWheelHandler } from "@/lib/event-management";
 
 // SimulationCanvas: Handles the canvas drawing and interaction
 export default function SimulationCanvas({
@@ -8,14 +8,18 @@ export default function SimulationCanvas({
   handleMouseDown,
   handleMouseMove,
   handleMouseUp,
-  handleWheel,
 }) {
-  const { canvasRef, setCanvasRef } = useGlobalState();
+  const { canvasRef } = useGlobalState();
+  const handleWheel = useWheelHandler();
 
   useEffect(() => {
-    const ref = { current: null };
-    setCanvasRef(ref);
-  }, [setCanvasRef]);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    // Attach non-passive listener
+    canvas.addEventListener("wheel", handleWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", handleWheel);
+  }, [canvasRef, handleWheel]);
 
   return (
     <canvas

@@ -61,7 +61,6 @@ export default function Component() {
         handleMouseDown={eventHandlers.handleMouseDown}
         handleMouseMove={eventHandlers.handleMouseMove}
         handleMouseUp={eventHandlers.handleMouseUp}
-        handleWheel={eventHandlers.handleWheel}
       />
 
       {/* Left Control Panel */}
