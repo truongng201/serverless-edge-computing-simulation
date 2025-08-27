@@ -16,7 +16,6 @@ export const useCanvasDrawing = (state) => {
     roads,
     showRoads,
     users,
-    selectedCentral,
   } = state;
   const {
     panOffset,
@@ -27,7 +26,8 @@ export const useCanvasDrawing = (state) => {
     edgeNodes,
     centralNodes,
     selectedUser,
-    selectedEdge
+    selectedEdge,
+    selectedCentral,
   } = useSimulationStore();
 
   // Drawing function with zoom and pan support

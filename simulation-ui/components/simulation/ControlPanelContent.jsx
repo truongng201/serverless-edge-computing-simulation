@@ -22,7 +22,6 @@ import useSimulationStore from "@/hooks/use-simulation-store";
 export default function ControlPanelContent({
   users,
   setUsers,
-  selectedCentral,
   deleteSelectedUser,
   resetSimulation,
   addCentralNode,
@@ -64,6 +63,7 @@ export default function ControlPanelContent({
     setEdgeCoverage,
     centralCoverage,
     setCentralCoverage,
+    selectedCentral,
     setSelectedCentral,
     centralNodes,
     setCentralNodes,
@@ -664,7 +664,6 @@ export default function ControlPanelContent({
       </div>
       <div className="pt-8">
         <EditModeCard
-          selectedCentral={selectedCentral}
           deleteSelectedNode={deleteSelectedNode}
           deleteSelectedUser={deleteSelectedUser}
         />

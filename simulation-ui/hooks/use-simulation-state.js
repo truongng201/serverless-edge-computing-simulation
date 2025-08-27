@@ -5,13 +5,9 @@ export function useSimulationState() {
 
 
   // UI State
-  const [selectedCentral, setSelectedCentral] = useState(null);
-
 
   return {
     users,
     setUsers,
-    selectedCentral,
-    setSelectedCentral,
   };
 }
