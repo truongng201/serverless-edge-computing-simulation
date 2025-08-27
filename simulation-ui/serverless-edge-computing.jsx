@@ -11,7 +11,6 @@ import ControlPanelContent from "@/components/simulation/ControlPanelContent";
 import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 
 // Import custom hooks and utilities
-import { useEventHandlers } from "@/lib/event-handlers";
 import useGlobalState from "@/hooks/use-global-state";
 import {
   useSimulationLogic,
@@ -23,9 +22,6 @@ export default function Component() {
   // Get all state from the custom hook
   const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } =
     useGlobalState();
-
-  // Get event handlers
-  const eventHandlers = useEventHandlers();
 
   // Get simulation logic
   const { simulationStep } = useSimulationLogic();
@@ -56,12 +52,7 @@ export default function Component() {
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gray-50">
       {/* Full Screen Canvas */}
-      <SimulationCanvas
-        handleCanvasClick={eventHandlers.handleCanvasClick}
-        handleMouseDown={eventHandlers.handleMouseDown}
-        handleMouseMove={eventHandlers.handleMouseMove}
-        handleMouseUp={eventHandlers.handleMouseUp}
-      />
+      <SimulationCanvas />
 
       {/* Left Control Panel */}
       <ControlPanel>
