@@ -1,4 +1,4 @@
-import { calculateDistance } from "./helper";
+import { calculateDistance } from "../helper";
 
 // Auto Placement Algorithms
 export const topKDemandPlacement = (users, candidates, k, lMax) => {

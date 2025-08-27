@@ -1,32 +1,30 @@
-import { 
-  updateStreetMapUsers, 
-  spawnNewStreetMapUsers, 
+import {
+  updateStreetMapUsers,
+  spawnNewStreetMapUsers,
   simulateServerlessFunctions,
-  autoAssignStreetMapUsers
+  autoAssignStreetMapUsers,
 } from "./street-map-users";
 import { updateTrafficLights } from "./road-network";
 import { useCallback, useRef } from "react";
-import { calculateDistance } from "./helper";
-import { calculateLatency } from "./placement-algorithms";
+import useGlobalState from "@/hooks/use-global-state";
 
 // Simulation Functions
 export const useSimulationLogic = (state, actions) => {
-  const {
-    isSimulating,
-    simulationSpeed,
-    roadMode,
-    roads,
-    userSpeed,
-    selectedScenario,
-    roadNetwork,
-    edgeNodes,
-    centralNodes,
-    assignmentAlgorithm,
-    simulationMode,
-  } = state;
 
-  const { setUsers, setRoadNetwork, setTotalLatency } = actions;
-   
+  const {
+    userSpeed,
+    isSimulating,
+    selectedScenario,
+    simulationSpeed,
+    roadNetwork,
+    setRoadNetwork,
+    edgeNodes,
+    assignmentAlgorithm,
+    centralNodes,
+    setUsers,
+    roadMode,
+    roads
+  } = useGlobalState();
 
   // Step counter for periodic operations in demo mode
   const stepCounterRef = useRef(0);
@@ -38,20 +36,22 @@ export const useSimulationLogic = (state, actions) => {
     // Handle street map scenario client-side simulation
     if (selectedScenario === "scenario4" && roadNetwork) {
       // Update traffic lights
-      const updatedTrafficLights = updateTrafficLights(roadNetwork.trafficLights);
-      setRoadNetwork(prevNetwork => ({
+      const updatedTrafficLights = updateTrafficLights(
+        roadNetwork.trafficLights
+      );
+      setRoadNetwork((prevNetwork) => ({
         ...prevNetwork,
-        trafficLights: updatedTrafficLights
+        trafficLights: updatedTrafficLights,
       }));
 
       // Update street map users
-      setUsers(prevUsers => {
+      setUsers((prevUsers) => {
         let updatedUsers = updateStreetMapUsers(
-          prevUsers, 
-          { ...roadNetwork, trafficLights: updatedTrafficLights }, 
+          prevUsers,
+          { ...roadNetwork, trafficLights: updatedTrafficLights },
           simulationSpeed[0]
         );
-        
+
         // Auto-assign unassigned users to nodes
         updatedUsers = autoAssignStreetMapUsers(
           updatedUsers,
@@ -59,14 +59,14 @@ export const useSimulationLogic = (state, actions) => {
           centralNodes,
           assignmentAlgorithm
         );
-        
+
         // Simulate serverless function execution
         updatedUsers = simulateServerlessFunctions(
           updatedUsers,
           edgeNodes,
           centralNodes
         );
-        
+
         // Spawn new users with controlled rate
         updatedUsers = spawnNewStreetMapUsers(
           updatedUsers,
@@ -76,24 +76,38 @@ export const useSimulationLogic = (state, actions) => {
           userSpeed[0],
           10 // user size
         );
-        
+
         return updatedUsers;
       });
-      
+
       return;
     }
 
     // For other scenarios, backend manages the simulation
     // Client-side simulation logic is disabled to avoid conflicts
     return;
-  }, [isSimulating, simulationSpeed, roadMode, roads, userSpeed, setUsers, selectedScenario, roadNetwork, setRoadNetwork, edgeNodes, centralNodes, assignmentAlgorithm]);
+  }, [
+    isSimulating,
+    simulationSpeed,
+    roadMode,
+    roads,
+    userSpeed,
+    setUsers,
+    selectedScenario,
+    roadNetwork,
+    setRoadNetwork,
+    edgeNodes,
+    centralNodes,
+    assignmentAlgorithm,
+  ]);
 
   return {
-    simulationStep
+    simulationStep,
   };
 };
 
-export const getEditModeDescription = (editMode) => {
+export const getEditModeDescription = () => {
+  const { editMode } = useGlobalState();
   switch (editMode) {
     case "nodes":
       return "Node Edit: Drag nodes to move • Click to select";
