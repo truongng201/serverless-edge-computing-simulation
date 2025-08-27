@@ -18,7 +18,7 @@ import axios from "axios";
 import { generateSaigonRoadNetwork } from "@/lib/road-network";
 import { generateStreetMapUsers } from "@/lib/street-map-users";
 import useGlobalState from "@/hooks/use-global-state";
-import {calculateLatency} from "@/lib/helper"
+import { calculateLatency } from "@/lib/helper";
 import { runGAPAssignment } from "@/lib/user-management";
 
 export default function ControlPanelContent({
@@ -62,7 +62,7 @@ export default function ControlPanelContent({
     centralNodes,
     setCentralNodes,
     selectedEdge,
-    setSelectedEdge
+    setSelectedEdge,
   } = useGlobalState();
 
   // Helper function to clear all users from backend
@@ -458,34 +458,58 @@ export default function ControlPanelContent({
       if ((edgeNodes?.length || 0) + (centralNodes?.length || 0) === 0) return;
       if (!users || users.length === 0) return;
 
-      setUsers((prev) => prev.map((u) => {
-        let bestLatency = Number.POSITIVE_INFINITY;
-        let bestType = null;
-        let bestId = null;
+      setUsers((prev) =>
+        prev.map((u) => {
+          let bestLatency = Number.POSITIVE_INFINITY;
+          let bestType = null;
+          let bestId = null;
 
-        // Evaluate all edges
-        for (let i = 0; i < edgeNodes.length; i++) {
-          const n = edgeNodes[i];
-          const lat = calculateLatency(u, n.id, "edge", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
-          if (lat < bestLatency) { bestLatency = lat; bestType = "edge"; bestId = n.id; }
-        }
+          // Evaluate all edges
+          for (let i = 0; i < edgeNodes.length; i++) {
+            const n = edgeNodes[i];
+            const lat = calculateLatency(
+              u,
+              n.id,
+              "edge",
+              edgeNodes,
+              centralNodes,
+              window.__LATENCY_PARAMS__
+            );
+            if (lat < bestLatency) {
+              bestLatency = lat;
+              bestType = "edge";
+              bestId = n.id;
+            }
+          }
 
-        // Evaluate all centrals
-        for (let i = 0; i < centralNodes.length; i++) {
-          const c = centralNodes[i];
-          const lat = calculateLatency(u, c.id, "central", edgeNodes, centralNodes, window.__LATENCY_PARAMS__);
-          if (lat < bestLatency) { bestLatency = lat; bestType = "central"; bestId = c.id; }
-        }
+          // Evaluate all centrals
+          for (let i = 0; i < centralNodes.length; i++) {
+            const c = centralNodes[i];
+            const lat = calculateLatency(
+              u,
+              c.id,
+              "central",
+              edgeNodes,
+              centralNodes,
+              window.__LATENCY_PARAMS__
+            );
+            if (lat < bestLatency) {
+              bestLatency = lat;
+              bestType = "central";
+              bestId = c.id;
+            }
+          }
 
-        if (!bestType || !bestId || !isFinite(bestLatency)) return u;
+          if (!bestType || !bestId || !isFinite(bestLatency)) return u;
 
-        return {
-          ...u,
-          assignedEdge: bestType === "edge" ? bestId : null,
-          assignedCentral: bestType === "central" ? bestId : null,
-          latency: bestLatency,
-        };
-      }));
+          return {
+            ...u,
+            assignedEdge: bestType === "edge" ? bestId : null,
+            assignedCentral: bestType === "central" ? bestId : null,
+            latency: bestLatency,
+          };
+        })
+      );
     }, 10000);
 
     return () => clearInterval(interval);
@@ -619,21 +643,13 @@ export default function ControlPanelContent({
         </button>
       </div>
       <div className="pt-8">
-        <EditModeCard
-          deleteSelectedNode={deleteSelectedNode}
-        />
+        <EditModeCard deleteSelectedNode={deleteSelectedNode} />
 
-        <ClearControlsCard
-          clearAllUsers={clearAllUsers}
-          clearAllCentralNodes={clearAllCentralNodes}
-        />
+        <ClearControlsCard clearAllUsers={clearAllUsers} />
 
-        <NodePlacementCard
-        />
+        <NodePlacementCard />
 
-        <UserAssignmentCard
-          runGAPBatch={runGAPBatch}
-        />
+        <UserAssignmentCard runGAPBatch={runGAPBatch} />
 
         <LiveSystemStatusCard
           loadingData={loadingData}
