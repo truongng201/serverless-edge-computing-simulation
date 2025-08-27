@@ -11,11 +11,7 @@ import {
 } from "./draw";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
-export const useCanvasDrawing = (state) => {
-  const {
-    roads,
-    showRoads,
-  } = state;
+export const useCanvasDrawing = () => {
   const {
     panOffset,
     canvasRef,
@@ -27,7 +23,9 @@ export const useCanvasDrawing = (state) => {
     selectedUser,
     selectedEdge,
     selectedCentral,
-    users
+    users,
+    roads,
+    showRoads,
   } = useSimulationStore();
 
   // Drawing function with zoom and pan support

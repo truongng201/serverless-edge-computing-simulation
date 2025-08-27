@@ -11,7 +11,6 @@ import ControlPanelContent from "@/components/simulation/ControlPanelContent";
 import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 
 // Import custom hooks and utilities
-import { useSimulationState } from "@/hooks/use-simulation-state";
 import { useEventHandlers } from "@/lib/event-handlers";
 import useSimulationStore from "@/hooks/use-simulation-store";
 import {
@@ -29,7 +28,6 @@ import * as UserManagement from "@/lib/user-management";
 
 export default function Component() {
   // Get all state from the custom hook
-  const state = useSimulationState();
   const {
     leftPanelOpen,
     setLeftPanelOpen,
@@ -55,13 +53,13 @@ export default function Component() {
   } = useSimulationStore();
 
   // Get event handlers
-  const eventHandlers = useEventHandlers(state, state);
+  const eventHandlers = useEventHandlers();
 
   // Get simulation logic
-  const { simulationStep } = useSimulationLogic(state, state);
+  const { simulationStep } = useSimulationLogic();
 
   // Get canvas drawing
-  const { draw } = useCanvasDrawing(state);
+  const { draw } = useCanvasDrawing();
 
   // Create action objects for easier prop passing
   const nodeActions = {

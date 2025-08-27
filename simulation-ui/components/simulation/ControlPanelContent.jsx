@@ -15,10 +15,10 @@ import {
 import { ChevronLeft } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { generateSaigonRoadNetwork } from "../../lib/road-network";
-import { generateStreetMapUsers } from "../../lib/street-map-users";
+import { generateSaigonRoadNetwork } from "@/lib/road-network";
+import { generateStreetMapUsers } from "@/lib/street-map-users";
 import useSimulationStore from "@/hooks/use-simulation-store";
-import {calculateLatency} from "../../lib/helper"
+import {calculateLatency} from "@/lib/helper"
 
 export default function ControlPanelContent({
   deleteSelectedUser,

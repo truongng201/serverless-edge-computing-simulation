@@ -3,11 +3,7 @@ import { calculateDistance } from "./helper";
 import useSimulationStore from "@/hooks/use-simulation-store";
 
 // Event Handlers
-export const useEventHandlers = (state, actions) => {
-  const {
-    roadMode,
-    roads,
-  } = state;
+export const useEventHandlers = (state) => {
 
   const {
     isDraggingUser,
@@ -45,7 +41,9 @@ export const useEventHandlers = (state, actions) => {
     selectedCentral,
     setSelectedCentral,
     users,
-    setUsers
+    setUsers,
+    roads,
+    roadMode
   } = useSimulationStore();
 
   // Handle canvas click to add users or select nodes
