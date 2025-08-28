@@ -56,60 +56,12 @@ class CentralCoreController:
         controller = CreateUserNodeController(self.scheduler, request_data)
         controller.execute()
         return f"User node {request_data.get('user_id')} created successfully"
-        
     
-    def update_user_node(self, data):
-        """Update user node location and recalculate assigned node"""
-        try:
-            user_id = data.get("user_id")
-            new_location = data.get("location", {})
-            
-            if not user_id:
-                self.logger.error("User ID is required for user node update")
-                return {
-                    "success": False,
-                    "error": "User ID is required"
-                }
-            
-            if not new_location or "x" not in new_location or "y" not in new_location:
-                self.logger.error("Valid location (x, y) is required for user node update")
-                return {
-                    "success": False,
-                    "error": "Valid location (x, y) is required"
-                }
-            
-            # Update user node in scheduler
-            success = self.scheduler.update_user_node(user_id, new_location)
-            
-            if success:
-                # Get updated user info
-                updated_user = self.scheduler.user_nodes.get(user_id)
-                if updated_user:
-                    return {
-                        "success": True,
-                        "message": f"User {user_id} updated successfully",
-                        "user": {
-                            "user_id": updated_user.user_id,
-                            "location": updated_user.location,
-                            "assigned_node_id": updated_user.assigned_node_id,
-                            "size": updated_user.size,
-                            "speed": updated_user.speed,
-                            "latency": updated_user.latency
-                        }
-                    }
-            
-            return {
-                "success": False,
-                "error": f"Failed to update user {user_id}"
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error updating user node: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
+    def update_user_node(self, request_data):
+        controller = UpdateUserNodeController(self.scheduler, request_data)
+        controller.execute()
+        return f"User node {request_data.get('user_id')} updated successfully"
+
     def get_all_users(self):
         """Get all user nodes"""
         try:
