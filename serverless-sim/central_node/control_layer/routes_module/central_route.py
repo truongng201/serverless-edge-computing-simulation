@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, Flask
 
 from config import Config
 
-from central_node.control_layer.controller_module.CentralCoreController import CentralCoreController
+from central_node.control_layer.controller_module.central_core_controller import CentralCoreController
 from shared.standard_response import standard_response
 
 central_route = Blueprint('central_route', __name__, url_prefix=Config.CENTRAL_ROUTE_PREFIX)
@@ -63,10 +63,17 @@ def create_user_node():
     return result
 
 @central_route.route("/update_user_node", methods=["POST"])
+@standard_response
 def update_user_node():
     request_data = request.get_json()
     result = central_core_controller.update_user_node(request_data)
     return result 
+
+@central_route.route("/get_all_users", methods=["GET"])
+@standard_response
+def get_all_users():
+    result = central_core_controller.get_all_users()
+    return result
 
 @central_route.route('/predict/<node_id>', methods=['GET'])
 def predict_workload(node_id):
@@ -75,13 +82,6 @@ def predict_workload(node_id):
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
-
-@central_route.route("/get_all_users", methods=["GET"])
-def get_all_users():
-    """Get all user nodes"""
-    result = central_core_controller.get_all_users()
-    status_code = 200 if result["success"] else 500
-    return jsonify(result), status_code
 
 @central_route.route("/delete_all_users", methods=["DELETE"])
 def delete_all_users():
