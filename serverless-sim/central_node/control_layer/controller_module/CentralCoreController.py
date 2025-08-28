@@ -47,12 +47,9 @@ class CentralCoreController:
         controller = GetClusterStatusController(self.scheduler, self.central_node_api_controller)
         return controller.execute()
             
-        
-            
     def update_edge_node(self, request_data):
         controler = UpdateEdgeNodeController(self.scheduler, request_data)
         controler.execute()
-
         return f"Edge node {request_data.get('node_id')} updated successfully"
     
     def create_user_node(self, data):
