@@ -88,7 +88,7 @@ if docker images | grep -q "python-serverless-handler"; then
 else
     echo "Building python serverless handler image..."
 
-    if docker build -t "$HANDLER_IMAGE" -f function_template/Dockerfile function_template; then
+    if docker build -t "$HANDLER_IMAGE" -f ../function_template/Dockerfile function_template; then
         echo "✅ Python serverless handler image built successfully"
     else
         echo "❌ Failed to build python serverless handler image"
@@ -145,23 +145,6 @@ echo ""
 echo "💾 Docker storage usage:"
 docker system df
 
-# Cleanup function
-cleanup_docker() {
-    echo ""
-    echo "🧹 Docker cleanup options:"
-    echo "• Remove unused containers: docker container prune"
-    echo "• Remove unused images: docker image prune"
-    echo "• Remove unused networks: docker network prune"
-    echo "• Remove everything unused: docker system prune"
-    echo ""
-    read -p "Do you want to run docker system prune now? (y/N): " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        docker system prune -f
-        echo "✅ Docker cleanup completed"
-    fi
-}
-
 # Final summary
 echo ""
 echo "✅ Docker setup completed successfully!"
@@ -176,6 +159,3 @@ echo "🚀 You can now deploy the serverless simulation:"
 echo "• Central node: ./deploy_central.sh"
 echo "• Edge nodes: ./deploy_edge.sh --node-id <ID> --central-url <URL>"
 echo ""
-
-# Ask for cleanup
-cleanup_docker

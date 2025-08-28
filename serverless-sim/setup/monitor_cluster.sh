@@ -93,14 +93,14 @@ display_status() {
     echo "-------------------"
     
     # Extract basic info using grep and sed
-    if echo "$status_json" | grep -q '"success".*true'; then
+    if echo "$status_json" | grep -q '"status": *"success"'; then
         echo "✅ Central node: Online"
         
         # Extract node counts
-        total_nodes=$(echo "$status_json" | jq -r '.cluster_info.total_nodes // 0')
-        healthy_nodes=$(echo "$status_json" | jq -r '.cluster_info.healthy_node_count // 0')
-        warning_nodes=$(echo "$status_json" | jq -r '.cluster_info.warning_node_count // 0')
-        unhealthy_nodes=$(echo "$status_json" | jq -r '.cluster_info.unhealthy_node_count // 0')
+        total_nodes=$(echo "$status_json" | jq -r '.data.cluster_info.total_nodes // 0')
+        healthy_nodes=$(echo "$status_json" | jq -r '.data.cluster_info.healthy_node_count // 0')
+        warning_nodes=$(echo "$status_json" | jq -r '.data.cluster_info.warning_node_count // 0')
+        unhealthy_nodes=$(echo "$status_json" | jq -r '.data.cluster_info.unhealthy_node_count // 0')
 
         echo "🖥️  Total nodes: $total_nodes"
         echo "✅ Healthy nodes: $healthy_nodes"
@@ -108,7 +108,7 @@ display_status() {
         echo "❌ Unhealthy nodes: $unhealthy_nodes"
 
         # Extract container info
-        total_containers=$(echo "$status_json" | jq -r '.health.total_containers // 0')
+        total_containers=$(echo "$status_json" | jq -r '.data.cluster_info.total_containers // 0')
         echo "📦 Total containers: ${total_containers}"
         
 
@@ -117,11 +117,11 @@ display_status() {
         echo "🏛️  CENTRAL NODE METRICS"
         echo "------------------------"
         
-        central_cpu=$(echo "$status_json" | jq -r '.central_node.cpu_usage // 0')
-        central_memory=$(echo "$status_json" | jq -r '.central_node.memory_usage // 0')
-        central_energy=$(echo "$status_json" | jq -r '.central_node.energy_consumption // 0')
-        central_uptime=$(echo "$status_json" | jq -r '.central_node.uptime // 0')
-        central_warm_container=$(echo "$status_json" | jq -r '.central_node.warm_container // 0')
+        central_cpu=$(echo "$status_json" | jq -r '.data.central_node.cpu_usage // 0')
+        central_memory=$(echo "$status_json" | jq -r '.data.central_node.memory_usage // 0')
+        central_energy=$(echo "$status_json" | jq -r '.data.central_node.energy_consumption // 0')
+        central_uptime=$(echo "$status_json" | jq -r '.data.central_node.uptime // 0')
+        central_warm_container=$(echo "$status_json" | jq -r '.data.central_node.warm_container // 0')
 
         if [[ "$central_cpu" != "0" || "$central_memory" != "0" ]]; then
             echo "💻 Central CPU: $(echo "$central_cpu" | bc)%"
@@ -149,14 +149,14 @@ display_node_details() {
     echo "-------------"
     
     # Check if edge nodes data is available
-    edge_nodes_count=$(echo "$status_json" | jq -r '.cluster_info.total_nodes // 0')
+    edge_nodes_count=$(echo "$status_json" | jq -r '.data.cluster_info.total_nodes // 0')
 
     if [[ "$edge_nodes_count" -gt 0 ]]; then
         echo "Total edge nodes: $edge_nodes_count"
         
         # Display basic info for each edge node
         echo "$status_json" | jq -r '
-            .cluster_info.edge_nodes_info[] |
+            .data.cluster_info.edge_nodes_info[] |
             "   🖥️ Node: \(.node_id)
     Status: \(.status)
     CPU: \((.metrics.cpu_usage | floor))%
@@ -166,7 +166,7 @@ display_node_details() {
     "
         ' 2>/dev/null || {
             echo "Edge nodes detected but details parsing failed"
-            echo "Use: curl $CENTRAL_URL/api/v1/central/cluster/status | jq '.cluster_info.edge_nodes_info'"
+            echo "Use: curl $CENTRAL_URL/api/v1/central/cluster/status | jq '.data.cluster_info.edge_nodes_info'"
         }
     else
         echo "No edge nodes currently registered"
