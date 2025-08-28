@@ -72,6 +72,11 @@ def stop_simulation():
     result = central_core_controller.stop_simulation()
     return result
 
+@central_route.route("/reset_simulation", methods=["POST"])
+@standard_response
+def reset_simulation():
+    result = central_core_controller.reset_simulation()
+    return result
 
 @central_route.route("/update_edge_node", methods=["POST"])
 @standard_response

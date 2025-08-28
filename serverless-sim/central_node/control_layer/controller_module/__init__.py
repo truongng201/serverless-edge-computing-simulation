@@ -12,3 +12,4 @@ from .start_vehicles_sample_controller import StartVehiclesSampleController
 from .start_simulation_controller import StartSimulationController
 from .stop_simulation_controller import StopSimulationController
 from .execute_function_controller import ExecuteFunctionController
+from .reset_simulation_controller import ResetSimulationController

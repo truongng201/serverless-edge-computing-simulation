@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { getDactSample, getVehicleSample, initializeStreetMap } from "@/lib/simulation-management";
+import { startDactSample, startVehiclesSample, initializeStreetMap } from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
 
 export default function ScenarioSelectionCard() {
@@ -19,9 +19,9 @@ export default function ScenarioSelectionCard() {
     setSelectedScenario(value);
 
     if (value === "scenario2") {
-      await getDactSample();
+      await startDactSample();
     } else if (value === "scenario3") {
-      await getVehicleSample();
+      await startVehiclesSample();
     } else if (value === "scenario4") {
       await initializeStreetMap();
     } else if (value === "none") {

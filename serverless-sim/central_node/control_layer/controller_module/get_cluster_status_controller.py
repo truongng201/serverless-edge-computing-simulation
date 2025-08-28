@@ -16,7 +16,6 @@ class GetClusterStatusController:
         central_node_status = self.central_node_api_controller.get_central_node_status()
         central_node_status["location"] = self.scheduler.get_central_node_info().get("location", {"x": 0.0, "y": 0.0})
         central_node_status["coverage"] = self.scheduler.get_central_node_info().get("coverage", 0)
-        central_node_status = self.central_node_api_controller.get_central_node_status()
         self.response["central_node"] = central_node_status
         self.response["cluster_info"] = scheduler_status
 
