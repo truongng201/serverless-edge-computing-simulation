@@ -13,7 +13,6 @@ from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 from central_node.control_layer.helper_module.data_manager import DataManager
-from shared import BadRequestException
 
 from config import Config
 
@@ -46,14 +45,8 @@ class CentralCoreController:
         return f"Update metrics for node {node_id} updated successfully"
             
     def get_cluster_status(self):
-        scheduler_status = self.scheduler.get_cluster_status()
-        central_node_status = self.central_node_api_controller.get_central_node_status()
-        central_node_status["location"] = self.scheduler.get_central_node_info().get("location", {"x": 0.0, "y": 0.0})
-        central_node_status["coverage"] = self.scheduler.get_central_node_info().get("coverage", 0)
-        return {
-            "central_node": central_node_status,
-            "cluster_info": scheduler_status,
-        }
+        controller = GetClusterStatusController(self.scheduler, self.central_node_api_controller)
+        return controller.execute()
             
         
             
