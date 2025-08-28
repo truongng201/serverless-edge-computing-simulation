@@ -76,6 +76,8 @@ class Scheduler:
         # Initialize GAP solver
         self.gap_solver = GAPSolver(GAPConfig(debug_logging=True))
         self.simulation = False
+        self.current_dataset = None
+        self.current_step_id = None
 
     def start_simulation(self):
         self.simulation = True

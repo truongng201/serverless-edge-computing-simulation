@@ -7,3 +7,4 @@ from .updaer_user_node_controller import UpdateUserNodeController
 from .get_all_users_controller import GetAllUsersController
 from .delete_all_users_controller import DeleteAllUsersController
 from .delete_user_controller import DeleteUserController
+from .start_dact_sample_controller import StartDactSampleController

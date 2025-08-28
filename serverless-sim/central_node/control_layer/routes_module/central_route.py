@@ -87,6 +87,12 @@ def delete_user(user_id):
     result = central_core_controller.delete_user(user_id)
     return result
 
+@central_route.route('/start_dact_sample', methods=['POST'])
+@standard_response
+def start_dact_sample():
+    result = central_core_controller.start_dact_sample()
+    return result
+
 @central_route.route('/predict/<node_id>', methods=['GET'])
 def predict_workload(node_id):
     horizon = request.args.get('horizon', default=30, type=int)
