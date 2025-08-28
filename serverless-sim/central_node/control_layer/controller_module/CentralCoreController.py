@@ -12,6 +12,7 @@ from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
 from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 from central_node.control_layer.helper_module.data_manager import DataManager
+from shared import BadRequestException
 
 from config import Config
 
@@ -119,27 +120,17 @@ class CentralCoreController:
                 "code": "METRICS_ERROR"
             }
             
-    def get_cluster_status(self) -> Dict[str, Any]:
-        try:
-            scheduler_status = self.scheduler.get_cluster_status()
-            central_node_status = self.central_node_api_controller.get_central_node_status()
-            central_node_status["location"] = self.scheduler.get_central_node_info().get("location", {"x": 0.0, "y": 0.0})
-            central_node_status["coverage"] = self.scheduler.get_central_node_info().get("coverage", 0)
-            return {
-                "success": True,
-                "central_node": central_node_status,
-                "cluster_info": scheduler_status,
-                "timestamp": time.time()
-            }
+    def get_cluster_status(self):
+        scheduler_status = self.scheduler.get_cluster_status()
+        central_node_status = self.central_node_api_controller.get_central_node_status()
+        central_node_status["location"] = self.scheduler.get_central_node_info().get("location", {"x": 0.0, "y": 0.0})
+        central_node_status["coverage"] = self.scheduler.get_central_node_info().get("coverage", 0)
+        return {
+            "central_node": central_node_status,
+            "cluster_info": scheduler_status,
+        }
             
-        except Exception as e:
-            
-            self.logger.error(f"Cluster status failed: {e}", exc_info=True)
-            return {
-                "success": False,
-                "error": str(e),
-                "code": "STATUS_ERROR"
-            }
+        
             
     def update_edge_node(self, data):
         new_location = data.get("location", None)

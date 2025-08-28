@@ -6,6 +6,7 @@ from flask import Blueprint, request, jsonify, Flask
 from config import Config
 
 from central_node.control_layer.controller_module.CentralCoreController import CentralCoreController
+from shared.standard_response import standard_response
 
 central_route = Blueprint('central_route', __name__, url_prefix=Config.CENTRAL_ROUTE_PREFIX)
 
@@ -47,10 +48,10 @@ def update_metrics(node_id):
 
 
 @central_route.route('/cluster/status', methods=['GET'])
+@standard_response
 def get_cluster_status():
     result = central_core_controller.get_cluster_status()
-    status_code = 200 if result["success"] else 500
-    return jsonify(result), status_code
+    return result
 
 
 @central_route.route('/predict/<node_id>', methods=['GET'])
