@@ -52,37 +52,11 @@ class CentralCoreController:
         controler.execute()
         return f"Edge node {request_data.get('node_id')} updated successfully"
     
-    def create_user_node(self, data):
-        user_location = data.get("location", {"x": 0.0, "y": 0.0})
+    def create_user_node(self, request_data):
+        controller = CreateUserNodeController(self.scheduler, request_data)
+        controller.execute()
+        return f"User node {request_data.get('user_id')} created successfully"
         
-        # Find nearest node (edge or central) using scheduler method
-        nearest_node_id, nearest_distance = self.scheduler._node_assignment(user_location)
-        data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
-        bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
-        propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
-        transmission_delay = data_size / bandwidth
-        total_turnaround_time = propagation_delay + transmission_delay
-        latency = Latency(
-            distance=nearest_distance,
-            data_size=data_size,
-            bandwidth=bandwidth,
-            propagation_delay=propagation_delay,
-            transmission_delay=transmission_delay,
-            computation_delay=0.0,
-            container_status="unknown",
-            total_turnaround_time=total_turnaround_time
-        )
-        user_node = UserNodeInfo(
-            user_id=data.get("user_id"),
-            assigned_node_id=nearest_node_id,
-            location=user_location,
-            last_executed=0,
-            size=data.get("size", 10),
-            speed=data.get("speed", 5),
-            latency=latency
-        )
-        self.scheduler.create_user_node(user_node)
-        return user_node
     
     def update_user_node(self, data):
         """Update user node location and recalculate assigned node"""

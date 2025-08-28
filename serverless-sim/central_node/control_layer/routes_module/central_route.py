@@ -55,23 +55,19 @@ def update_edge_node():
     result = central_core_controller.update_edge_node(request_data)
     return result
 
+@central_route.route("/create_user_node", methods=["POST"])
+@standard_response
+def create_user_node():
+    request_data = request.get_json()
+    result = central_core_controller.create_user_node(request_data)
+    return result
+
 @central_route.route('/predict/<node_id>', methods=['GET'])
 def predict_workload(node_id):
     horizon = request.args.get('horizon', default=30, type=int)
     result = central_core_controller.predict_workload(node_id, horizon)
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
-
-    
-@central_route.route("/create_user_node", methods=["POST"])
-def create_user_node():
-    user_data = request.get_json()
-    result = central_core_controller.create_user_node(user_data)
-    if result:
-        return jsonify({"status": "success", "message": "Node user creation success"}), 201
-    else:
-        return jsonify({"status": "error", "message": "Node User creation failed"}), 400
-
 
 @central_route.route("/update_user_node", methods=["POST"])
 def update_user_node():
