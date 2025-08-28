@@ -158,27 +158,9 @@ else
     echo "⚠️  curl not found, skipping connectivity test"
 fi
 
-# Create necessary directories
-echo "📁 Creating directories..."
-
-# Get local IP
-LOCAL_IP=$(hostname -I | awk '{print $1}' 2>/dev/null || ifconfig | grep -Eo 'inet (addr:)?([0-9]*\.){3}[0-9]*' | grep -Eo '([0-9]*\.){3}[0-9]*' | grep -v '127.0.0.1' | head -n1)
-if [[ -z "$LOCAL_IP" ]]; then
-    LOCAL_IP="localhost"
-fi
-
 echo "🚀 Starting Edge Node..."
 echo "   Node ID: $NODE_ID"
 echo "   Central Node: $CENTRAL_URL"
-echo "   Host: $EDGE_HOST"
-if [[ -n "$EDGE_PORT" ]]; then
-    echo "   Port: $EDGE_PORT"
-else
-    echo "   Port: Auto-detect"
-fi
-echo "   Local IP: $LOCAL_IP"
-echo "   Log Level: $LOG_LEVEL"
-echo ""
 echo "🛑 Press Ctrl+C to stop"
 echo ""
 

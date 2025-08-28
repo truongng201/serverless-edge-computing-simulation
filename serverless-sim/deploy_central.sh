@@ -39,27 +39,9 @@ else
     fi
 fi
 
-# Set default configuration
-PORT=${PORT:-8000}
-HOST=${HOST:-0.0.0.0}
-LOG_LEVEL=${LOG_LEVEL:-INFO}
-
 echo "🚀 Starting Central Node..."
-echo "   Host: $HOST"
-echo "   Port: $PORT"
-echo "   Log Level: $LOG_LEVEL"
-echo ""
-echo "🌐 Access URLs:"
-echo "   Simulation UI: http://$HOST:$PORT"
-echo "   Central API: http://$HOST:$PORT/api/v1/central"
-echo "   Health Check: http://$HOST:$PORT/api/v1/central/health"
-echo ""
 echo "🛑 Press Ctrl+C to stop"
 echo ""
 
 # Start the central node
-python3 central_main.py \
-    --host "$HOST" \
-    --port "$PORT" \
-    --log-level "$LOG_LEVEL" \
-    "$@"
+python3 central_main.py "$@"
