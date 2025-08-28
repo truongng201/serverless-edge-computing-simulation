@@ -38,7 +38,7 @@ class CentralCoreController:
         controller.execute()
         return f"Node {request_data.get('node_id')} registered successfully"
 
-    def update_node_metrics(self, node_id: str, request_data: Dict[str, Any]) -> Dict[str, Any]:
+    def update_node_metrics(self, node_id, request_data):
         controller = UpdateNodeMetricsController(self.scheduler, node_id, request_data)
         controller.execute()
         return f"Update metrics for node {node_id} updated successfully"
@@ -46,10 +46,20 @@ class CentralCoreController:
     def get_cluster_status(self):
         controller = GetClusterStatusController(self.scheduler, self.central_node_api_controller)
         return controller.execute()
+    
+    def start_simulation(self):
+        controller = StartSimulationController(self.scheduler)
+        controller.execute()
+        return "Simulation started successfully"
+
+    def stop_simulation(self):
+        controller = StopSimulationController(self.scheduler)
+        controller.execute()
+        return "Simulation stopped successfully"
             
     def update_edge_node(self, request_data):
-        controler = UpdateEdgeNodeController(self.scheduler, request_data)
-        controler.execute()
+        controller = UpdateEdgeNodeController(self.scheduler, request_data)
+        controller.execute()
         return f"Edge node {request_data.get('node_id')} updated successfully"
     
     def create_user_node(self, request_data):
@@ -289,85 +299,3 @@ class CentralCoreController:
                 self.scheduler.create_user_node(user_node)
         self.step_id += 1
         return True
-
-    def start_simulation(self):
-        try:
-            self.simulation = True
-            return {
-                "success": True,
-                "message": "Simulation started successfully"
-            }
-        except Exception as e:
-            self.logger.error(f"Error starting simulation: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-            
-    def stop_simulation(self):
-        try:
-            self.simulation = False
-            return {
-                "success": True,
-                "message": "Simulation stopped successfully"
-            }
-        except Exception as e:
-            self.logger.error(f"Error stopping simulation: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    def set_scheduling_strategy(self, strategy_name: str):
-        """Set the scheduling strategy"""
-        try:
-            from central_node.control_layer.scheduler_module.scheduler import SchedulingStrategy
-            
-            # Map string to enum
-            strategy_map = {
-                'round_robin': SchedulingStrategy.ROUND_ROBIN,
-                'least_loaded': SchedulingStrategy.LEAST_LOADED,
-                'geographic': SchedulingStrategy.GEOGRAPHIC,
-                'predictive': SchedulingStrategy.PREDICTIVE,
-                'gap_baseline': SchedulingStrategy.GAP_BASELINE
-            }
-            
-            if strategy_name not in strategy_map:
-                return {
-                    "success": False,
-                    "error": f"Unknown strategy: {strategy_name}. Available: {list(strategy_map.keys())}"
-                }
-            
-            self.scheduler.set_scheduling_strategy(strategy_map[strategy_name])
-            
-            return {
-                "success": True,
-                "message": f"Scheduling strategy set to: {strategy_name}",
-                "strategy": strategy_name
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Error setting scheduling strategy: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-    
-    def get_scheduling_strategy(self):
-        """Get current scheduling strategy"""
-        try:
-            current_strategy = self.scheduler.get_scheduling_strategy()
-            return {
-                "success": True,
-                "strategy": current_strategy,
-                "available_strategies": [
-                    "round_robin", "least_loaded", "geographic", 
-                    "predictive", "gap_baseline"
-                ]
-            }
-        except Exception as e:
-            self.logger.error(f"Error getting scheduling strategy: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }

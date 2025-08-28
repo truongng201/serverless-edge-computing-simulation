@@ -24,6 +24,19 @@ def register_central_route(app: Flask):
     app.register_blueprint(central_route)
     logging.getLogger(__name__).info("Central API routes registered successfully")
 
+@central_route.route('/health', methods=['GET'])
+@standard_response
+def health_check():
+    return {
+        "status": "healthy",
+        "timestamp": time.time(),
+        "components": {
+            "scheduler": "running",
+            "predictor": "running",
+            "migration_manager": "running",
+            "metrics_collector": "running"
+        }
+    }
 
 @central_route.route('/nodes/register', methods=['POST'])
 @standard_response
@@ -45,6 +58,18 @@ def update_metrics(node_id):
 @standard_response
 def get_cluster_status():
     result = central_core_controller.get_cluster_status()
+    return result
+
+@central_route.route('/start_simulation', methods=['POST'])
+@standard_response
+def start_simulation():
+    result = central_core_controller.start_simulation()
+    return result
+
+@central_route.route('/stop_simulation', methods=['POST'])
+@standard_response
+def stop_simulation():
+    result = central_core_controller.stop_simulation()
     return result
 
 
@@ -93,13 +118,6 @@ def start_dact_sample():
     result = central_core_controller.start_dact_sample()
     return result
 
-@central_route.route('/predict/<node_id>', methods=['GET'])
-def predict_workload(node_id):
-    horizon = request.args.get('horizon', default=30, type=int)
-    result = central_core_controller.predict_workload(node_id, horizon)
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
-
 @central_route.route('/execute', methods=['POST'])
 def execute_function():
     if not central_core_controller:
@@ -117,54 +135,3 @@ def get_vehicles_sample():
     result = central_core_controller.get_vehicles_sample()
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
-
-@central_route.route('/start_simulation', methods=['POST'])
-def start_simulation():
-    if not central_core_controller:
-        return jsonify({"success": False, "error": "Central node not initialized"}), 500
-    result = central_core_controller.start_simulation()
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
-
-@central_route.route('/stop_simulation', methods=['POST'])
-def stop_simulation():
-    if not central_core_controller:
-        return jsonify({"success": False, "error": "Central node not initialized"}), 500
-    result = central_core_controller.stop_simulation()
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
-
-@central_route.route('/set_scheduling_strategy', methods=['POST'])
-def set_scheduling_strategy():
-    """Set the scheduling strategy"""
-    if not central_core_controller:
-        return jsonify({"success": False, "error": "Central node not initialized"}), 500
-    
-    data = request.get_json()
-    strategy = data.get('strategy', 'round_robin')
-    
-    result = central_core_controller.set_scheduling_strategy(strategy)
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
-
-@central_route.route('/get_scheduling_strategy', methods=['GET'])
-def get_scheduling_strategy():
-    """Get current scheduling strategy"""
-    if not central_core_controller:
-        return jsonify({"success": False, "error": "Central node not initialized"}), 500
-    
-    result = central_core_controller.get_scheduling_strategy()
-    return jsonify(result), 200
-
-@central_route.route('/health', methods=['GET'])
-def health_check():
-    return jsonify({
-        "status": "healthy",
-        "timestamp": time.time(),
-        "components": {
-            "scheduler": "running",
-            "predictor": "running",
-            "migration_manager": "running",
-            "metrics_collector": "running"
-        }
-    })
