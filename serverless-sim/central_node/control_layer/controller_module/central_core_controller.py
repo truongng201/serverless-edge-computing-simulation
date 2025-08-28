@@ -1,5 +1,4 @@
-from central_node.api_layer.central_controller import CentralNodeAPIController
-from central_node.api_layer.central_agent import CentralNodeAPIAgent
+from central_node.api_layer import CentralNodeAPIController, CentralNodeAPIAgent
 
 from central_node.control_layer.controller_module import *
 from central_node.control_layer.scheduler_module.scheduler import Scheduler

@@ -1,4 +1,4 @@
-from central_node.api_layer.central_controller import CentralNodeAPIController
+from central_node.api_layer import CentralNodeAPIController
 
 from shared import BadRequestException
 
@@ -10,8 +10,8 @@ class ExecuteFunctionController:
         
     def _execute_function(self):
         self.response = self.central_node_api_controller.execute_function(self.request_data)
-        # if self.response.get("status") != "success":
-        #     raise BadRequestException("Failed to execute function")
+        if self.response.get("status") != "success":
+            raise BadRequestException("Failed to execute function")
 
     def execute(self):
         self._execute_function()

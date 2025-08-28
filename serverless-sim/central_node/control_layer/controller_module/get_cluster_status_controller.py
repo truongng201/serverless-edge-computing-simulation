@@ -1,5 +1,5 @@
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
-from central_node.api_layer.central_controller import CentralNodeAPIController
+from central_node.api_layer import CentralNodeAPIController
 
 
 class GetClusterStatusController:
