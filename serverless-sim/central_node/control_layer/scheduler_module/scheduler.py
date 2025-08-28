@@ -75,6 +75,13 @@ class Scheduler:
         
         # Initialize GAP solver
         self.gap_solver = GAPSolver(GAPConfig(debug_logging=True))
+        self.simulation = False
+
+    def start_simulation(self):
+        self.simulation = True
+        
+    def stop_simulation(self):
+        self.simulation = False
 
     def get_central_node_info(self) -> Dict[str, Any]:
         return self.central_node

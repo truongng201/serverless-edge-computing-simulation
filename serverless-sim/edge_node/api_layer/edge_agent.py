@@ -4,8 +4,6 @@ import requests
 import time
 from typing import Dict, Any
 
-from shared_resource_layer.container_manager import ContainerManager
-from shared_resource_layer.system_metrics import SystemMetricsCollector
 from edge_node.api_layer.edge_controller import EdgeNodeAPIController
 
 from config import Config, ContainerState

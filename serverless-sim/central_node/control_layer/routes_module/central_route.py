@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, Flask
 
 from config import Config
 
-from central_node.control_layer.controller_module.central_core_controller import CentralCoreController
+from central_node.control_layer.controller_module.CentralCoreController import CentralCoreController
 
 central_route = Blueprint('central_route', __name__, url_prefix=Config.CENTRAL_ROUTE_PREFIX)
 
@@ -23,17 +23,6 @@ def register_central_route(app: Flask):
     app.register_blueprint(central_route)
     logging.getLogger(__name__).info("Central API routes registered successfully")
 
-# API Routes
-@central_route.route('/schedule', methods=['POST'])
-def schedule_request():
-    """Schedule a request to an edge node"""
-    data = request.get_json()
-    if not data:
-        return jsonify({"success": False, "error": "No data provided"}), 400
-
-    result = central_core_controller.schedule_request(data)
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
 
 @central_route.route('/nodes/register', methods=['POST'])
 def register_node():
@@ -45,6 +34,7 @@ def register_node():
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
+
 @central_route.route('/nodes/<node_id>/metrics', methods=['POST'])
 def update_metrics(node_id):
     data = request.get_json()
@@ -55,11 +45,13 @@ def update_metrics(node_id):
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
+
 @central_route.route('/cluster/status', methods=['GET'])
 def get_cluster_status():
     result = central_core_controller.get_cluster_status()
     status_code = 200 if result["success"] else 500
     return jsonify(result), status_code
+
 
 @central_route.route('/predict/<node_id>', methods=['GET'])
 def predict_workload(node_id):
@@ -67,6 +59,7 @@ def predict_workload(node_id):
     result = central_core_controller.predict_workload(node_id, horizon)
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
+
 
 @central_route.route("/update_edge_node", methods=["POST"])
 def update_edge_node():
@@ -77,6 +70,7 @@ def update_edge_node():
     else:
         return jsonify({"status": "error", "message": "Edge node update failed"}), 400
     
+    
 @central_route.route("/create_user_node", methods=["POST"])
 def create_user_node():
     user_data = request.get_json()
@@ -85,6 +79,7 @@ def create_user_node():
         return jsonify({"status": "success", "message": "Node user creation success"}), 201
     else:
         return jsonify({"status": "error", "message": "Node User creation failed"}), 400
+
 
 @central_route.route("/update_user_node", methods=["POST"])
 def update_user_node():
@@ -96,6 +91,7 @@ def update_user_node():
     result = central_core_controller.update_user_node(user_data)
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
+
 
 @central_route.route("/get_all_users", methods=["GET"])
 def get_all_users():

@@ -33,37 +33,7 @@ class CentralCoreController:
         SchedulerAgent(self.scheduler).start_all_tasks()
         UsersAgent(self.scheduler).start_all_tasks()
 
-
-    def schedule_request(self, request_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Schedule a request to an edge node"""
-        try:
-            decision = self.scheduler.schedule_request(request_data)
-            
-            if not decision:
-                return {
-                    "success": False,
-                    "error": "No available edge nodes",
-                    "code": "NO_NODES_AVAILABLE"
-                }
-                
-            return {
-                "success": True,
-                "target_node": decision.target_node_id,
-                "estimated_time": decision.execution_time_estimate,
-                "confidence": decision.confidence,
-                "reasoning": decision.reasoning
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Request scheduling failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "code": "SCHEDULING_ERROR"
-            }
-            
     def register_edge_node(self, node_data: Dict[str, Any]) -> Dict[str, Any]:
-        """Register a new edge node"""
         try:
             node_metrics = NodeMetrics(
                 node_id=node_data["node_id"],
@@ -150,7 +120,6 @@ class CentralCoreController:
             }
             
     def get_cluster_status(self) -> Dict[str, Any]:
-        """Get overall cluster status including central node metrics"""
         try:
             scheduler_status = self.scheduler.get_cluster_status()
             central_node_status = self.central_node_api_controller.get_central_node_status()
@@ -172,36 +141,6 @@ class CentralCoreController:
                 "code": "STATUS_ERROR"
             }
             
-    def predict_workload(self, node_id: str, horizon_minutes: int = 30) -> Dict[str, Any]:
-        """Get workload prediction for a node"""
-        try:
-            prediction = self.predictor.predict_workload(node_id, horizon_minutes)
-            
-            if not prediction:
-                return {
-                    "success": False,
-                    "error": "Prediction not available",
-                    "code": "PREDICTION_ERROR"
-                }
-                
-            return {
-                "success": True,
-                "prediction": {
-                    "predicted_load": prediction.predicted_load,
-                    "confidence_interval": prediction.confidence_interval,
-                    "horizon_minutes": prediction.prediction_horizon,
-                    "accuracy": prediction.model_accuracy
-                }
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Prediction failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "code": "PREDICTION_ERROR"
-            }
-
     def update_edge_node(self, data):
         new_location = data.get("location", None)
         coverage = data.get("coverage", None)

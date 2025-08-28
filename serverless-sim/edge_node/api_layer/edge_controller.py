@@ -4,8 +4,7 @@ import random
 import string
 from typing import Dict, Any, Tuple
 
-from shared_resource_layer.container_manager import ContainerManager, ContainerState
-from shared_resource_layer.system_metrics import SystemMetricsCollector
+from shared.resource_layer import ContainerManager, SystemMetricsCollector
 from config import Config
 
 
