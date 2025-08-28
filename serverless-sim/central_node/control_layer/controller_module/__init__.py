@@ -1,3 +1,5 @@
 from .RegisterEdgeNodeController import RegisterEdgeNodeController
 from .UpdateNodeMetricsController import UpdateNodeMetricsController
 from .GetClusterStatusController import GetClusterStatusController
+from .UpdateEdgeNodeController import UpdateEdgeNodeController
+from .CreateUserNodeController import CreateUserNodeController

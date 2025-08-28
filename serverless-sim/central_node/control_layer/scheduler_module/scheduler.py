@@ -83,6 +83,14 @@ class Scheduler:
     def stop_simulation(self):
         self.simulation = False
 
+    def get_edge_node(self, node_id: str) -> Optional[EdgeNodeInfo]:
+        return self.edge_nodes.get(node_id)
+    
+    def update_edge_node(self, new_edge_node: EdgeNodeInfo):
+        if new_edge_node.node_id not in self.edge_nodes:
+            return
+        self.edge_nodes[new_edge_node.node_id] = new_edge_node
+    
     def get_central_node_info(self) -> Dict[str, Any]:
         return self.central_node
     
@@ -244,11 +252,6 @@ class Scheduler:
             "warning_node_count": len(classified_nodes["warning"]),
             "warning_node_list": list(classified_nodes["warning"]),
         }
-
-    def update_edge_node_info(self, new_edge_node: EdgeNodeInfo):
-        if new_edge_node.node_id not in self.edge_nodes:
-            return
-        self.edge_nodes[new_edge_node.node_id] = new_edge_node
     
     def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
         """Update user node location and reassign to nearest node"""

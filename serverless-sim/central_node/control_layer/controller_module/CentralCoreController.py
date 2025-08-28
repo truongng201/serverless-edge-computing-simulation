@@ -11,7 +11,6 @@ from central_node.control_layer.scheduler_module.scheduler import Scheduler, Edg
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
 from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
-from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 from central_node.control_layer.helper_module.data_manager import DataManager
 
 from config import Config
@@ -50,23 +49,11 @@ class CentralCoreController:
             
         
             
-    def update_edge_node(self, data):
-        new_location = data.get("location", None)
-        coverage = data.get("coverage", None)
+    def update_edge_node(self, request_data):
+        controler = UpdateEdgeNodeController(self.scheduler, request_data)
+        controler.execute()
 
-        if not new_location:
-            return None
-
-        # Update the node's location
-        edge_node = self.scheduler.edge_nodes.get(data.get("node_id", None))
-        if not edge_node:
-            return None
-
-        edge_node.location = new_location
-        edge_node.coverage = coverage
-        self.scheduler.update_edge_node_info(edge_node)
-
-        return edge_node
+        return f"Edge node {request_data.get('node_id')} updated successfully"
     
     def create_user_node(self, data):
         user_location = data.get("location", {"x": 0.0, "y": 0.0})

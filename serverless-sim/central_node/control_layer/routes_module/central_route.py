@@ -34,6 +34,7 @@ def register_node():
 
 
 @central_route.route('/nodes/<node_id>/metrics', methods=['POST'])
+@standard_response
 def update_metrics(node_id):
     request_data = request.get_json()
     result = central_core_controller.update_node_metrics(node_id, request_data)
@@ -47,6 +48,13 @@ def get_cluster_status():
     return result
 
 
+@central_route.route("/update_edge_node", methods=["POST"])
+@standard_response
+def update_edge_node():
+    request_data = request.get_json()
+    result = central_core_controller.update_edge_node(request_data)
+    return result
+
 @central_route.route('/predict/<node_id>', methods=['GET'])
 def predict_workload(node_id):
     horizon = request.args.get('horizon', default=30, type=int)
@@ -54,16 +62,6 @@ def predict_workload(node_id):
     status_code = 200 if result["success"] else 400
     return jsonify(result), status_code
 
-
-@central_route.route("/update_edge_node", methods=["POST"])
-def update_edge_node():
-    node_data = request.get_json()
-    result = central_core_controller.update_edge_node(node_data)
-    if result:
-        return jsonify({"status": "success", "message": "Update edge node success"}), 200
-    else:
-        return jsonify({"status": "error", "message": "Edge node update failed"}), 400
-    
     
 @central_route.route("/create_user_node", methods=["POST"])
 def create_user_node():
