@@ -5,3 +5,4 @@ from .update_edge_node_controller import UpdateEdgeNodeController
 from .create_user_node_controller import CreateUserNodeController
 from .updaer_user_node_controller import UpdateUserNodeController
 from .get_all_users_controller import GetAllUsersController
+from .delete_all_users_controller import DeleteAllUsersController

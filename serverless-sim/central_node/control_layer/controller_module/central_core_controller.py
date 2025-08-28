@@ -104,26 +104,18 @@ class CentralCoreController:
                 "error": str(e),
                 "users": []
             }
-            
+     
+     
+    def delete_all_users(self):
+        controller = DeleteAllUsersController(self.scheduler)
+        controller.execute()
+        return "Delete all users executed successfully"
+
     def execute_function(self, data):
         try:
             return self.central_node_api_controller.execute_function(data)
         except Exception as e:
             self.logger.error(f"Error executing function: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-            
-    def delete_all_users(self):
-        try:
-            self.scheduler.user_nodes.clear()
-            return {
-                "success": True,
-                "message": "All user nodes deleted successfully"
-            }
-        except Exception as e:
-            self.logger.error(f"Error deleting all user nodes: {e}")
             return {
                 "success": False,
                 "error": str(e)
