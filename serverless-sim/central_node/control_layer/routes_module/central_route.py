@@ -81,17 +81,17 @@ def delete_all_users():
     result = central_core_controller.delete_all_users()
     return result
 
+@central_route.route('/delete_user/<user_id>', methods=['DELETE'])
+@standard_response
+def delete_user(user_id):
+    result = central_core_controller.delete_user(user_id)
+    return result
+
 @central_route.route('/predict/<node_id>', methods=['GET'])
 def predict_workload(node_id):
     horizon = request.args.get('horizon', default=30, type=int)
     result = central_core_controller.predict_workload(node_id, horizon)
     status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
-
-@central_route.route('/delete_user/<user_id>', methods=['DELETE'])
-def delete_user(user_id):
-    result = central_core_controller.delete_user(user_id)
-    status_code = 200 if result["success"] else 500
     return jsonify(result), status_code
 
 @central_route.route('/execute', methods=['POST'])

@@ -6,3 +6,4 @@ from .create_user_node_controller import CreateUserNodeController
 from .updaer_user_node_controller import UpdateUserNodeController
 from .get_all_users_controller import GetAllUsersController
 from .delete_all_users_controller import DeleteAllUsersController
+from .delete_user_controller import DeleteUserController
