@@ -1,5 +1,4 @@
 import logging
-from typing import Dict, Any
 import time
 import random
 
@@ -25,9 +24,6 @@ class CentralCoreController:
         self.predictor = WorkloadPredictor()
         self.data_manager = DataManager()
         self.central_node_api_controller = CentralNodeAPIController()
-        self.simulation = False
-        self.step_id = None
-        self.current_dataset = None
         
         CentralNodeAPIAgent(self.central_node_api_controller).start_all_tasks()
         SchedulerAgent(self.scheduler).start_all_tasks()
@@ -126,20 +122,20 @@ class CentralCoreController:
         controller.execute()
         return f"User {user_id} deleted successfully"
 
-    def execute_function(self, data):
-        try:
-            return self.central_node_api_controller.execute_function(data)
-        except Exception as e:
-            self.logger.error(f"Error executing function: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
-            
+    def execute_function(self, request_data):
+        controller = ExecuteFunctionController(self.scheduler, request_data)
+        response = controller.execute()
+        return response
+
     def start_dact_sample(self):
         controller = StartDactSampleController(self.data_manager, self.scheduler)
         controller.execute()
         return "Start using dact sample"
+    
+    def start_vehicles_sample(self):
+        controller = StartVehiclesSampleController(self.data_manager, self.scheduler)
+        controller.execute()
+        return "Start using vehicles sample"
 
     def _update_dact_sample(self):
         if not self.simulation or not self.step_id:
@@ -190,65 +186,6 @@ class CentralCoreController:
                 self.scheduler.create_user_node(user_node)
         self.step_id += 1
         return True
-
-    def get_vehicles_sample(self):
-        try:
-            sample = self.data_manager.get_vehicle_data_by_timestep(28800.00)
-            self.step_id = 28800.00
-            self.current_dataset = "vehicles"
-            users = []
-            self.scheduler.user_nodes.clear()  # Clear existing users for fresh start
-            for item in sample.get("items", []):
-                user_node = None
-                if item.get(f"user_{item.get('id', 0)}") in self.scheduler.user_nodes:
-                    user_node = self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")]
-                else:
-                    location =  {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                    nearest_node_id, nearest_distance = self.scheduler._node_assignment(location)
-                    data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
-                    bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
-                    propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
-                    transmission_delay = data_size / bandwidth
-                    total_turnaround_time = propagation_delay + transmission_delay
-                    latency = Latency(
-                        distance=nearest_distance,
-                        data_size=data_size,
-                        bandwidth=bandwidth,
-                        propagation_delay=propagation_delay,
-                        transmission_delay=transmission_delay,
-                        computation_delay=0.0,
-                        container_status="unknown",
-                        total_turnaround_time=total_turnaround_time
-                    )
-                    user_node = UserNodeInfo(
-                        user_id=f"user_{item.get('id', 0)}",
-                        assigned_node_id=nearest_node_id,
-                        location=location,
-                        last_executed=0,
-                        size=item.get("size", 10),
-                        speed=item.get("speed", 5),
-                        latency=latency
-                    )
-                    self.scheduler.create_user_node(user_node)
-                users.append({
-                    "user_id": user_node.user_id,
-                    "assigned_node_id": user_node.assigned_node_id,
-                    "location": user_node.location,
-                    "last_executed": time.time() - user_node.last_executed,
-                    "size": user_node.size,
-                    "speed": user_node.speed,
-                    "latency": user_node.latency
-                })
-            return {
-                "success": True,
-                "total_count": len(users)
-            }
-        except Exception as e:
-            self.logger.error(f"Error getting vehicles sample: {e}")
-            return {
-                "success": False,
-                "error": str(e)
-            }
 
     def _update_vehicles_sample(self):
         if not self.simulation or not self.step_id:

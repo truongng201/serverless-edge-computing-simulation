@@ -118,20 +118,15 @@ def start_dact_sample():
     result = central_core_controller.start_dact_sample()
     return result
 
-@central_route.route('/execute', methods=['POST'])
-def execute_function():
-    if not central_core_controller:
-        return jsonify({"success": False, "error": "Central node not initialized"}), 500
-        
-    data = request.get_json()
-    result = central_core_controller.execute_function(data)
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
+@central_route.route('/start_vehicles_sample', methods=['POST'])
+@standard_response
+def start_vehicles_sample():
+    result = central_core_controller.start_vehicles_sample()
+    return result
 
-@central_route.route('/get_vehicles_sample', methods=['GET'])
-def get_vehicles_sample():
-    if not central_core_controller:
-        return jsonify({"success": False, "error": "Central node not initialized"}), 500
-    result = central_core_controller.get_vehicles_sample()
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
+@central_route.route('/execute', methods=['POST'])
+@standard_response
+def execute_function():
+    request_data = request.get_json()
+    result = central_core_controller.execute_function(request_data)
+    return result
