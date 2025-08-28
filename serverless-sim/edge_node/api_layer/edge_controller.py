@@ -5,7 +5,7 @@ import string
 from typing import Dict, Any, Tuple
 
 from shared.resource_layer import ContainerManager, SystemMetricsCollector
-from config import Config
+from config import Config, ContainerState
 
 
 class EdgeNodeAPIController:
