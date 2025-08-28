@@ -26,14 +26,14 @@ def register_central_route(app: Flask):
 
 
 @central_route.route('/nodes/register', methods=['POST'])
+@standard_response
 def register_node():
-    data = request.get_json()
-    if not data or "node_id" not in data:
+    request_data = request.get_json()
+    if not request_data or "node_id" not in request_data:
         return jsonify({"success": False, "error": "Invalid node data"}), 400
-        
-    result = central_core_controller.register_edge_node(data)
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
+
+    result = central_core_controller.register_edge_node(request_data)
+    return result
 
 
 @central_route.route('/nodes/<node_id>/metrics', methods=['POST'])

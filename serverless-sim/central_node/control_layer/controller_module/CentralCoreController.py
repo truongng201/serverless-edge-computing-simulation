@@ -6,6 +6,9 @@ import random
 from central_node.api_layer.central_controller import CentralNodeAPIController
 from central_node.api_layer.central_agent import CentralNodeAPIAgent
 
+from central_node.control_layer.controller_module import (
+    RegisterEdgeNodeController
+)
 from central_node.control_layer.scheduler_module.scheduler import Scheduler, EdgeNodeInfo, UserNodeInfo, Latency
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
 from central_node.control_layer.agents_module.users_agent import UsersAgent
@@ -34,51 +37,11 @@ class CentralCoreController:
         SchedulerAgent(self.scheduler).start_all_tasks()
         UsersAgent(self.scheduler).start_all_tasks()
 
-    def register_edge_node(self, node_data: Dict[str, Any]) -> Dict[str, Any]:
-        try:
-            node_metrics = NodeMetrics(
-                node_id=node_data["node_id"],
-                cpu_usage=0.0,
-                memory_usage=0.0,
-                memory_total=0,
-                running_container=0,
-                warm_container=0,
-                active_requests=0,
-                total_requests=0,
-                response_time_avg=0.0,
-                energy_consumption=0.0,
-                load_average=[],
-                network_io={},
-                disk_io={},
-                timestamp=0,
-                uptime=0
-            )
+    def register_edge_node(self, request_data):
+        controller = RegisterEdgeNodeController(self.scheduler, request_data)
+        controller.execute()
+        return f"Node {request_data.get('node_id')} registered successfully"
 
-            node_info = EdgeNodeInfo(
-                node_id=node_data["node_id"],
-                endpoint=node_data["endpoint"],
-                location=node_data.get("location", {"x": 0.0, "y": 0.0}),
-                system_info=node_data.get("system_info", {}),
-                last_heartbeat=time.time(),
-                metrics_info=node_metrics,
-                coverage=node_data.get("coverage", 300.0)
-            )
-            
-            self.scheduler.register_edge_node(node_info)
-            
-            return {
-                "success": True,
-                "message": f"Edge node {node_data['node_id']} registered successfully"
-            }
-            
-        except Exception as e:
-            self.logger.error(f"Node registration failed: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "code": "REGISTRATION_ERROR"
-            }
-            
     def update_node_metrics(self, node_id: str, request_data: Dict[str, Any]) -> Dict[str, Any]:
         try:
             # Add to global metrics collection
