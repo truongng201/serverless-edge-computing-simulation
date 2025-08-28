@@ -35,13 +35,9 @@ def register_node():
 
 @central_route.route('/nodes/<node_id>/metrics', methods=['POST'])
 def update_metrics(node_id):
-    data = request.get_json()
-    if not data:
-        return jsonify({"success": False, "error": "No metrics data provided"}), 400
-        
-    result = central_core_controller.update_node_metrics(node_id, data)
-    status_code = 200 if result["success"] else 400
-    return jsonify(result), status_code
+    request_data = request.get_json()
+    result = central_core_controller.update_node_metrics(node_id, request_data)
+    return result
 
 
 @central_route.route('/cluster/status', methods=['GET'])

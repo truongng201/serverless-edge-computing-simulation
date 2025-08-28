@@ -1,1 +1,2 @@
 from .RegisterEdgeNodeController import RegisterEdgeNodeController
+from .UpdateNodeMetricsController import UpdateNodeMetricsController
