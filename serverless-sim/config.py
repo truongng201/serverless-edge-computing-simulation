@@ -19,7 +19,7 @@ class Config:
     DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
-    DEFAULT_MAX_WARM_TIME = 20 # seconds
+    DEFAULT_MAX_WARM_TIME = 5 # seconds
     
     
     # Cleanup

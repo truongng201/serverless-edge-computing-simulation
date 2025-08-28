@@ -3,14 +3,20 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Server, Database, Play } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
+import { useEffect } from "react";
+import { getClusterStatusAndUsersData } from "@/lib/simulation-management";
 
-export default function LiveSystemStatusCard({
-  loadingData,
-  dataError,
-  fetchLiveClusterStatus,
-  startLiveDataPolling,
-}) {
-  const { liveData } = useGlobalState();
+export default function LiveSystemStatusCard({ startLiveDataPolling }) {
+  const { liveData, loadingData, dataError, setDataError } = useGlobalState();
+
+  useEffect(() => {
+    if (dataError != "") {
+      setTimeout(() => {
+        setDataError("");
+      }, 3000);
+    }
+  }, [dataError]);
+
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -43,8 +49,7 @@ export default function LiveSystemStatusCard({
             {liveData && (
               <div className="mt-2 text-gray-700">
                 <div>
-                  Central CPU:{" "}
-                  {liveData.central_node?.cpu_usage?.toFixed(1)}%
+                  Central CPU: {liveData.central_node?.cpu_usage?.toFixed(1)}%
                 </div>
               </div>
             )}
@@ -52,7 +57,7 @@ export default function LiveSystemStatusCard({
 
           <div className="grid grid-cols-2 gap-2">
             <Button
-              onClick={fetchLiveClusterStatus}
+              onClick={getClusterStatusAndUsersData}
               size="sm"
               variant="outline"
               disabled={loadingData}
@@ -74,7 +79,7 @@ export default function LiveSystemStatusCard({
           </div>
         </div>
 
-        {dataError && (
+        {dataError != "" && (
           <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
             {dataError}
           </div>

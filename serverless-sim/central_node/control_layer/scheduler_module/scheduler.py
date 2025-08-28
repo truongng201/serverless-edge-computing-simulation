@@ -75,7 +75,35 @@ class Scheduler:
         
         # Initialize GAP solver
         self.gap_solver = GAPSolver(GAPConfig(debug_logging=True))
+        self.simulation = False
+        self.current_dataset = None
+        self.current_step_id = None
 
+    def start_simulation(self):
+        self.simulation = True
+        
+    def stop_simulation(self):
+        self.simulation = False
+
+    def get_edge_node(self, node_id: str) -> Optional[EdgeNodeInfo]:
+        return self.edge_nodes.get(node_id)
+    
+    def update_edge_node(self, new_edge_node: EdgeNodeInfo):
+        if new_edge_node.node_id not in self.edge_nodes:
+            return
+        self.edge_nodes[new_edge_node.node_id] = new_edge_node
+        
+    def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
+        if user_id not in self.user_nodes:
+            return False
+        
+        self.user_nodes[user_id].location = new_location
+        assigned_node_id, assigned_node_distance = self._node_assignment(new_location)
+        self.user_nodes[user_id].assigned_node_id = assigned_node_id
+        self.user_nodes[user_id].latency.distance = assigned_node_distance
+        
+        return True
+    
     def get_central_node_info(self) -> Dict[str, Any]:
         return self.central_node
     
@@ -237,27 +265,6 @@ class Scheduler:
             "warning_node_count": len(classified_nodes["warning"]),
             "warning_node_list": list(classified_nodes["warning"]),
         }
-
-    def update_edge_node_info(self, new_edge_node: EdgeNodeInfo):
-        if new_edge_node.node_id not in self.edge_nodes:
-            return
-        self.edge_nodes[new_edge_node.node_id] = new_edge_node
-    
-    def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
-        """Update user node location and reassign to nearest node"""
-        if user_id not in self.user_nodes:
-            return False
-        
-        # Update location
-        self.user_nodes[user_id].location = new_location
-        
-        # Recalculate nearest node
-        nearest_node_id, nearest_distance = self._node_assignment(new_location)
-        self.user_nodes[user_id].assigned_node_id = nearest_node_id
-        self.user_nodes[user_id].latency.distance = nearest_distance
-        
-        self.logger.info(f"Updated user {user_id} location to {new_location}, assigned to {nearest_node_id}")
-        return True
     
     def _node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
         min_distance = self._calculate_distance(user_location, self.central_node["location"])

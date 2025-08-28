@@ -12,10 +12,7 @@ import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 
 // Import custom hooks and utilities
 import useGlobalState from "@/hooks/use-global-state";
-import {
-  useSimulationLogic,
-  getEditModeDescription,
-} from "@/lib/simulation-logic";
+import { useSimulationLogic } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
 
 export default function Component() {
@@ -51,20 +48,16 @@ export default function Component() {
 
   return (
     <div className="relative w-full h-screen overflow-hidden bg-gray-50">
-      {/* Full Screen Canvas */}
       <SimulationCanvas />
 
-      {/* Left Control Panel */}
       <ControlPanel>
         <ControlPanelContent />
       </ControlPanel>
 
-      {/* Right Metrics Panel */}
       <MetricsPanel>
         <MetricsPanelContent />
       </MetricsPanel>
 
-      {/* Toggle Buttons for Panels */}
       {!leftPanelOpen && (
         <Button
           className="absolute left-4 top-4 z-20"
@@ -84,8 +77,7 @@ export default function Component() {
         </Button>
       )}
 
-      {/* Instructions */}
-      <EditModeDescription description={getEditModeDescription()} />
+      <EditModeDescription />
     </div>
   );
 }

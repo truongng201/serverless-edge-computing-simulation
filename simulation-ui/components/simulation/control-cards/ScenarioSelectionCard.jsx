@@ -9,9 +9,27 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
+import { startDactSample, startVehiclesSample, initializeStreetMap } from "@/lib/simulation-management";
+import { clearAllUsers } from "@/lib/user-management";
 
-export default function ScenarioSelectionCard({ handleScenarioChange }) {
-  const { selectedScenario } = useGlobalState();
+export default function ScenarioSelectionCard() {
+  const { setRoadNetwork, selectedScenario, setSelectedScenario } = useGlobalState();
+
+  const handleScenarioChange = async (value) => {
+    setSelectedScenario(value);
+
+    if (value === "scenario2") {
+      await startDactSample();
+    } else if (value === "scenario3") {
+      await startVehiclesSample();
+    } else if (value === "scenario4") {
+      await initializeStreetMap();
+    } else if (value === "none") {
+      await clearAllUsers();
+      setRoadNetwork(null);
+    }
+  };
+
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">

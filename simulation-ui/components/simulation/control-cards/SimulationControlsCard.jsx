@@ -3,20 +3,20 @@ import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Slider } from "@/components/ui/slider";
 import { Switch } from "@/components/ui/switch";
-import { Play, Pause } from "lucide-react";
+import { Play, Pause, RotateCcw } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
+import { stopSimulation, startSimulation, resetSimulation } from "@/lib/simulation-management";
 
-export default function SimulationControlsCard({
-  handleToggleSimulation,
-  simulationLoading,
-}) {
+export default function SimulationControlsCard() {
   const {
     isSimulating,
     simulationSpeed,
     setSimulationSpeed,
     predictionEnabled,
     setPredictionEnabled,
-    users
+    simulationLoading,
+    users,
+    setSelectedScenario
   } = useGlobalState();
   return (
     <Card className="mb-4">
@@ -27,7 +27,13 @@ export default function SimulationControlsCard({
       <CardContent className="space-y-3">
         <div className="flex gap-2">
           <Button
-            onClick={handleToggleSimulation}
+            onClick={async () => {
+              if (isSimulating) {
+                await stopSimulation();
+              } else {
+                await startSimulation();
+              }
+            }}
             variant={isSimulating ? "destructive" : "default"}
             size="sm"
             className="flex-1"
@@ -39,6 +45,12 @@ export default function SimulationControlsCard({
               <Play className="w-4 h-4" />
             )}
             {simulationLoading ? "Loading..." : isSimulating ? "Stop" : "Start"}
+          </Button>
+          <Button size='sm' variant={"outline"} onClick={async () => {
+            await resetSimulation();
+            setSelectedScenario("none");
+          }}>
+            <RotateCcw className="w-4 h-4" />
           </Button>
         </div>
         {isSimulating && (

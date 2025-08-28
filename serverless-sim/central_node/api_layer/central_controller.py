@@ -5,10 +5,11 @@ import string
 from typing import Dict, Any, Tuple
 
 
-from shared_resource_layer.container_manager import ContainerManager
-from shared_resource_layer.system_metrics import SystemMetricsCollector
+from shared.resource_layer import ContainerManager, SystemMetricsCollector
+from shared import BadRequestException
 
 from config import Config, ContainerState
+
 
 class CentralNodeAPIController:
     def __init__(self):
@@ -34,53 +35,36 @@ class CentralNodeAPIController:
         
     def execute_function(self, function_data: Dict[str, Any]) -> Dict[str, Any]:
         start_time = time.time()
+        
+        random_string_name = ''.join(random.choices(string.ascii_letters + string.digits, k=Config.DEFAULT_CONTAINER_ID_LENGTH))
+        image = function_data.get("image", Config.DEFAULT_CONTAINER_IMAGE)
+        function_data["function_name"] = f"fn_{random_string_name}"
+        function_data["image"] = image
+        
+        container_id, container_status = self._get_or_create_container(function_data["function_name"], image)
+
+        if not container_id:
+            raise BadRequestException(f"Failed to create or reuse container {time.time() - start_time}")
+
+        execution_time = time.time() - start_time
+        self.response_times.append(execution_time)
+        result = self.container_manager.execute_container(container_id, function_data)
+        
+        if not self.container_manager.warm_container(container_id):
+            raise BadRequestException(f"Failed to warm container {container_id}")
+        
         self.active_requests += 1
         self.total_requests += 1
-
-        try:
-            random_string_name = ''.join(random.choices(string.ascii_letters + string.digits, k=Config.DEFAULT_CONTAINER_ID_LENGTH))
-            image = function_data.get("image", Config.DEFAULT_CONTAINER_IMAGE)
-            function_data["function_name"] = f"fn_{random_string_name}"
-            function_data["image"] = image
-            
-            # Check if we need to create a new container or reuse existing
-            container_id, container_status = self._get_or_create_container(function_data["function_name"], image)
-
-            if not container_id:
-                return {
-                    "success": False,
-                    "error": "Failed to create or reuse container",
-                    "execution_time": time.time() - start_time
-                }
-
-            execution_time = time.time() - start_time
-            self.response_times.append(execution_time)
-            result = self.container_manager.execute_container(container_id, function_data)
-            
-            if not self.container_manager.warm_container(container_id):
-                return {
-                    "success": False,
-                    "error": "Failed to create or reuse container",
-                    "execution_time": time.time() - start_time
-                }
-            return {
-                "success": True,
-                "result": result,
-                "function_name": function_data["function_name"],
-                "container_id": container_id,
-                "container_status": container_status,
-                "execution_time": execution_time,
-                "node_id": "central_node"
-            }
-        except Exception as e:
-            self.logger.error(f"Error occurred while executing function: {e}")
-            return {
-                "success": False,
-                "error": str(e),
-                "execution_time": time.time() - start_time
-            }
-        finally:
-            self.active_requests -= 1
+        return {
+            "status": "success",
+            "result": result,
+            "function_name": function_data["function_name"],
+            "container_id": container_id,
+            "container_status": container_status,
+            "execution_time": execution_time,
+            "node_id": "central_node"
+        }
+        
 
     def _get_or_create_container(self, function_name: str, image: str) -> Tuple[str, str]:
         # Check for existing warm container for this function

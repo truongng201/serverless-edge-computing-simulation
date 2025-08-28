@@ -14,18 +14,15 @@ class UsersAgent:
         self.central_node = self.scheduler.central_node
         self.user_nodes = self.scheduler.user_nodes
 
-
         # Cleanup dead nodes
         self.excute_function_thread = None
         self.is_cleaning = False
-        self.excute_function_interval = Config.DEFAULT_EXECUTION_TIME_INTERVAL
 
         self.logger.info("Users Agent initialized")
 
     def _excute_function(self):
         for user_node in self.user_nodes.values():
             # Execute the function for each user node
-            self.logger.info(f"Executing function for user node: {user_node.user_id} with assigned node: {user_node.assigned_node_id}")
             assigned_node = user_node.assigned_node_id
             if not assigned_node:
                 continue  # Skip if the assigned node is not valid
@@ -70,10 +67,10 @@ class UsersAgent:
         while True:
             try:
                 self._excute_function()
-                time.sleep(self.excute_function_interval)
+                time.sleep(Config.DEFAULT_EXECUTION_TIME_INTERVAL)
             except Exception as e:
-                self.logger.error(f"Error in cleanup loop: {e}")
-                time.sleep(self.excute_function_interval)
+                self.logger.error(f"Error in execute function loop: {e}")
+                time.sleep(Config.DEFAULT_EXECUTION_TIME_INTERVAL)
 
     def start_excute_function_containers(self):
         if self.is_cleaning:
