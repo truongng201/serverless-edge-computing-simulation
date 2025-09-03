@@ -150,6 +150,6 @@ class GetAllUsersController:
 
 
     def execute(self):
-        self._update_scheduler()
         self._get_all_users()
+        self._update_scheduler()
         return self.response
