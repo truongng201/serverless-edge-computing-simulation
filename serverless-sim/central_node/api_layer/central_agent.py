@@ -2,12 +2,10 @@ import logging
 import threading
 import time
 
-from central_node.api_layer import CentralNodeAPIController
-
 from config import Config, ContainerState
 
 class CentralNodeAPIAgent:
-    def __init__(self, controller: CentralNodeAPIController):
+    def __init__(self, controller):
         self.logger = logging.getLogger(__name__)
         self.controller = controller
         self.container_manager = self.controller.container_manager
