@@ -1,5 +1,7 @@
 export const drawUserConnections = (ctx, users, centralNodes, edgeNodes, zoomLevel) => {
-  users.forEach((user, index) => {
+  users.forEach((user) => {
+    // Only draw for active users with an assignment
+    if (!user || user.shouldDespawn) return;
     let targetNode = null;
     
     // Find the assigned node

@@ -61,3 +61,8 @@ class Config:
     DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (100, 1000)  # 100 B/ms to 1 KB/ms
     DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s)
     DEFAULT_PIXEL_TO_METERS = 10 # 1 pixel = 10 m
+
+    # User cleanup
+    # If a user hasn't been updated for this many seconds, remove it
+    USER_TTL_SECONDS = 2
+    USER_CLEANUP_INTERVAL = 2  # how often to scan for stale users

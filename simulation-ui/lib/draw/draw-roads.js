@@ -41,19 +41,6 @@ export const drawRoads = (ctx, roads, visibleLeft, visibleTop, visibleRight, vis
             ctx.setLineDash([]);
         }
 
-        // Draw road labels
-        if (zoomLevel > 0.5) {
-            const midX = (road.startX + road.endX) / 2;
-            const midY = (road.startY + road.endY) / 2;
-            const fontSize = Math.max(8, 12 / zoomLevel);
-
-            ctx.fillStyle = "#FFFFFF";
-            ctx.font = `bold ${fontSize}px sans-serif`;
-            ctx.textAlign = "center";
-            ctx.strokeStyle = "#000000";
-            ctx.lineWidth = 3 / zoomLevel;
-            ctx.strokeText(road.id, midX, midY);
-            ctx.fillText(road.id, midX, midY);
-        }
+        // Hide road labels for a cleaner view
     });
 };

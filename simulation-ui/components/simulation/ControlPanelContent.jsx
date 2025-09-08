@@ -17,6 +17,7 @@ import { useEffect, useRef } from "react";
 import useGlobalState from "@/hooks/use-global-state";
 import { calculateLatency } from "@/lib/helper";
 import { runGAPAssignment } from "@/lib/user-management";
+import { runAssignmentAlgorithm } from "@/lib/user-management/run-assignment-algorithm";
 import { getClusterStatusAndUsersData } from "@/lib/simulation-management";
 
 export default function ControlPanelContent() {
@@ -29,6 +30,7 @@ export default function ControlPanelContent() {
     simulationSpeed,
     edgeNodes,
     centralNodes,
+    isSimulating,
   } = useGlobalState();
 
   // Function to run GAP batch assignment
@@ -64,68 +66,20 @@ export default function ControlPanelContent() {
     };
   }, []);
 
-  // Periodic auto (re)assignment every 10s: pick min latency among all edges and centrals
+  // Automatic assignment algorithm every 2s when simulation is running
   useEffect(() => {
     const interval = setInterval(() => {
+      // Only run auto-assignment when simulation is running
+      if (!isSimulating) return;
       if ((edgeNodes?.length || 0) + (centralNodes?.length || 0) === 0) return;
       if (!users || users.length === 0) return;
 
-      setUsers((prev) =>
-        prev.map((u) => {
-          let bestLatency = Number.POSITIVE_INFINITY;
-          let bestType = null;
-          let bestId = null;
-
-          // Evaluate all edges
-          for (let i = 0; i < edgeNodes.length; i++) {
-            const n = edgeNodes[i];
-            const lat = calculateLatency(
-              u,
-              n.id,
-              "edge",
-              edgeNodes,
-              centralNodes,
-              window.__LATENCY_PARAMS__
-            );
-            if (lat < bestLatency) {
-              bestLatency = lat;
-              bestType = "edge";
-              bestId = n.id;
-            }
-          }
-
-          // Evaluate all centrals
-          for (let i = 0; i < centralNodes.length; i++) {
-            const c = centralNodes[i];
-            const lat = calculateLatency(
-              u,
-              c.id,
-              "central",
-              edgeNodes,
-              centralNodes,
-              window.__LATENCY_PARAMS__
-            );
-            if (lat < bestLatency) {
-              bestLatency = lat;
-              bestType = "central";
-              bestId = c.id;
-            }
-          }
-
-          if (!bestType || !bestId || !isFinite(bestLatency)) return u;
-
-          return {
-            ...u,
-            assignedEdge: bestType === "edge" ? bestId : null,
-            assignedCentral: bestType === "central" ? bestId : null,
-            latency: bestLatency,
-          };
-        })
-      );
-    }, 10000);
+      // Run assignment algorithm to automatically assign users to best nodes
+      runAssignmentAlgorithm();
+    }, 2000); // Run every 2 seconds
 
     return () => clearInterval(interval);
-  }, [edgeNodes, centralNodes, users]);
+  }, [edgeNodes, centralNodes, users, isSimulating]);
 
   return (
     <>

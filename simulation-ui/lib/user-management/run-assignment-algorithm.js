@@ -1,5 +1,6 @@
 import useGlobalState from "@/hooks/use-global-state";
 import { calculateDistance } from "../helper";
+import { calculateLatency } from "./placement-algorithms";
 
 export const runAssignmentAlgorithm = () => {
   const { users, edgeNodes, centralNodes, assignmentAlgorithm, setUsers } =

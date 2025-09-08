@@ -1,6 +1,7 @@
 import {
   updateStreetMapUsers,
-  spawnNewStreetMapUsers,
+  // spawnNewStreetMapUsers,
+  spawnStreetUsersByTime,
   simulateServerlessFunctions,
   autoAssignStreetMapUsers,
 } from "./street-map-users";
@@ -23,7 +24,11 @@ export const useSimulationLogic = () => {
     centralNodes,
     setUsers,
     roadMode,
-    roads
+    roads,
+    streetSpawnRate,
+    streetMaxUsers,
+    lastStreetSpawnAt,
+    setLastStreetSpawnAt
   } = useGlobalState();
 
   // Simulation step
@@ -34,7 +39,8 @@ export const useSimulationLogic = () => {
     if (selectedScenario === "scenario4" && roadNetwork) {
       // Update traffic lights
       const updatedTrafficLights = updateTrafficLights(
-        roadNetwork.trafficLights
+        roadNetwork.trafficLights,
+        simulationSpeed?.[0] ?? 1
       );
       setRoadNetwork((prevNetwork) => ({
         ...prevNetwork,
@@ -64,15 +70,23 @@ export const useSimulationLogic = () => {
           centralNodes
         );
 
-        // Spawn new users with controlled rate
-        updatedUsers = spawnNewStreetMapUsers(
+        // Spawn new users using real-time rate (users/sec)
+        const now = Date.now();
+        const spawnPerSecond = streetSpawnRate?.[0] ?? 0.5;
+        const maxUsers = streetMaxUsers?.[0] ?? 15;
+        const result = spawnStreetUsersByTime(
           updatedUsers,
           { ...roadNetwork, trafficLights: updatedTrafficLights },
-          25, // max users (reduced for better performance)
-          0.08, // spawn rate (reduced to control density)
-          userSpeed[0],
-          10 // user size
+          maxUsers,
+          spawnPerSecond,
+          userSpeed?.[0] ?? 5,
+          10,
+          now,
+          lastStreetSpawnAt
         );
+        updatedUsers = result.users;
+        // Update last spawn time in global state
+        setLastStreetSpawnAt(result.lastSpawnAt);
 
         return updatedUsers;
       });
@@ -96,6 +110,10 @@ export const useSimulationLogic = () => {
     edgeNodes,
     centralNodes,
     assignmentAlgorithm,
+    streetSpawnRate,
+    streetMaxUsers,
+    lastStreetSpawnAt,
+    setLastStreetSpawnAt,
   ]);
 
   return {

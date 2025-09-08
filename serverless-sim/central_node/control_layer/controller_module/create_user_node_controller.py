@@ -1,4 +1,5 @@
 import random
+import time
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler, Latency, UserNodeInfo
 
@@ -43,7 +44,9 @@ class CreateUserNodeController:
             last_executed=0,
             size=self.user_data.get("size", 10),
             speed=self.user_data.get("speed", 5),
-            latency=latency
+            latency=latency,
+            created_at=time.time(),
+            last_updated=time.time()
         )
         self.scheduler.create_user_node(user_node)
 

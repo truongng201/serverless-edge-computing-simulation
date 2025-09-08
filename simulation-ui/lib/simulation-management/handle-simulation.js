@@ -1,5 +1,6 @@
 import useGlobalState from "@/hooks/use-global-state";
 import axios from "axios";
+import { runAssignmentAlgorithm } from "../user-management/run-assignment-algorithm";
 
 export const startSimulation = async () => {
   const { setIsSimulating, setLoadingSimulation } = useGlobalState.getState();
@@ -11,6 +12,11 @@ export const startSimulation = async () => {
 
     if (response.data && response.data.status === "success") {
       setIsSimulating(true);
+      
+      // Automatically run assignment algorithm when starting simulation
+      setTimeout(() => {
+        runAssignmentAlgorithm();
+      }, 1000); // Wait 1 second after starting simulation
     }
   } catch (error) {
     console.error("Error starting simulation:", error);

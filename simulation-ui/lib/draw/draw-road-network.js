@@ -26,7 +26,8 @@ export const drawRoadNetwork = (ctx, roadNetwork, visibleLeft, visibleTop, visib
     const perpX = -unitY; // Perpendicular for lane separation
     const perpY = unitX;
 
-    const roadWidth = road.type === 'major' ? 8 / zoomLevel : 4 / zoomLevel;
+    // Make roads thicker so they are visible without heavy zoom
+    const roadWidth = road.type === 'major' ? 18 / zoomLevel : 10 / zoomLevel;
     const laneOffset = roadWidth / 4;
 
     // Draw road background (asphalt)
@@ -39,11 +40,11 @@ export const drawRoadNetwork = (ctx, roadNetwork, visibleLeft, visibleTop, visib
     ctx.stroke();
 
     // Draw lane dividers for bidirectional roads
-    if (road.direction === 'bidirectional' && zoomLevel > 0.8) {
+    if (road.direction === 'bidirectional' && zoomLevel > 0.6) {
       // Center line (dashed yellow)
       ctx.strokeStyle = '#F59E0B';
-      ctx.lineWidth = 1 / zoomLevel;
-      ctx.setLineDash([8 / zoomLevel, 8 / zoomLevel]);
+      ctx.lineWidth = 1.5 / zoomLevel;
+      ctx.setLineDash([10 / zoomLevel, 10 / zoomLevel]);
 
       ctx.beginPath();
       ctx.moveTo(from.x, from.y);
@@ -53,9 +54,9 @@ export const drawRoadNetwork = (ctx, roadNetwork, visibleLeft, visibleTop, visib
       ctx.setLineDash([]); // Reset line dash
 
       // Lane edges (solid white)
-      if (road.type === 'major' && zoomLevel > 1.2) {
+      if (road.type === 'major' && zoomLevel > 0.9) {
         ctx.strokeStyle = '#FFFFFF';
-        ctx.lineWidth = 0.8 / zoomLevel;
+        ctx.lineWidth = 1.2 / zoomLevel;
 
         // Left edge
         ctx.beginPath();
@@ -83,7 +84,8 @@ export const drawRoadNetwork = (ctx, roadNetwork, visibleLeft, visibleTop, visib
     ) return;
 
     // Draw intersection area (lighter asphalt for intersection)
-    const intersectionSize = intersection.type === 'major' ? 16 / zoomLevel : 10 / zoomLevel;
+    // Increase intersection size to match thicker roads
+    const intersectionSize = intersection.type === 'major' ? 26 / zoomLevel : 16 / zoomLevel;
     ctx.fillStyle = '#4A5568'; // Slightly lighter than road
     ctx.fillRect(
       intersection.x - intersectionSize / 2,
@@ -95,7 +97,7 @@ export const drawRoadNetwork = (ctx, roadNetwork, visibleLeft, visibleTop, visib
     // Draw crosswalk stripes for major intersections
     if (intersection.type === 'major' && zoomLevel > 1) {
       ctx.strokeStyle = '#FFFFFF';
-      ctx.lineWidth = 1 / zoomLevel;
+      ctx.lineWidth = 1.2 / zoomLevel;
 
       // Horizontal crosswalk
       for (let i = -2; i <= 2; i++) {
@@ -116,14 +118,7 @@ export const drawRoadNetwork = (ctx, roadNetwork, visibleLeft, visibleTop, visib
       }
     }
 
-    // Draw intersection name for major intersections when zoomed in
-    if (intersection.type === 'major' && zoomLevel > 1.8) {
-      const fontSize = Math.max(8, 12 / zoomLevel);
-      ctx.fillStyle = '#1F2937';
-      ctx.font = `bold ${fontSize}px sans-serif`;
-      ctx.textAlign = 'center';
-      ctx.fillText(intersection.name, intersection.x, intersection.y - intersectionSize / 2 - 8);
-    }
+    // Remove intersection name labels for a cleaner map
   });
   ctx.restore();
 

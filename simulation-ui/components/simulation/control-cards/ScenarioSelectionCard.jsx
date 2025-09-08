@@ -52,7 +52,7 @@ export default function ScenarioSelectionCard() {
                 Scenario 3: Vehicle Sample
               </SelectItem>
               <SelectItem value="scenario4">
-                Scenario 4: Street Map (Saigon)
+                Scenario 4: Street Map
               </SelectItem>
             </SelectContent>
           </Select>

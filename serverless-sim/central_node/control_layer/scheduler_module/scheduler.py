@@ -7,6 +7,7 @@ import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
 from dataclasses import dataclass
+import time
 from enum import Enum
 
 from config import Config
@@ -51,6 +52,8 @@ class UserNodeInfo:
     speed: int
     last_executed: float
     latency: Latency
+    created_at: float
+    last_updated: float
 
 @dataclass
 class SchedulingDecision:
@@ -101,6 +104,7 @@ class Scheduler:
         assigned_node_id, assigned_node_distance = self._node_assignment(new_location)
         self.user_nodes[user_id].assigned_node_id = assigned_node_id
         self.user_nodes[user_id].latency.distance = assigned_node_distance
+        self.user_nodes[user_id].last_updated = time.time()
         
         return True
     

@@ -4,7 +4,16 @@ import { Slider } from "@/components/ui/slider";
 import useGlobalState from "@/hooks/use-global-state";
 
 export default function UserSettingsCard() {
-  const { userSpeed, setUserSpeed, userSize, setUserSize } = useGlobalState();
+  const {
+    userSpeed,
+    setUserSpeed,
+    userSize,
+    setUserSize,
+    streetSpawnRate,
+    setStreetSpawnRate,
+    streetMaxUsers,
+    setStreetMaxUsers,
+  } = useGlobalState();
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -29,6 +38,26 @@ export default function UserSettingsCard() {
             max={15}
             min={5}
             step={1}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-xs">Spawn rate (users/sec): {streetSpawnRate[0].toFixed(2)}</Label>
+          <Slider
+            value={streetSpawnRate}
+            onValueChange={setStreetSpawnRate}
+            max={5}
+            min={0}
+            step={0.1}
+          />
+        </div>
+        <div className="space-y-2">
+          <Label className="text-xs">Max users: {streetMaxUsers[0]}</Label>
+          <Slider
+            value={streetMaxUsers}
+            onValueChange={setStreetMaxUsers}
+            max={100}
+            min={5}
+            step={5}
           />
         </div>
       </CardContent>
