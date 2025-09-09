@@ -1,5 +1,6 @@
 import useGlobalState from "@/hooks/use-global-state";
 import { calculateDistance } from "../helper";
+import { calculateLatency } from "./placement-algorithms";
 
 export const runAssignmentAlgorithm = () => {
   const { users, edgeNodes, centralNodes, assignmentAlgorithm, setUsers } =
@@ -107,19 +108,6 @@ export const runAssignmentAlgorithm = () => {
           }
           break;
 
-        case "random":
-          // Random assignment
-          const allNodes = [
-            ...edgeNodes.map((n) => ({ ...n, type: "edge" })),
-            ...centralNodes.map((n) => ({ ...n, type: "central" })),
-          ];
-          if (allNodes.length > 0) {
-            const randomNode =
-              allNodes[Math.floor(Math.random() * allNodes.length)];
-            bestNode = randomNode;
-            bestType = randomNode.type;
-          }
-          break;
 
         default:
           console.warn(`Unknown assignment algorithm: ${assignmentAlgorithm}`);

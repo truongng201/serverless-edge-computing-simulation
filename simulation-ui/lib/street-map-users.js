@@ -30,7 +30,7 @@ const deleteUserFromBackend = async (userId) => {
 };
 
 // Create user in backend API
-const createUserInBackend = async (user) => {
+export const createUserInBackend = async (user) => {
   try {
     if (process.env.NEXT_PUBLIC_API_URL) {
       const userData = {
@@ -152,6 +152,12 @@ export const createStreetMapUser = (id, intersections, roads, trafficLights, use
     routeDuration: routeDuration,
     estimatedArrival: Date.now() + routeDuration,
     
+    // Stop detection properties
+    lastPosition: { x: startIntersection.x, y: startIntersection.y },
+    lastMoveTime: Date.now(),
+    stoppedDuration: 0,
+    maxStopTime: 5000, // Auto-delete if stopped for 5 seconds
+    
     // Serverless function properties
     assignedEdge: null,
     assignedCentral: null,
@@ -221,12 +227,68 @@ export const updateStreetMapUsers = (users, roadNetwork, simulationSpeed = 1) =>
   const { intersections, roads, trafficLights } = roadNetwork;
   const currentTime = Date.now();
   
-  return users.map(user => {
+  // First pass: update users and mark despawn flags
+  const updatedUsers = users.map(user => {
     if (user.type !== 'street_map') return user;
     
     // Check if user should despawn (reached destination or timeout)
-    if (user.pathIndex >= user.path.length - 1 || currentTime > user.estimatedArrival) {
-      return { ...user, shouldDespawn: true };
+    if (user.waypointIndex >= user.waypoints.length - 1 || 
+        user.pathIndex >= user.path.length - 1 || 
+        currentTime > user.estimatedArrival) {
+      return { 
+        ...user, 
+        shouldDespawn: true,
+        // Clear assignments immediately so connection lines won't render this frame
+        assignedEdge: null,
+        assignedCentral: null,
+        assignedNodeID: null,
+      };
+    }
+
+    // Check if user is very close to final destination
+    if (user.waypoints && user.waypoints.length > 0) {
+      const finalDestination = user.waypoints[user.waypoints.length - 1];
+      const distanceToDestination = Math.sqrt(
+        Math.pow(user.x - finalDestination.x, 2) + 
+        Math.pow(user.y - finalDestination.y, 2)
+      );
+      if (distanceToDestination < 15) { // Within 15 pixels of destination
+        return { 
+          ...user, 
+          shouldDespawn: true,
+          assignedEdge: null,
+          assignedCentral: null,
+          assignedNodeID: null,
+        };
+      }
+    }
+
+    // Check if user has stopped moving for too long
+    const hasMovedSinceLastUpdate = 
+      Math.abs(user.x - user.lastPosition.x) > 1 || 
+      Math.abs(user.y - user.lastPosition.y) > 1;
+    
+    let updatedStoppedDuration = user.stoppedDuration;
+    let lastMoveTime = user.lastMoveTime;
+    
+    if (hasMovedSinceLastUpdate) {
+      // User is moving, reset stopped duration
+      updatedStoppedDuration = 0;
+      lastMoveTime = currentTime;
+    } else {
+      // User hasn't moved, increase stopped duration
+      updatedStoppedDuration = currentTime - lastMoveTime;
+    }
+    
+    // Auto-delete if user has been stopped for too long (and not waiting at traffic light)
+    if (updatedStoppedDuration > user.maxStopTime && !user.isWaitingAtLight) {
+      return { 
+        ...user, 
+        shouldDespawn: true,
+        assignedEdge: null,
+        assignedCentral: null,
+        assignedNodeID: null,
+      };
     }
     
     // Check if waiting at traffic light
@@ -239,7 +301,10 @@ export const updateStreetMapUsers = (users, roadNetwork, simulationSpeed = 1) =>
           isWaitingAtLight: false,
           waitingLightId: null,
           isMoving: true,
-          currentSpeed: user.baseSpeed
+          currentSpeed: user.baseSpeed,
+          lastPosition: { x: user.x, y: user.y },
+          lastMoveTime: lastMoveTime,
+          stoppedDuration: updatedStoppedDuration
         };
       } else {
         // Still waiting
@@ -247,7 +312,10 @@ export const updateStreetMapUsers = (users, roadNetwork, simulationSpeed = 1) =>
           ...user,
           currentSpeed: 0,
           vx: 0,
-          vy: 0
+          vy: 0,
+          lastPosition: { x: user.x, y: user.y },
+          lastMoveTime: lastMoveTime,
+          stoppedDuration: updatedStoppedDuration
         };
       }
     }
@@ -267,7 +335,10 @@ export const updateStreetMapUsers = (users, roadNetwork, simulationSpeed = 1) =>
         isMoving: false,
         currentSpeed: 0,
         vx: 0,
-        vy: 0
+        vy: 0,
+        lastPosition: { x: user.x, y: user.y },
+        lastMoveTime: lastMoveTime,
+        stoppedDuration: updatedStoppedDuration
       };
     }
     
@@ -287,7 +358,10 @@ export const updateStreetMapUsers = (users, roadNetwork, simulationSpeed = 1) =>
           ...user,
           waypointIndex: user.waypointIndex + 1,
           pathIndex: user.waypointIndex + 1,
-          currentIntersection: user.path[user.waypointIndex + 1] || user.currentIntersection
+          currentIntersection: user.path[user.waypointIndex + 1] || user.currentIntersection,
+          lastPosition: { x: user.x, y: user.y },
+          lastMoveTime: lastMoveTime,
+          stoppedDuration: updatedStoppedDuration
         };
       }
       
@@ -302,11 +376,19 @@ export const updateStreetMapUsers = (users, roadNetwork, simulationSpeed = 1) =>
         y: user.y + normalizedDy * speed,
         vx: normalizedDx * speed,
         vy: normalizedDy * speed,
-        direction: Math.atan2(dy, dx)
+        direction: Math.atan2(dy, dx),
+        lastPosition: { x: user.x, y: user.y },
+        lastMoveTime: lastMoveTime,
+        stoppedDuration: updatedStoppedDuration
       };
     }
     
-    return user;
+    return {
+      ...user,
+      lastPosition: { x: user.x, y: user.y },
+      lastMoveTime: lastMoveTime,
+      stoppedDuration: updatedStoppedDuration
+    };
   });
   
   // Handle user despawning and API cleanup
@@ -314,7 +396,7 @@ export const updateStreetMapUsers = (users, roadNetwork, simulationSpeed = 1) =>
   const usersToDelete = [];
   
   updatedUsers.forEach(user => {
-    if (user.shouldDespawn) {
+    if (user.type === 'street_map' && user.shouldDespawn) {
       usersToDelete.push(user);
     } else {
       usersToKeep.push(user);
@@ -323,7 +405,12 @@ export const updateStreetMapUsers = (users, roadNetwork, simulationSpeed = 1) =>
   
   // Delete users from backend API if they should despawn
   usersToDelete.forEach(user => {
-    deleteUserFromBackend(user.id);
+    try {
+      console.log(`Despawning user ${user.id}: reached destination or timeout`);
+      deleteUserFromBackend(user.id);
+    } catch (e) {
+      console.warn('Failed to delete user from backend', user.id, e);
+    }
   });
   
   // Update user positions in backend periodically (every few updates to avoid spamming)
@@ -371,6 +458,56 @@ export const spawnNewStreetMapUsers = (
   }
   
   return currentUsers;
+};
+
+// Real-time spawn: spawn users based on time interval rather than per-frame probability
+// Returns { users, lastSpawnAt }
+export const spawnStreetUsersByTime = (
+  currentUsers,
+  roadNetwork,
+  maxUsers = 100,
+  spawnPerSecond = 1,
+  userSpeed = 30,
+  userSize = 8,
+  now = Date.now(),
+  lastSpawnAt = null,
+  maxPerTick = 3
+) => {
+  const { intersections, roads, trafficLights } = roadNetwork;
+  const streetMapUsers = currentUsers.filter(u => u.type === 'street_map');
+  let users = currentUsers;
+
+  if (streetMapUsers.length >= maxUsers) {
+    return { users, lastSpawnAt: lastSpawnAt ?? now };
+  }
+
+  // If spawn rate is zero or negative, do nothing
+  if (!spawnPerSecond || spawnPerSecond <= 0) {
+    return { users, lastSpawnAt: lastSpawnAt ?? now };
+  }
+
+  const intervalMs = 1000 / spawnPerSecond;
+  let nextSpawnTime = lastSpawnAt ?? now;
+  let spawnedThisTick = 0;
+
+  while (now - nextSpawnTime >= intervalMs && users.filter(u => u.type === 'street_map').length < maxUsers) {
+    // Create new user
+    const newUserId = Date.now() + Math.random() * 1000;
+    const newUser = createStreetMapUser(newUserId, intersections, roads, trafficLights, userSpeed, userSize);
+    if (newUser) {
+      // Register in backend (fire and forget)
+      createUserInBackend(newUser);
+      users = [...users, newUser];
+      spawnedThisTick++;
+    }
+    nextSpawnTime += intervalMs;
+
+    if (spawnedThisTick >= maxPerTick) break; // safety cap per tick
+  }
+
+  // Ensure lastSpawnAt never jumps backwards
+  const updatedLastSpawnAt = nextSpawnTime > now ? nextSpawnTime - intervalMs : nextSpawnTime;
+  return { users, lastSpawnAt: updatedLastSpawnAt };
 };
 
 // Convert regular users to street map users

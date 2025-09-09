@@ -118,6 +118,10 @@ const useGlobalState = create((set) => ({
   userSpeed: [5],
   userSize: [10],
   predictionSteps: [10],
+  // Street spawn controls
+  streetSpawnRate: [0.5], // users per second
+  streetMaxUsers: [15],
+  lastStreetSpawnAt: null,
   setUserSpeed: (updater) =>
     set((state) => ({
       userSpeed: typeof updater === "function"
@@ -128,6 +132,24 @@ const useGlobalState = create((set) => ({
     set((state) => ({
       userSize: typeof updater === "function"
         ? updater(state.userSize)
+        : updater
+    })),
+  setStreetSpawnRate: (updater) =>
+    set((state) => ({
+      streetSpawnRate: typeof updater === "function"
+        ? updater(state.streetSpawnRate)
+        : updater
+    })),
+  setStreetMaxUsers: (updater) =>
+    set((state) => ({
+      streetMaxUsers: typeof updater === "function"
+        ? updater(state.streetMaxUsers)
+        : updater
+    })),
+  setLastStreetSpawnAt: (updater) =>
+    set((state) => ({
+      lastStreetSpawnAt: typeof updater === "function"
+        ? updater(state.lastStreetSpawnAt)
         : updater
     })),
   setPredictionSteps: (updater) =>

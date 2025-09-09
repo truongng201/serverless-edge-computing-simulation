@@ -231,50 +231,49 @@ export const generateSaigonRoadNetwork = (width = 3000, height = 3000) => {
 };
 
 // Update traffic light states based on time with proper coordination
-export const updateTrafficLights = (trafficLights) => {
+export const updateTrafficLights = (trafficLights, simulationSpeed = 1) => {
   const currentTime = Date.now();
-  
-  return trafficLights.map((light, index) => {
-    const timeSinceChange = currentTime - light.lastStateChange;
-    let newState = light.state;
-    let newLastStateChange = light.lastStateChange;
-    let newCurrentDirection = light.currentDirection;
-    
-    // Traffic light cycle: North-South green -> Yellow -> Red -> East-West green -> Yellow -> Red
-    const totalCycleTime = light.greenTime + light.yellowTime + light.redTime;
-    const cyclePosition = timeSinceChange % totalCycleTime;
-    
-    // Phase offset for different intersections (to avoid all red at same time)
-    const phaseOffset = (index * 5000) % totalCycleTime; // 5 second offset per intersection
-    const adjustedCyclePosition = (cyclePosition + phaseOffset) % totalCycleTime;
-    
-    // Determine state based on cycle position
-    if (adjustedCyclePosition < light.greenTime) {
-      // Green phase
+  const speed = Math.max(0.1, Number(simulationSpeed) || 1);
+
+  // Target behavior: with simulationSpeed=1, flip allowance every ~5s
+  const GREEN_MS = 5000 / speed;   // allowed direction duration
+  const YELLOW_MS = 300 / speed;   // short caution
+  const RED_MS = 5000 / speed;     // all-stop for clearance
+  const PHASE_MS = GREEN_MS + YELLOW_MS + RED_MS;
+
+  return trafficLights.map((light) => {
+    const timeSinceChange = currentTime - (light.lastStateChange || currentTime);
+    let newState = light.state || 'green';
+    let newLastStateChange = light.lastStateChange || currentTime;
+    let newCurrentDirection = light.currentDirection || 'north-south';
+
+    // Compute position within the current phase
+    const cyclePosition = timeSinceChange % PHASE_MS;
+
+    if (cyclePosition < GREEN_MS) {
+      // Green for current direction
       newState = 'green';
-      // North-South is green first half of cycle, East-West second half
-      newCurrentDirection = adjustedCyclePosition < (light.greenTime / 2) ? 'north-south' : 'east-west';
-    } else if (adjustedCyclePosition < light.greenTime + light.yellowTime) {
-      // Yellow phase
+    } else if (cyclePosition < GREEN_MS + YELLOW_MS) {
+      // Yellow for current direction
       newState = 'yellow';
-      // Keep same direction as was green
     } else {
-      // Red phase - brief all-red for safety
+      // Brief red (all stop), then flip direction at phase boundary
       newState = 'red';
     }
-    
-    // Update state change time only when state actually changes
-    if (newState !== light.state) {
-      newLastStateChange = currentTime;
+
+    // If we just wrapped a full phase since the last change window, flip direction
+    if (cyclePosition < (light.cyclePosition || 0)) {
+      // Phase wrapped; toggle direction
+      newCurrentDirection = (light.currentDirection === 'north-south') ? 'east-west' : 'north-south';
+      newLastStateChange = currentTime; // anchor phase start
     }
-    
+
     return {
       ...light,
       state: newState,
       lastStateChange: newLastStateChange,
       currentDirection: newCurrentDirection,
-      cyclePosition: adjustedCyclePosition,
-      phaseOffset: phaseOffset
+      cyclePosition: cyclePosition,
     };
   });
 };

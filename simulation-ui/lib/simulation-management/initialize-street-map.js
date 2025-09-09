@@ -1,5 +1,5 @@
 import useGlobalState from "@/hooks/use-global-state";
-import { clearAllUsers } from "@/lib/user-management";
+import { serverClearAllUsers } from "@/lib/user-management";
 import { generateSaigonRoadNetwork } from "@/lib/road-network";
 import { generateStreetMapUsers } from "@/lib/street-map-users";
 
@@ -11,14 +11,17 @@ export const initializeStreetMap = async () => {
     setUsers,
     userSpeed,
     userSize,
+    setLastStreetSpawnAt,
+    streetSpawnRate,
+    streetMaxUsers,
   } = useGlobalState.getState();
 
   try {
     setLoadingData(true);
     setDataError("");
 
-    // Clear existing users from backend first
-    await clearAllUsers();
+    // Clear existing users on backend without touching local scenario selection
+    await serverClearAllUsers();
 
     // Generate Saigon road network
     const newRoadNetwork = generateSaigonRoadNetwork(1200, 800); // Adjust to canvas size
@@ -32,6 +35,9 @@ export const initializeStreetMap = async () => {
       userSize[0]
     );
     setUsers(streetUsers);
+
+    // Initialize spawn timestamp so real-time spawner starts cleanly
+    setLastStreetSpawnAt(Date.now());
   } catch (error) {
     console.error("Error initializing street map scenario:", error);
     setDataError(`Failed to initialize street map: ${error.message}`);

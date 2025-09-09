@@ -6,6 +6,7 @@ import {
   randomNearestPlacement,
   calculateLatency 
 } from "./placement-algorithms";
+import { calculateDistance } from "../helper";
 
 export const runPlacementAlgorithm = () => {
   const { users, edgeNodes, placementAlgorithm, setEdgeNodes, setUsers } =
