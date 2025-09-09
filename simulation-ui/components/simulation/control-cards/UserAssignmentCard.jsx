@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
+import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -8,9 +9,10 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Target, MapPin } from "lucide-react";
+import { Target, MapPin, Settings2 } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
 import { runAssignmentAlgorithm } from "@/lib/user-management";
+import { useEffect, useState } from "react";
 
 export default function UserAssignmentCard({
   runGAPBatch,
@@ -22,6 +24,82 @@ export default function UserAssignmentCard({
     centralNodes,
     users,
   } = useGlobalState();
+
+  // Local config states (load from backend on mount)
+  const [dwell, setDwell] = useState(1.0);
+  const [threshold, setThreshold] = useState(0.1);
+  const [scanInterval, setScanInterval] = useState(0.5);
+
+  useEffect(() => {
+    const loadStatus = async () => {
+      try {
+        if (!process.env.NEXT_PUBLIC_API_URL) return;
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/assignment/status`);
+        if (!res.ok) return;
+        const payload = await res.json();
+        const cfg = payload?.data?.config || {};
+        if (typeof cfg.handoff_min_dwell_seconds === "number") setDwell(cfg.handoff_min_dwell_seconds);
+        if (typeof cfg.handoff_improvement_threshold === "number") setThreshold(cfg.handoff_improvement_threshold);
+        if (typeof cfg.assignment_scan_interval === "number") setScanInterval(cfg.assignment_scan_interval);
+      } catch (e) {
+        // ignore
+      }
+    };
+    loadStatus();
+  }, []);
+  // Map UI selection -> backend strategy
+  const mapToBackend = (ui) => {
+    switch (ui) {
+      case "nearest-distance":
+        return "geographic"; // distance-based
+      case "nearest-latency":
+        return "least_loaded"; // load-aware proxy
+      case "gap-baseline":
+        return "gap_baseline"; // GAP solver baseline
+      default:
+        return "geographic";
+    }
+  };
+
+  const onSelectAlgo = async (value) => {
+    try {
+      setAssignmentAlgorithm(value);
+      if (process.env.NEXT_PUBLIC_API_URL) {
+        const strategy = mapToBackend(value);
+        await fetch(
+          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/assignment/strategy`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ strategy }),
+          }
+        );
+      }
+    } catch (e) {
+      console.warn("Failed to set backend assignment strategy", e);
+    }
+  };
+
+  const applyConfig = async () => {
+    try {
+      if (!process.env.NEXT_PUBLIC_API_URL) return;
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/assignment/config`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            handoff_min_dwell_seconds: Number(dwell),
+            handoff_improvement_threshold: Number(threshold),
+            assignment_scan_interval: Number(scanInterval),
+          }),
+        }
+      );
+    } catch (e) {
+      console.warn("Failed to update assignment config", e);
+    }
+  };
+
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -33,10 +111,7 @@ export default function UserAssignmentCard({
       <CardContent className="space-y-3">
         <div className="space-y-2">
           <Label className="text-xs">Assignment Algorithm</Label>
-          <Select
-            value={assignmentAlgorithm}
-            onValueChange={setAssignmentAlgorithm}
-          >
+          <Select value={assignmentAlgorithm} onValueChange={onSelectAlgo}>
             <SelectTrigger className="h-8">
               <SelectValue />
             </SelectTrigger>
@@ -44,9 +119,48 @@ export default function UserAssignmentCard({
               <SelectItem value="nearest-distance">Nearest Distance</SelectItem>
               <SelectItem value="nearest-latency">Nearest Latency</SelectItem>
               <SelectItem value="gap-baseline">GAP Baseline</SelectItem>
-              <SelectItem value="random">Random Assignment</SelectItem>
             </SelectContent>
           </Select>
+        </div>
+
+        {/* Online assignment tuning */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 text-xs font-medium">
+            <Settings2 className="w-3 h-3" /> Online Reassignment
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Dwell: {dwell.toFixed(2)} s</Label>
+            <Slider
+              value={[dwell]}
+              onValueChange={(v) => setDwell(v[0])}
+              min={0}
+              max={3}
+              step={0.1}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Threshold: {(threshold * 100).toFixed(0)}%</Label>
+            <Slider
+              value={[threshold]}
+              onValueChange={(v) => setThreshold(v[0])}
+              min={0}
+              max={0.5}
+              step={0.01}
+            />
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Scan interval: {scanInterval.toFixed(2)} s</Label>
+            <Slider
+              value={[scanInterval]}
+              onValueChange={(v) => setScanInterval(v[0])}
+              min={0.1}
+              max={2}
+              step={0.1}
+            />
+          </div>
+          <Button size="sm" variant="outline" onClick={applyConfig}>
+            Apply Assignment Config
+          </Button>
         </div>
 
         <div className="text-xs text-gray-600 mb-2">

@@ -22,6 +22,10 @@ class UsersAgent:
         self.cleanup_users_thread = None
         self.is_users_cleaning = False
 
+        # Assignment reassignment loop
+        self.assignment_thread = None
+        self.is_assignment_running = False
+
         self.logger.info("Users Agent initialized")
 
     def _excute_function(self):
@@ -139,10 +143,44 @@ class UsersAgent:
             self.cleanup_users_thread.join()
         self.logger.info("Inactive users cleanup thread stopped")
 
+    # --- Online reassignment loop ---
+    def _assignment_scan_once(self):
+        try:
+            for user in list(self.scheduler.user_nodes.values()):
+                self.scheduler.maybe_reassign_user(user)
+        except Exception as e:
+            self.logger.error(f"Assignment scan error: {e}")
+
+    def assignment_scan_loop(self):
+        while True:
+            try:
+                self._assignment_scan_once()
+                time.sleep(self.scheduler.assignment_scan_interval)
+            except Exception as e:
+                self.logger.error(f"Error in assignment scan loop: {e}")
+                time.sleep(self.scheduler.assignment_scan_interval)
+
+    def start_assignment_scan(self):
+        if self.is_assignment_running:
+            return
+        self.is_assignment_running = True
+        self.assignment_thread = threading.Thread(target=self.assignment_scan_loop)
+        self.assignment_thread.daemon = True
+        self.assignment_thread.start()
+        self.logger.info("Assignment scan thread started")
+
+    def stop_assignment_scan(self):
+        self.is_assignment_running = False
+        if self.assignment_thread:
+            self.assignment_thread.join()
+        self.logger.info("Assignment scan thread stopped")
+
     def start_all_tasks(self):
         self.start_excute_function_containers()
         self.start_cleanup_inactive_users()
+        self.start_assignment_scan()
         
     def stop_all_tasks(self):
         self.stop_excute_function_containers()
         self.stop_cleanup_inactive_users()
+        self.stop_assignment_scan()

@@ -66,3 +66,9 @@ class Config:
     # If a user hasn't been updated for this many seconds, remove it
     USER_TTL_SECONDS = 2
     USER_CLEANUP_INTERVAL = 2  # how often to scan for stale users
+
+    # Assignment / handoff parameters
+    HANDOFF_MIN_DWELL_SECONDS = 1.0  # minimum time to stay on a node before switching
+    HANDOFF_IMPROVEMENT_THRESHOLD = 0.1  # 10% better score required to switch
+    ASSIGNMENT_SCAN_INTERVAL = 0.5  # seconds between reassignment scans
+    LOAD_AWARE_ALPHA = 1.0  # weight for CPU load in load-aware score
