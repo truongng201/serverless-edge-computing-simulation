@@ -60,6 +60,26 @@ export const runPlacementAlgorithm = () => {
     });
   });
 
+  // Persist new positions to backend so poll won't snap them back
+  try {
+    if (process.env.NEXT_PUBLIC_API_URL) {
+      const updates = edgeNodes.map((node, index) => {
+        if (index >= selectedPositions.length) return null;
+        const payload = {
+          node_id: node.id,
+          coverage: node.coverage || 300.0,
+          location: { x: Math.round(selectedPositions[index].x), y: Math.round(selectedPositions[index].y) },
+        };
+        return fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_edge_node`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }).catch(() => null);
+      }).filter(Boolean);
+      if (updates.length) Promise.allSettled(updates);
+    }
+  } catch {}
+
   // Reassign users to nearest edge nodes
   const updatedNodes = edgeNodes.map((node, index) => {
     if (index < selectedPositions.length) {

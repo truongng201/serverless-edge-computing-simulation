@@ -72,9 +72,9 @@ def main():
     app = create_central_node_app()
     
     logger.info("Central Node components:")
-    logger.info("  ✓ Control Layer (Scheduler, Prediction, Migration, Metrics, Graph, UI, Data)")
-    logger.info("  ✓ API Layer (REST endpoints)")
-    logger.info("  ✓ Resource Layer (Docker management)")
+    logger.info("  OK Control Layer (Scheduler, Prediction, Migration, Metrics, Graph, UI, Data)")
+    logger.info("  OK API Layer (REST endpoints)")
+    logger.info("  OK Resource Layer (Docker management)")
     
     logger.info("-" * 60)
     logger.info("Available endpoints:")

@@ -137,10 +137,10 @@ def main():
     for attempt in range(args.retry_connection):
         is_connected, message = validate_central_node_connection(args.central_url)
         if is_connected:
-            logger.info(f"✓ Central node connection: {message}")
+            logger.info(f"Central node connection: {message}")
             break
         else:
-            logger.warning(f"✗ Attempt {attempt + 1}/{args.retry_connection}: {message}")
+            logger.warning(f"Attempt {attempt + 1}/{args.retry_connection} failed: {message}")
             if attempt < args.retry_connection - 1:
                 logger.info("Retrying in 5 seconds...")
                 time.sleep(5)
@@ -157,10 +157,10 @@ def main():
     app = create_edge_node_app(args.node_id, args.central_url, args.port, local_ip)
 
     logger.info("Edge Node components:")
-    logger.info("  ✓ API Layer (Container execution, request handling)")
-    logger.info("  ✓ Resource Layer (Docker management, system metrics)")
-    logger.info("  ✓ Metrics reporting (every 10 seconds)")
-    logger.info("  ✓ Automatic registration with central node")
+    logger.info("  OK API Layer (Container execution, request handling)")
+    logger.info("  OK Resource Layer (Docker management, system metrics)")
+    logger.info("  OK Metrics reporting (every 10 seconds)")
+    logger.info("  OK Automatic registration with central node")
     
     logger.info("-" * 60)
     logger.info("Edge Node endpoints:")
@@ -175,7 +175,7 @@ def main():
         logger.info("Starting metrics reporting and registration...")
         if edge_node_api_agent:
             edge_node_api_agent.start_metrics_reporting()
-            logger.info("✓ Metrics reporting started")
+            logger.info("Metrics reporting started")
         else:
             logger.warning("Failed to start metrics reporting")
     
@@ -186,7 +186,7 @@ def main():
 
         if edge_node_api_agent:
             edge_node_api_agent.start_cleanup_containers()
-            logger.info("✓ Cleanup started")
+            logger.info("Cleanup started")
         else:
             logger.warning("Failed to start cleanup")
 

@@ -15,34 +15,23 @@ import {
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
 import useGlobalState from "@/hooks/use-global-state";
-import { calculateLatency } from "@/lib/helper";
-import { runGAPAssignment } from "@/lib/user-management";
-import { runAssignmentAlgorithm } from "@/lib/user-management/run-assignment-algorithm";
+// import { calculateLatency } from "@/lib/helper"; // unused here
+// Frontend assignment removed; backend is authoritative
+// import { runGAPAssignment } from "@/lib/user-management";
 import { getClusterStatusAndUsersData } from "@/lib/simulation-management";
 
 export default function ControlPanelContent() {
   const intervalRef = useRef(null);
   const {
     users,
-    setUsers,
     leftPanelOpen,
     setLeftPanelOpen,
     simulationSpeed,
     edgeNodes,
     centralNodes,
-    isSimulating,
   } = useGlobalState();
 
-  // Function to run GAP batch assignment
-  const runGAPBatch = () => {
-    if (typeof runGAPAssignment === "function") {
-      runGAPAssignment(users, edgeNodes, centralNodes, setUsers, {
-        method: "greedy",
-        enableMemoryConstraints: false,
-        debug: true,
-      });
-    }
-  };
+  // GAP batch (client-side) is deprecated; backend handles assignment
 
   // Start live data polling
   const startLiveDataPolling = async () => {
@@ -66,20 +55,7 @@ export default function ControlPanelContent() {
     };
   }, []);
 
-  // Automatic assignment algorithm every 2s when simulation is running
-  useEffect(() => {
-    const interval = setInterval(() => {
-      // Only run auto-assignment when simulation is running
-      if (!isSimulating) return;
-      if ((edgeNodes?.length || 0) + (centralNodes?.length || 0) === 0) return;
-      if (!users || users.length === 0) return;
-
-      // Run assignment algorithm to automatically assign users to best nodes
-      runAssignmentAlgorithm();
-    }, 2000); // Run every 2 seconds
-
-    return () => clearInterval(interval);
-  }, [edgeNodes, centralNodes, users, isSimulating]);
+  // Removed client-side auto-assignment loop; backend handoff is authoritative
 
   return (
     <>
@@ -107,7 +83,7 @@ export default function ControlPanelContent() {
 
         <NodePlacementCard />
 
-        <UserAssignmentCard runGAPBatch={runGAPBatch} />
+        <UserAssignmentCard />
 
         <ZoomControlsCard />
 

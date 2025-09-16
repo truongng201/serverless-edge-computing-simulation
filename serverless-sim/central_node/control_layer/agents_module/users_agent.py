@@ -29,7 +29,8 @@ class UsersAgent:
         self.logger.info("Users Agent initialized")
 
     def _excute_function(self):
-        for user_node in self.user_nodes.values():
+        # Snapshot to avoid concurrent modification errors during cleanup
+        for user_node in list(self.user_nodes.values()):
             # Execute the function for each user node
             assigned_node = user_node.assigned_node_id
             if not assigned_node:
@@ -100,6 +101,12 @@ class UsersAgent:
     def _cleanup_inactive_users(self):
         from config import Config
         try:
+            # Skip auto-clean for dataset-driven scenarios to keep sampled users alive
+            try:
+                if getattr(self.scheduler, 'current_dataset', None) in ("dact", "vehicles"):
+                    return
+            except Exception:
+                pass
             now = time.time()
             stale_ids = []
             for user_id, user_node in list(self.scheduler.user_nodes.items()):

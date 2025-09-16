@@ -26,18 +26,30 @@ class GetAllUsersController:
         sample = self.data_manager.get_dact_data_by_step(self.current_step_id)
 
         if not sample:
-            return False
+            # If we hit the end of dataset, wrap to the beginning for continuous playback
+            self.current_step_id = 1
+            sample = self.data_manager.get_dact_data_by_step(self.current_step_id)
+            if not sample:
+                return False
         
         for item in sample.get("items", []):
-            user_node = None
-            if item.get(f"user_{item.get('id', 0)}") in self.scheduler.user_nodes:
-                user_node = self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")]
-                user_node.location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                nearest_node_id, nearest_distance = self.scheduler._node_assignment(user_node.location)
-                user_node.assigned_node_id = nearest_node_id
-                user_node.latency.propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
-                user_node.latency.total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay
-                self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")] = user_node
+            user_id = f"user_{item.get('id', 0)}"
+            location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
+            if user_id in self.scheduler.user_nodes:
+                # Update existing user via scheduler helper (updates last_updated & history)
+                self.scheduler.update_user_node(user_id, location)
+                user_node = self.scheduler.user_nodes[user_id]
+                # Keep speed/size in sync if present
+                user_node.size = item.get("size", user_node.size)
+                user_node.speed = item.get("speed", user_node.speed)
+                # Refresh propagation delay and total time with updated distance
+                dist_m = getattr(user_node.latency, 'distance', 0)
+                user_node.latency.propagation_delay = dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.total_turnaround_time = (
+                    user_node.latency.propagation_delay
+                    + getattr(user_node.latency, 'transmission_delay', 0)
+                    + getattr(user_node.latency, 'computation_delay', 0)
+                )
             else:
                 location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
                 nearest_node_id, nearest_distance = self.scheduler._node_assignment(location)
@@ -57,7 +69,7 @@ class GetAllUsersController:
                     total_turnaround_time=total_turnaround_time
                 )
                 user_node = UserNodeInfo(
-                    user_id=f"user_{item.get('id', 0)}",
+                    user_id=user_id,
                     assigned_node_id=nearest_node_id,
                     location=location,
                     last_executed=0,
@@ -66,7 +78,9 @@ class GetAllUsersController:
                     latency=latency
                 )
                 self.scheduler.create_user_node(user_node)
-        self.current_step_id += 1
+        # Advance multiple steps per tick to increase apparent speed
+        step_mul = max(1, int(getattr(Config, 'DATASET_STEP_MULTIPLIER', 1)))
+        self.current_step_id += step_mul
         return True
     
     
@@ -77,18 +91,26 @@ class GetAllUsersController:
         sample = self.data_manager.get_vehicle_data_by_timestep(self.current_step_id)
 
         if not sample:
-            return False
+            self.current_step_id = 1
+            sample = self.data_manager.get_vehicle_data_by_timestep(self.current_step_id)
+            if not sample:
+                return False
         
         for item in sample.get("items", []):
-            user_node = None
-            if item.get(f"user_{item.get('id', 0)}") in self.scheduler.user_nodes:
-                user_node = self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")]
-                user_node.location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                nearest_node_id, nearest_distance = self.scheduler._node_assignment(user_node.location)
-                user_node.assigned_node_id = nearest_node_id
-                user_node.latency.propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
-                user_node.latency.total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay
-                self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")] = user_node
+            user_id = f"user_{item.get('id', 0)}"
+            location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
+            if user_id in self.scheduler.user_nodes:
+                self.scheduler.update_user_node(user_id, location)
+                user_node = self.scheduler.user_nodes[user_id]
+                user_node.size = item.get("size", user_node.size)
+                user_node.speed = item.get("speed", user_node.speed)
+                dist_m = getattr(user_node.latency, 'distance', 0)
+                user_node.latency.propagation_delay = dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.total_turnaround_time = (
+                    user_node.latency.propagation_delay
+                    + getattr(user_node.latency, 'transmission_delay', 0)
+                    + getattr(user_node.latency, 'computation_delay', 0)
+                )
             else:
                 location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
                 nearest_node_id, nearest_distance = self.scheduler._node_assignment(location)
@@ -108,7 +130,7 @@ class GetAllUsersController:
                     total_turnaround_time=total_turnaround_time
                 )
                 user_node = UserNodeInfo(
-                    user_id=f"user_{item.get('id', 0)}",
+                    user_id=user_id,
                     assigned_node_id=nearest_node_id,
                     location=location,
                     last_executed=0,
@@ -117,7 +139,8 @@ class GetAllUsersController:
                     latency=latency
                 )
                 self.scheduler.create_user_node(user_node)
-        self.current_step_id += 1
+        step_mul = max(1, int(getattr(Config, 'DATASET_STEP_MULTIPLIER', 1)))
+        self.current_step_id += step_mul
         return True
        
         
