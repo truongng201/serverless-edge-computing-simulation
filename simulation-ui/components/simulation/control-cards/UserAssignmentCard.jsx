@@ -9,14 +9,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Target, MapPin, Settings2 } from "lucide-react";
+import { Target, Settings2 } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { runAssignmentAlgorithm } from "@/lib/user-management";
 import { useEffect, useState } from "react";
 
-export default function UserAssignmentCard({
-  runGAPBatch,
-}) {
+export default function UserAssignmentCard({}) {
   const {
     edgeNodes,
     assignmentAlgorithm,
@@ -237,35 +234,7 @@ export default function UserAssignmentCard({
           <div>Users: {users?.length || 0}</div>
         </div>
 
-        <div className="grid grid-cols-1 gap-2">
-          <Button
-            onClick={runAssignmentAlgorithm}
-            size="sm"
-            variant="outline"
-            className="w-full"
-            disabled={
-              !users?.length || (!edgeNodes.length && !centralNodes.length)
-            }
-          >
-            <MapPin className="w-4 h-4 mr-1" />
-            Run User Assignment
-          </Button>
-
-          {assignmentAlgorithm === "gap-baseline" && (
-            <Button
-              onClick={() => runGAPBatch()}
-              size="sm"
-              variant="default"
-              className="w-full bg-blue-600 hover:bg-blue-700"
-              disabled={
-                !users?.length || (!edgeNodes.length && !centralNodes.length)
-              }
-            >
-              <Target className="w-4 h-4 mr-1" />
-              Run GAP Batch (Optimal)
-            </Button>
-          )}
-        </div>
+        <div className="grid grid-cols-1 gap-2"></div>
       </CardContent>
     </Card>
   );

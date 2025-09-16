@@ -2,6 +2,7 @@ from .register_edge_node_controller import RegisterEdgeNodeController
 from .update_node_metrics_controller import UpdateNodeMetricsController
 from .get_cluster_status_controller import GetClusterStatusController
 from .update_edge_node_controller import UpdateEdgeNodeController
+from .update_central_node_controller import UpdateCentralNodeController
 from .create_user_node_controller import CreateUserNodeController
 from .update_user_node_controller import UpdateUserNodeController
 from .get_all_users_controller import GetAllUsersController

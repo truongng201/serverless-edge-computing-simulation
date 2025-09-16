@@ -72,3 +72,14 @@ class Config:
     HANDOFF_IMPROVEMENT_THRESHOLD = 0.1  # 10% better score required to switch
     ASSIGNMENT_SCAN_INTERVAL = 0.5  # seconds between reassignment scans
     LOAD_AWARE_ALPHA = 1.0  # weight for CPU load in load-aware score
+
+    # Predictive scheduling parameters
+    PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB = 256  # default per-user memory footprint
+    PREDICTIVE_DEFAULT_DATA_SIZE_BYTES = 512 * 1024  # 512 KB when historical data missing
+    PREDICTIVE_COLD_START_MS = 300  # expected cold start penalty
+    PREDICTIVE_HANDOFF_COST = 0.05  # score penalty for handoff
+    PREDICTIVE_WARM_BASE_PROB = 0.2  # base warm probability when metrics are missing
+
+    # Dataset playback speed (Scenario 2 / vehicles)
+    # Multiply timestep advancement per poll to make movements appear faster on canvas
+    DATASET_STEP_MULTIPLIER = 8

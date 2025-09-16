@@ -99,6 +99,13 @@ def update_user_node():
     result = central_core_controller.update_user_node(request_data)
     return result 
 
+@central_route.route("/update_central_node", methods=["POST"])
+@standard_response
+def update_central_node():
+    request_data = request.get_json()
+    result = central_core_controller.update_central_node(request_data)
+    return result
+
 @central_route.route("/get_all_users", methods=["GET"])
 @standard_response
 def get_all_users():

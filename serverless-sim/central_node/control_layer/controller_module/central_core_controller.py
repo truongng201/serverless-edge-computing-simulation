@@ -68,6 +68,10 @@ class CentralCoreController:
         controller = UpdateEdgeNodeController(self.scheduler, request_data)
         controller.execute()
         return f"Edge node {request_data.get('node_id')} updated successfully"
+
+    def update_central_node(self, request_data):
+        controller = UpdateCentralNodeController(self.scheduler, request_data)
+        return controller.execute()
     
     def create_user_node(self, request_data):
         controller = CreateUserNodeController(self.scheduler, request_data)

@@ -58,6 +58,42 @@ export function useMouseUpHandler() {
       }
     }
 
+    // Handle API call for central node position update
+    if (
+      isDraggingNode &&
+      draggedNode &&
+      draggedNode.node &&
+      draggedNode.type === "central"
+    ) {
+      try {
+        const payload = {
+          location: {
+            x: Math.round(draggedNode.node.x),
+            y: Math.round(draggedNode.node.y),
+          },
+          coverage: draggedNode.node.coverage || 0,
+        };
+        if (process.env.NEXT_PUBLIC_API_URL) {
+          const response = await fetch(
+            `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/update_central_node`,
+            {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            }
+          );
+          if (!response.ok) {
+            console.error(
+              "Failed to update central node position:",
+              response.statusText
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error updating central node position:", error);
+      }
+    }
+
     // Handle API call for user position update
     if (isDraggingUser && draggedUser) {
       try {
