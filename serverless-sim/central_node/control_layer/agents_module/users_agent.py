@@ -97,60 +97,7 @@ class UsersAgent:
             self.cleanup_thread.join()
         self.logger.info("Cleanup execute function thread stopped")
 
-    # --- Inactive users cleanup ---
-    def _cleanup_inactive_users(self):
-        from config import Config
-        try:
-            # Skip auto-clean for dataset-driven scenarios to keep sampled users alive
-            try:
-                if getattr(self.scheduler, 'current_dataset', None) in ("dact", "vehicles"):
-                    return
-            except Exception:
-                pass
-            now = time.time()
-            stale_ids = []
-            for user_id, user_node in list(self.scheduler.user_nodes.items()):
-                last_updated = getattr(user_node, 'last_updated', None)
-                if last_updated is None:
-                    continue
-                if now - last_updated > Config.USER_TTL_SECONDS:
-                    stale_ids.append(user_id)
-
-            for uid in stale_ids:
-                try:
-                    del self.scheduler.user_nodes[uid]
-                    self.logger.info(f"Cleaned up inactive user: {uid}")
-                except Exception as e:
-                    self.logger.error(f"Failed to clean inactive user {uid}: {e}")
-        except Exception as e:
-            self.logger.error(f"Error while scanning inactive users: {e}")
-
-    def cleanup_inactive_users_loop(self):
-        from config import Config
-        while True:
-            try:
-                self._cleanup_inactive_users()
-                time.sleep(Config.USER_CLEANUP_INTERVAL)
-            except Exception as e:
-                self.logger.error(f"Error in users cleanup loop: {e}")
-                time.sleep(Config.USER_CLEANUP_INTERVAL)
-
-    def start_cleanup_inactive_users(self):
-        if self.is_users_cleaning:
-            return
-        self.is_users_cleaning = True
-        self.cleanup_users_thread = threading.Thread(target=self.cleanup_inactive_users_loop)
-        self.cleanup_users_thread.daemon = True
-        self.cleanup_users_thread.start()
-        self.logger.info("Inactive users cleanup thread started")
-
-    def stop_cleanup_inactive_users(self):
-        self.is_users_cleaning = False
-        if self.cleanup_users_thread:
-            self.cleanup_users_thread.join()
-        self.logger.info("Inactive users cleanup thread stopped")
-
-    # --- Online reassignment loop ---
+   
     def _assignment_scan_once(self):
         try:
             for user in list(self.scheduler.user_nodes.values()):
@@ -184,10 +131,8 @@ class UsersAgent:
 
     def start_all_tasks(self):
         self.start_excute_function_containers()
-        self.start_cleanup_inactive_users()
         self.start_assignment_scan()
         
     def stop_all_tasks(self):
         self.stop_excute_function_containers()
-        self.stop_cleanup_inactive_users()
         self.stop_assignment_scan()
