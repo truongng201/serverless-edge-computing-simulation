@@ -157,9 +157,3 @@ def set_assignment_config():
     request_data = request.get_json() or {}
     result = central_core_controller.update_assignment_config(request_data)
     return result
-
-@central_route.route('/assignment/status', methods=['GET'])
-@standard_response
-def assignment_status():
-    result = central_core_controller.get_assignment_status()
-    return result

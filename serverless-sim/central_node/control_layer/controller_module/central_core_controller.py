@@ -116,9 +116,6 @@ class CentralCoreController:
         self.scheduler.set_assignment_config(**cfg)
         return self.scheduler.get_assignment_status()
 
-    def get_assignment_status(self):
-        return self.scheduler.get_assignment_status()
-
     def start_dact_sample(self):
         controller = StartDactSampleController(self.data_manager, self.scheduler)
         controller.execute()

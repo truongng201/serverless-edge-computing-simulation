@@ -195,19 +195,6 @@ class Scheduler:
             f"alpha={self.load_aware_alpha}"
         )
 
-    def get_assignment_status(self) -> Dict[str, Any]:
-        return {
-            'strategy': self.get_scheduling_strategy(),
-            'config': {
-                'handoff_min_dwell_seconds': self.handoff_min_dwell_seconds,
-                'handoff_improvement_threshold': self.handoff_improvement_threshold,
-                'assignment_scan_interval': self.assignment_scan_interval,
-                'load_aware_alpha': self.load_aware_alpha,
-            },
-            'handoff_log_tail': self.handoff_log[-20:],
-            'users': len(self.user_nodes),
-            'edge_nodes': len(self.edge_nodes),
-        }
     
     def create_user_node(self, user_node: UserNodeInfo):
         self.user_nodes[user_node.user_id] = user_node
