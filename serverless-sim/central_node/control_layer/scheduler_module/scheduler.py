@@ -12,8 +12,9 @@ from enum import Enum
 
 from config import Config
 
-from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
 from central_node.control_layer.scheduler_module.gap_solver import GAPSolver, GAPConfig
+from central_node.control_layer.models import EdgeNodeInfo, UserNodeInfo, NodeMetrics
+
 
 class SchedulingStrategy(Enum):
     ROUND_ROBIN = "round_robin"
@@ -21,42 +22,6 @@ class SchedulingStrategy(Enum):
     GEOGRAPHIC = "geographic"
     PREDICTIVE = "predictive"
     GAP_BASELINE = "gap_baseline"
-
-@dataclass
-class Latency:
-    distance: float
-    data_size: float
-    bandwidth: float
-    propagation_delay: float
-    transmission_delay: float
-    computation_delay: float
-    container_status: str
-    total_turnaround_time: float
-
-@dataclass
-class EdgeNodeInfo:
-    node_id: str
-    endpoint: str
-    location: Dict[str, float]  # {"x": ..., "y": ...}
-    system_info: Dict[str, Any]
-    last_heartbeat: float
-    metrics_info: NodeMetrics
-    coverage: float
-
-@dataclass
-class UserNodeInfo:
-    user_id: str
-    assigned_node_id: str
-    location: Dict[str, float]  # {"x": ..., "y": ...}
-    size: int
-    speed: int
-    last_executed: float
-    latency: Latency
-    created_at: float = field(default_factory=lambda: time.time())
-    last_updated: float = field(default_factory=lambda: time.time())
-    memory_requirement: float = field(default_factory=lambda: Config.PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB * 1024 * 1024)
-    last_handoff: float = 0.0
-    predictive_debug: Optional[Dict[str, Any]] = None
 
 @dataclass
 class SchedulingDecision:

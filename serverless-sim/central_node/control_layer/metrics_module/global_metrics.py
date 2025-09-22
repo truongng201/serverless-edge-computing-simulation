@@ -18,16 +18,3 @@ class NodeMetrics:
     disk_io: Dict[str, float]
     timestamp: float
     uptime: float
-
-@dataclass
-class ClusterMetrics:
-    timestamp: float
-    total_nodes: int
-    healthy_nodes: int
-    total_cpu_usage: float
-    total_memory_usage: float
-    total_containers: int
-    total_requests: int
-    avg_response_time: float
-    total_energy: float
-    load_distribution: Dict[str, float]

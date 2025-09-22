@@ -10,22 +10,27 @@ from collections import defaultdict
 from typing import Dict, Any, List, Optional
 
 class DataManager:
-    """
-    Manages simulation data for the central node UI.
-    Provides data loading capabilities for DACT and vehicle datasets.
-    """
-    
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.dact_loader = DactDataLoader()
-        self.vehicle_loader = VehicleDataLoader()
+        self.vehicle_loader = None
+        self.dact_loader = None
+    
+    def _load_vehicle_data(self, data_path: str = None):
+        self.vehicle_loader = VehicleDataLoader(data_path)
+        self.logger.info(f"Vehicle data loaded with {len(self.vehicle_loader)} records")
+        
+    def _load_dact_data(self, data_path: str = None):
+        self.dact_loader = DactDataLoader(data_path)
+        self.logger.info(f"DACT data loaded with {len(self.dact_loader)} trips")
         
     def get_vehicle_data_by_timestep(self, timestep: float) -> Optional[Dict[str, Any]]:
-        """Get vehicle data for a specific timestep"""
+        if self.vehicle_loader is None:
+            self._load_vehicle_data()
         return self.vehicle_loader.get_data_by_timestep(timestep)
         
     def get_dact_data_by_step(self, step_id: int) -> Optional[Dict[str, Any]]:
-        """Get DACT data for a specific step"""
+        if self.dact_loader is None:
+            self._load_dact_data()
         return self.dact_loader.get_data_by_step(step_id)
 
 

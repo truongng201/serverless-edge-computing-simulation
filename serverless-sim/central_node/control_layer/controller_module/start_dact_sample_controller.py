@@ -1,8 +1,9 @@
 import random
 import time
 
-from central_node.control_layer.scheduler_module.scheduler import Scheduler, Latency, UserNodeInfo
+from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.helper_module.data_manager import DataManager
+from central_node.control_layer.models import Latency, UserNodeInfo
 
 from config import Config
 

@@ -5,29 +5,12 @@ from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
 from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
-from central_node.control_layer.prediction_module.trajectory_predictor import TrajectoryPredictor
 from central_node.control_layer.helper_module.data_manager import DataManager
 
 class CentralCoreController:
     def __init__(self):
         self.scheduler = Scheduler()
         self.predictor = WorkloadPredictor()
-        # Attach trajectory predictor (optional GNN)
-        try:
-            import os
-            base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            # model file path relative to prediction_module
-            model_path = os.path.join(
-                base,
-                'prediction_module',
-                'spatial_temporal_gnn',
-                'st-gnn_small_9_nodes_model.keras'
-            )
-            self.trajectory_predictor = TrajectoryPredictor(model_path=model_path, sequence_length=5)
-        except Exception:
-            self.trajectory_predictor = TrajectoryPredictor(model_path=None)
-        # Share with scheduler
-        self.scheduler.trajectory_predictor = self.trajectory_predictor
         self.data_manager = DataManager()
         self.central_node_api_controller = CentralNodeAPIController()
         

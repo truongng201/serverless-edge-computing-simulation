@@ -1,5 +1,5 @@
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
-from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
+from central_node.control_layer.models import NodeMetrics
 
 class UpdateNodeMetricsController:
     def __init__(self, scheduler: Scheduler, node_id: str, node_data: dict):
