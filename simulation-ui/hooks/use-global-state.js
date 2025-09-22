@@ -263,7 +263,7 @@ const useGlobalState = create((set) => ({
     })),
   
   // User Assignment state
-  assignmentAlgorithm: "nearest-distance",
+  assignmentAlgorithm: "greedy",
   setAssignmentAlgorithm: (updater) =>
     set((state) => ({
       assignmentAlgorithm: typeof updater === "function"

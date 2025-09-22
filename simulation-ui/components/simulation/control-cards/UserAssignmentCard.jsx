@@ -1,7 +1,6 @@
+// ...existing code...
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Slider } from "@/components/ui/slider";
 import {
   Select,
   SelectContent,
@@ -11,51 +10,40 @@ import {
 } from "@/components/ui/select";
 import { Target } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { useEffect, useState } from "react";
+import React, { useState, useEffect } from "react";
+import {
+  setServerAssignmentAlgorithm,
+  getAllAssignmentAlgorithms,
+  getCurrentAssignmentAlgorithm,
+} from "@/lib/user-management";
 
 export default function UserAssignmentCard({}) {
-  const {
-    assignmentAlgorithm,
-    setAssignmentAlgorithm,
-  } = useGlobalState();
+  const { assignmentAlgorithm, setAssignmentAlgorithm } = useGlobalState();
 
-  
-  // Map UI selection -> backend strategy
-  const mapToBackend = (ui) => {
-    switch (ui) {
-      case "nearest-distance":
-        return "geographic"; // distance-based
-      case "nearest-latency":
-        return "least_loaded"; // load-aware proxy
-      case "gap-baseline":
-        return "gap_baseline"; // GAP solver baseline
-      case "predictive-gnn":
-        return "predictive"; // predictive (GNN/trajectory)
-      default:
-        return "geographic";
-    }
+  const [algorithms, setAlgorithms] = useState([]);
+
+  const handleSelectChange = async (value) => {
+    setAssignmentAlgorithm(value);
+    await setServerAssignmentAlgorithm(value);
   };
 
-  const onSelectAlgo = async (value) => {
-    try {
-      setAssignmentAlgorithm(value);
-      if (process.env.NEXT_PUBLIC_API_URL) {
-        const strategy = mapToBackend(value);
-        await fetch(
-          `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/assignment/strategy`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ strategy }),
-          }
-        );
+  useEffect(() => {
+    const fetchData = async () => {
+      // Fetch all algorithms first so we know valid choices
+      const allAlgorithms = await getAllAssignmentAlgorithms();
+      setAlgorithms(allAlgorithms || []);
+
+      // Then get current algorithm; if none, default to the first available
+      let currentAlgorithm = await getCurrentAssignmentAlgorithm();
+      
+      if (currentAlgorithm) {
+        setAssignmentAlgorithm(currentAlgorithm);
       }
-    } catch (e) {
-      console.warn("Failed to set backend assignment strategy", e);
-    }
-  };
+    };
+    fetchData();
+  }, [setAssignmentAlgorithm]);
 
-
+  console.log("Current assignment algorithm:", assignmentAlgorithm);
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
@@ -67,19 +55,26 @@ export default function UserAssignmentCard({}) {
       <CardContent className="space-y-3">
         <div className="space-y-2">
           <Label className="text-xs">Assignment Algorithm</Label>
-          <Select value={assignmentAlgorithm} onValueChange={onSelectAlgo}>
+          <Select
+            value={assignmentAlgorithm ?? ""}
+            onValueChange={handleSelectChange}
+          >
             <SelectTrigger className="h-8">
               <SelectValue />
             </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="nearest-distance">Nearest Distance</SelectItem>
-              <SelectItem value="nearest-latency">Nearest Latency</SelectItem>
-              <SelectItem value="gap-baseline">GAP Baseline</SelectItem>
-              <SelectItem value="predictive-gnn">Predictive (GNN)</SelectItem>
-            </SelectContent>
+            {algorithms.length > 0 && (
+              <SelectContent>
+                {algorithms.map((algo) => (
+                  <SelectItem key={algo} value={algo}>
+                    {algo}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            )}
           </Select>
         </div>
       </CardContent>
     </Card>
   );
 }
+// ...existing code...
