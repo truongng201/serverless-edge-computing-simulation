@@ -143,17 +143,21 @@ def execute_function():
     result = central_core_controller.execute_function(request_data)
     return result
 
-# Assignment strategy/config endpoints
-@central_route.route('/assignment/strategy', methods=['POST'])
+@central_route.route('/assignment_algorithm', methods=['POST'])
 @standard_response
-def set_assignment_strategy():
+def set_assignment_algorithm():
     request_data = request.get_json() or {}
-    result = central_core_controller.set_assignment_strategy(request_data)
+    result = central_core_controller.set_assignment_algorithm(request_data)
     return result
 
-@central_route.route('/assignment/config', methods=['POST'])
+@central_route.route('/assignment_algorithm', methods=['GET'])
 @standard_response
-def set_assignment_config():
-    request_data = request.get_json() or {}
-    result = central_core_controller.update_assignment_config(request_data)
+def get_assignment_algorithm():
+    result = central_core_controller.get_assignment_algorithm()
+    return result
+
+@central_route.route('/all_assignment_algorithms', methods=['GET'])
+@standard_response
+def get_all_assignment_algorithms():
+    result = central_core_controller.get_all_assignment_algorithms()
     return result

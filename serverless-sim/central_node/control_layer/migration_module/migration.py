@@ -2,7 +2,7 @@ import logging
 import time
 from typing import Dict, List, Optional, Any
 
-from control_layer.models import MigrationRequest, MigrationStatus, MigrationReason
+from central_node.control_layer.models import MigrationRequest, MigrationStatus, MigrationReason
 
 from config import Config
 

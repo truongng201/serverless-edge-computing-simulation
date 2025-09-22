@@ -16,12 +16,9 @@ from central_node.control_layer.scheduler_module.gap_solver import GAPSolver, GA
 from central_node.control_layer.models import EdgeNodeInfo, UserNodeInfo, NodeMetrics
 
 
-class SchedulingStrategy(Enum):
-    ROUND_ROBIN = "round_robin"
-    LEAST_LOADED = "least_loaded"
-    GEOGRAPHIC = "geographic"
-    PREDICTIVE = "predictive"
-    GAP_BASELINE = "gap_baseline"
+class AssignmentAlgorithm(Enum):
+    GREEDY = "greedy"
+    CVX = "convex optimization"
 
 @dataclass
 class SchedulingDecision:
@@ -31,8 +28,8 @@ class SchedulingDecision:
     reasoning: str
 
 class Scheduler:
-    def __init__(self, strategy: SchedulingStrategy = SchedulingStrategy.ROUND_ROBIN):
-        self.strategy = strategy
+    def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
+        self.assignment_algorithm = assignment_algorithm
         self.edge_nodes: Dict[str, EdgeNodeInfo] = {}
         self.central_node = {
             "node_id": "central_node",
@@ -79,6 +76,23 @@ class Scheduler:
             return
         self.edge_nodes[new_edge_node.node_id] = new_edge_node
         
+    def get_central_node_info(self) -> Dict[str, Any]:
+        return self.central_node
+    
+    def get_assignment_algorithm(self) -> str:
+        return self.assignment_algorithm.value
+    
+    def get_all_assignment_algorithms(self) -> List[str]:
+        return [algorithm.value for algorithm in AssignmentAlgorithm]
+
+    def set_assignment_algorithm(self, assignment_algorithm: str):
+        try:
+            self.assignment_algorithm = AssignmentAlgorithm(assignment_algorithm)
+            self.logger.info(f"Assignment algorithm set to {self.assignment_algorithm.value}")
+        except ValueError:
+            self.logger.error(f"Invalid assignment algorithm: {assignment_algorithm}")
+            raise Exception(f"Invalid assignment algorithm: {assignment_algorithm}")
+        
     def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
         if user_id not in self.user_nodes:
             return False
@@ -124,25 +138,6 @@ class Scheduler:
             pass
         
         return True
-    
-    def get_central_node_info(self) -> Dict[str, Any]:
-        return self.central_node
-    
-    def set_scheduling_strategy(self, strategy: SchedulingStrategy):
-        """Change the scheduling strategy"""
-        # Allow string input for convenience
-        if isinstance(strategy, str):
-            try:
-                strategy = SchedulingStrategy(strategy)
-            except Exception:
-                self.logger.warning(f"Unknown strategy '{strategy}', fallback to round_robin")
-                strategy = SchedulingStrategy.ROUND_ROBIN
-        self.strategy = strategy
-        self.logger.info(f"Scheduling strategy changed to: {self.strategy.value}")
-        
-    def get_scheduling_strategy(self) -> str:
-        """Get current scheduling strategy"""
-        return self.strategy.value
 
     def set_assignment_config(self, **kwargs):
         """Update handoff/assignment runtime parameters."""
@@ -209,15 +204,15 @@ class Scheduler:
             self.logger.warning("No healthy edge nodes available")
             return None
             
-        if self.strategy == SchedulingStrategy.ROUND_ROBIN:
+        if self.assignment_algorithm == AssignmentAlgorithm.ROUND_ROBIN:
             return self._schedule_round_robin(available_nodes, request_data)
-        elif self.strategy == SchedulingStrategy.LEAST_LOADED:
+        elif self.assignment_algorithm == AssignmentAlgorithm.LEAST_LOADED:
             return self._schedule_least_loaded(available_nodes, request_data)
-        elif self.strategy == SchedulingStrategy.GEOGRAPHIC:
+        elif self.assignment_algorithm == AssignmentAlgorithm.GEOGRAPHIC:
             return self._schedule_geographic(available_nodes, request_data)
-        elif self.strategy == SchedulingStrategy.PREDICTIVE:
+        elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
             return self._schedule_predictive(available_nodes, request_data)
-        elif self.strategy == SchedulingStrategy.GAP_BASELINE:
+        elif self.assignment_algorithm == AssignmentAlgorithm.GAP_BASELINE:
             return self._schedule_gap_baseline(available_nodes, request_data)
         else:
             return self._schedule_round_robin(available_nodes, request_data)
@@ -539,18 +534,18 @@ class Scheduler:
         candidates.sort(key=lambda item: item['score'], reverse=True)
         return candidates
 
-    def _best_node_for_user(self, user: UserNodeInfo, user_location: Dict[str, float], strategy: SchedulingStrategy) -> Tuple[str, float]:
+    def _best_node_for_user(self, user: UserNodeInfo, user_location: Dict[str, float], assignment_algorithm: AssignmentAlgorithm) -> Tuple[str, float]:
         # returns (node_id, score). central node id is 'central_node'
-        if strategy == SchedulingStrategy.PREDICTIVE:
+        if assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
             candidates = self._predictive_candidate_scores(user, user_location)
             if not candidates:
                 return 'central_node', float('inf')
             best = candidates[0]
             return best['node_id'], best['score']
-        if strategy in (SchedulingStrategy.GEOGRAPHIC, SchedulingStrategy.ROUND_ROBIN, SchedulingStrategy.PREDICTIVE, SchedulingStrategy.GAP_BASELINE, SchedulingStrategy.LEAST_LOADED):
+        if assignment_algorithm in (AssignmentAlgorithm.GEOGRAPHIC, AssignmentAlgorithm.ROUND_ROBIN, AssignmentAlgorithm.PREDICTIVE, AssignmentAlgorithm.GAP_BASELINE, AssignmentAlgorithm.LEAST_LOADED):
             # Implement two simple strategies: geographic (distance) and load-aware
             best_id = 'central_node'
-            if strategy == SchedulingStrategy.LEAST_LOADED:
+            if assignment_algorithm == AssignmentAlgorithm.LEAST_LOADED:
                 best_score = self._score_node_load_aware(user_location, None)
             else:
                 best_score = self._score_node_distance(user_location, None)
@@ -559,7 +554,7 @@ class Scheduler:
                 # Only consider nodes within coverage
                 if self._calculate_distance(user_location, node.location) > node.coverage:
                     continue
-                score = self._score_node_load_aware(user_location, node) if strategy == SchedulingStrategy.LEAST_LOADED else self._score_node_distance(user_location, node)
+                score = self._score_node_load_aware(user_location, node) if assignment_algorithm == AssignmentAlgorithm.LEAST_LOADED else self._score_node_distance(user_location, node)
                 if score < best_score:
                     best_score = score
                     best_id = node_id
@@ -568,7 +563,7 @@ class Scheduler:
         return 'central_node', self._score_node_distance(user_location, None)
 
     def maybe_reassign_user(self, user: UserNodeInfo) -> bool:
-        """Re-evaluate assignment based on current strategy and location.
+        """Re-evaluate assignment based on current assignment_algorithm and location.
         Returns True if re-assigned.
         """
         try:
@@ -578,9 +573,9 @@ class Scheduler:
             if now - last_handoff < self.handoff_min_dwell_seconds:
                 return False
 
-            # Use predicted next location for PREDICTIVE strategy
+            # Use predicted next location for PREDICTIVE assignment_algorithm
             loc_for_assignment = user.location
-            if self.strategy == SchedulingStrategy.PREDICTIVE and self.trajectory_predictor is not None:
+            if self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE and self.trajectory_predictor is not None:
                 hist = self._user_history.get(user.user_id, [])
                 if hist:
                     try:
@@ -591,7 +586,7 @@ class Scheduler:
 
             current_id = user.assigned_node_id or 'central_node'
 
-            if self.strategy == SchedulingStrategy.PREDICTIVE:
+            if self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
                 candidates = self._predictive_candidate_scores(user, loc_for_assignment)
                 if not candidates:
                     return False
@@ -646,11 +641,11 @@ class Scheduler:
                     return True
                 return False
 
-            target_id, target_score = self._best_node_for_user(user, loc_for_assignment, self.strategy)
+            target_id, target_score = self._best_node_for_user(user, loc_for_assignment, self.assignment_algorithm)
             current_node = None if current_id == 'central_node' else self.edge_nodes.get(current_id)
             if self._calculate_distance(user.location, self.central_node["location"]) > 1e9:  # defensive
                 return False
-            if self.strategy == SchedulingStrategy.LEAST_LOADED:
+            if self.assignment_algorithm == AssignmentAlgorithm.LEAST_LOADED:
                 current_score = self._score_node_load_aware(loc_for_assignment, current_node)
             else:
                 current_score = self._score_node_distance(loc_for_assignment, current_node)
