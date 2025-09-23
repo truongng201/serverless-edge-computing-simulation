@@ -3,6 +3,7 @@ import time
 from typing import Dict, List, Optional, Any, Tuple
 import time
 from enum import Enum
+import cvxpy as cp
 
 from config import Config
 
@@ -163,19 +164,44 @@ class Scheduler:
         }
     
     def _node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
-        min_distance = self._calculate_distance(user_location, self.central_node["location"])
-        nearest_node_id = "central_node"  # default to central node
-        
-        # Check all edge nodes
-        for node_id, edge_node in self.edge_nodes.items():
-            distance = self._calculate_distance(user_location, edge_node.location)
-            if distance < min_distance and distance <= edge_node.coverage:
-                min_distance = distance
-                nearest_node_id = node_id
-
-        return nearest_node_id, min_distance * Config.DEFAULT_PIXEL_TO_METERS
+        if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
+            return self._greedy_assignment(user_location)
+        elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
+            return self._convex_optimization_assignment(user_location)
+        else:
+            raise Exception(f"Unknown assignment algorithm: {self.assignment_algorithm}")
 
     def _calculate_distance(self, location1: Dict[str, float], location2: Dict[str, float]) -> float:
         dx = location1["x"] - location2["x"]
         dy = location1["y"] - location2["y"]
         return (dx ** 2 + dy ** 2) ** 0.5
+    
+    def _greedy_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+        '''
+            RULE:
+            1. Assign to the nearest healthy node within coverage.
+            2. If no healthy node is available, assign to the nearest warning node within coverage.
+            3. If no warning node is available, assign to the nearest unhealthy node within coverage.
+            4. If no edge node is within coverage, assign to the central node.
+        '''
+        classified_nodes = self._classify_nodes()
+        min_distance = self._calculate_distance(user_location, self.central_node["location"])
+        nearest_node_id = "central_node"  # default to central node
+
+        for node_id, edge_node in self.edge_nodes.items():
+            distance = self._calculate_distance(user_location, edge_node.location)
+            if distance < min_distance and distance <= edge_node.coverage:
+                min_distance = distance
+                nearest_node_id = node_id
+                if node_id in classified_nodes["healthy"]:
+                    break  # Found the nearest healthy node
+                elif node_id in classified_nodes["warning"] and nearest_node_id not in classified_nodes["healthy"]:
+                    nearest_node_id = node_id  # Update to nearest warning node if no healthy found yet
+                elif node_id in classified_nodes["unhealthy"] and nearest_node_id not in classified_nodes["healthy"] and nearest_node_id not in classified_nodes["warning"]:
+                    nearest_node_id = node_id  # Update to nearest unhealthy node if no healthy or warning found yet
+        
+        return nearest_node_id, min_distance * Config.DEFAULT_PIXEL_TO_METERS
+    
+    def _convex_optimization_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+        pass
+        

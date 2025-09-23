@@ -43,7 +43,6 @@ class Config:
     EDGE_ROUTE_PREFIX = "/api/v1/edge"
     
     # Scheduling Configuration
-    DEFAULT_SCHEDULING_ALGORITHM = "round_robin"
     MIGRATION_THRESHOLD = 0.8  # CPU usage threshold for migration
     
     # Docker Configuration

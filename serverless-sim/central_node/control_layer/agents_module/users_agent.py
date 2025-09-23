@@ -38,12 +38,10 @@ class UsersAgent:
 
             if assigned_node == self.central_node['node_id']:
                 try:
-                    start = time.time()
                     result = requests.post(f"http://{self.central_node['endpoint']}/api/v1/central/execute", json={"user_id": user_node.user_id})
-                    end = time.time()
-                    container_status = result.json().get("container_status", "unknown")
-                    user_node.latency.computation_delay = (end - start) * 1000 # in ms
-                    user_node.latency.container_status = container_status
+                    data = result.json().get("data", {})
+                    user_node.latency.computation_delay = data.get("execution_time", 0.0)
+                    user_node.latency.container_status =  data.get("container_status", "unknown")
                     user_node.last_executed = time.time()
                     if result.status_code == 200:
                         self.logger.info(f"Function executed successfully for user node: {user_node.user_id} (central node)")
@@ -57,13 +55,9 @@ class UsersAgent:
             edge_node = self.edge_nodes.get(user_node.assigned_node_id)
             if edge_node:
                 try:
-                    start = time.time()
                     result = requests.post(f"http://{edge_node.endpoint}/api/v1/edge/execute", json={"user_id": user_node.user_id})
-                    end = time.time()
-                    computation_delay = (end - start) * 1000  # in ms
-                    container_status = result.json().get("container_status", "unknown")
-                    user_node.latency.computation_delay = computation_delay
-                    user_node.latency.container_status = container_status
+                    user_node.latency.computation_delay = result.json().get("execution_time", 0.0)
+                    user_node.latency.container_status = result.json().get("container_status", "unknown")
                     user_node.last_executed = time.time()
                     if result.status_code == 200:
                         self.logger.info(f"Function executed successfully for user node: {user_node.user_id}")
