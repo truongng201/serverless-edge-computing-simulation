@@ -1,8 +1,3 @@
-"""
-Central Node Control Layer - Scheduler Module
-Handles scheduling decisions, load balancing, and request routing
-"""
-
 import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
@@ -88,10 +83,35 @@ class Scheduler:
     def set_assignment_algorithm(self, assignment_algorithm: str):
         try:
             self.assignment_algorithm = AssignmentAlgorithm(assignment_algorithm)
-            self.logger.info(f"Assignment algorithm set to {self.assignment_algorithm.value}")
         except ValueError:
-            self.logger.error(f"Invalid assignment algorithm: {assignment_algorithm}")
             raise Exception(f"Invalid assignment algorithm: {assignment_algorithm}")
+        
+    def register_edge_node(self, node_info: EdgeNodeInfo):
+        if node_info.node_id in self.edge_nodes:
+            raise Exception(f"Node {node_info.node_id} is already registered")
+        self.edge_nodes[node_info.node_id] = node_info
+        self.logger.info(f"Registered edge node: {node_info.node_id}")
+        
+    def unregister_edge_node(self, node_id: str):
+        if node_id in self.edge_nodes:
+            del self.edge_nodes[node_id]
+            self.logger.info(f"Unregistered edge node: {node_id}")
+
+    def update_node_metrics(self, node_id: str, new_metrics: NodeMetrics, system_info: Dict[str, Any], endpoint: str):
+        if node_id in self.edge_nodes:
+            self.edge_nodes[node_id].metrics_info = new_metrics
+            self.edge_nodes[node_id].system_info = system_info
+            self.edge_nodes[node_id].last_heartbeat = time.time()
+        else:
+            self.register_edge_node(EdgeNodeInfo(
+                node_id=node_id,
+                endpoint=endpoint,
+                location={"x": 0.0, "y": 0.0},
+                system_info=system_info,
+                last_heartbeat=time.time(),
+                metrics_info=new_metrics,
+                coverage=300.0
+            ))
         
     def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
         if user_id not in self.user_nodes:
@@ -139,23 +159,6 @@ class Scheduler:
         
         return True
 
-    def set_assignment_config(self, **kwargs):
-        """Update handoff/assignment runtime parameters."""
-        if 'handoff_min_dwell_seconds' in kwargs:
-            self.handoff_min_dwell_seconds = float(kwargs['handoff_min_dwell_seconds'])
-        if 'handoff_improvement_threshold' in kwargs:
-            self.handoff_improvement_threshold = float(kwargs['handoff_improvement_threshold'])
-        if 'assignment_scan_interval' in kwargs:
-            self.assignment_scan_interval = float(kwargs['assignment_scan_interval'])
-        if 'load_aware_alpha' in kwargs:
-            self.load_aware_alpha = float(kwargs['load_aware_alpha'])
-        self.logger.info(
-            f"Assignment config updated: dwell={self.handoff_min_dwell_seconds}s, "
-            f"threshold={self.handoff_improvement_threshold}, scan={self.assignment_scan_interval}s, "
-            f"alpha={self.load_aware_alpha}"
-        )
-
-    
     def create_user_node(self, user_node: UserNodeInfo):
         self.user_nodes[user_node.user_id] = user_node
         # initialize last_updated if missing
@@ -169,92 +172,16 @@ class Scheduler:
         except Exception:
             self._user_history[user_node.user_id] = []
 
-    def register_edge_node(self, node_info: EdgeNodeInfo):
-        if node_info.node_id in self.edge_nodes:
-            raise Exception(f"Node {node_info.node_id} is already registered")
-        self.edge_nodes[node_info.node_id] = node_info
-        self.logger.info(f"Registered edge node: {node_info.node_id}")
-        
-    def unregister_edge_node(self, node_id: str):
-        if node_id in self.edge_nodes:
-            del self.edge_nodes[node_id]
-            self.logger.info(f"Unregistered edge node: {node_id}")
-
-    def update_node_metrics(self, node_id: str, new_metrics: NodeMetrics, system_info: Dict[str, Any], endpoint: str):
-        if node_id in self.edge_nodes:
-            self.edge_nodes[node_id].metrics_info = new_metrics
-            self.edge_nodes[node_id].system_info = system_info
-            self.edge_nodes[node_id].last_heartbeat = time.time()
-        else:
-            self.register_edge_node(EdgeNodeInfo(
-                node_id=node_id,
-                endpoint=endpoint,
-                location={"x": 0.0, "y": 0.0},
-                system_info=system_info,
-                last_heartbeat=time.time(),
-                metrics_info=new_metrics,
-                coverage=300.0
-            ))
-
     def schedule_request(self, request_data: Dict[str, Any]) -> Optional[SchedulingDecision]:
-        """Schedule a request to the best available edge node"""
         available_nodes = []
         
         if not available_nodes:
             self.logger.warning("No healthy edge nodes available")
             return None
             
-        if self.assignment_algorithm == AssignmentAlgorithm.ROUND_ROBIN:
-            return self._schedule_round_robin(available_nodes, request_data)
-        elif self.assignment_algorithm == AssignmentAlgorithm.LEAST_LOADED:
-            return self._schedule_least_loaded(available_nodes, request_data)
-        elif self.assignment_algorithm == AssignmentAlgorithm.GEOGRAPHIC:
-            return self._schedule_geographic(available_nodes, request_data)
-        elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
-            return self._schedule_predictive(available_nodes, request_data)
-        elif self.assignment_algorithm == AssignmentAlgorithm.GAP_BASELINE:
-            return self._schedule_gap_baseline(available_nodes, request_data)
-        else:
-            return self._schedule_round_robin(available_nodes, request_data)
-
-    def _schedule_round_robin(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """Round robin scheduling"""
-        if self.round_robin_index >= len(nodes):
-            self.round_robin_index = 0
-            
-        selected_node = nodes[self.round_robin_index]
-        self.round_robin_index += 1
+        if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
+            pass
         
-        return SchedulingDecision(
-            target_node_id=selected_node.node_id,
-            execution_time_estimate=1.0,  # Default estimate
-            confidence=0.8,
-            reasoning="Round robin selection"
-        )
-        
-    def _schedule_least_loaded(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """Least loaded scheduling"""
-        selected_node = min(nodes, key=lambda n: n.current_load)
-        
-        return SchedulingDecision(
-            target_node_id=selected_node.node_id,
-            execution_time_estimate=1.0 / (1.0 - selected_node.current_load),
-            confidence=0.9,
-            reasoning=f"Least loaded node (load: {selected_node.current_load:.2f})"
-        )
-        
-    def _schedule_geographic(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """Geographic-based scheduling"""
-        # For now, just use least loaded
-        # TODO: Implement actual geographic distance calculation
-        return self._schedule_least_loaded(nodes, request_data)
-        
-    def _schedule_predictive(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """Predictive scheduling using ML models"""
-        # For now, just use least loaded
-        # TODO: Integrate with prediction module
-        return self._schedule_least_loaded(nodes, request_data)
-    
     def _classify_nodes(self):
         classified_nodes = {
             "healthy": set(),
@@ -385,7 +312,6 @@ class Scheduler:
             # Fallback to round robin
             return self._schedule_round_robin(nodes, request_data)
 
-    # --- Online assignment / handoff helpers ---
     def _score_node_distance(self, user_location: Dict[str, float], node: Optional[EdgeNodeInfo]) -> float:
         # Lower is better
         if node is None:
