@@ -24,7 +24,6 @@ class Scheduler:
             "coverage": 0 # default coverage
         }
         self.user_nodes: Dict[str, UserNodeInfo] = {}
-        self.round_robin_index = 0
         self.logger = logging.getLogger(__name__)
         
         self.simulation = False
