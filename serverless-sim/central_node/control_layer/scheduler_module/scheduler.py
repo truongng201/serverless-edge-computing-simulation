@@ -90,46 +90,11 @@ class Scheduler:
     def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
         if user_id not in self.user_nodes:
             return False
-
-        user = self.user_nodes[user_id]
-        user.location = new_location
-
-        # Keep current assignment unless it's invalid/out of coverage.
-        nearest_id, nearest_dist_m = self._node_assignment(new_location)
-        current_id = user.assigned_node_id or None
-        if not current_id:
-            # First-time assignment
-            user.assigned_node_id = nearest_id
-            user.latency.distance = nearest_dist_m
-        else:
-            # Validate coverage for current edge; if invalid, fall back to nearest
-            if current_id == 'central_node':
-                # Distance to central for latency
-                dist_px = self._calculate_distance(new_location, self.central_node["location"])
-                user.latency.distance = dist_px * Config.DEFAULT_PIXEL_TO_METERS
-            else:
-                curr_node = self.edge_nodes.get(current_id)
-                if not curr_node:
-                    user.assigned_node_id = nearest_id
-                    user.latency.distance = nearest_dist_m
-                else:
-                    dist_px = self._calculate_distance(new_location, curr_node.location)
-                    # If out of coverage, switch immediately to nearest
-                    if dist_px > curr_node.coverage:
-                        user.assigned_node_id = nearest_id
-                        user.latency.distance = nearest_dist_m
-                    else:
-                        user.latency.distance = dist_px * Config.DEFAULT_PIXEL_TO_METERS
-        user.last_updated = time.time()
-        # Append to trajectory history
-        try:
-            hist = self._user_history.get(user_id, [])
-            hist.append((new_location['x'], new_location['y']))
-            if len(hist) > 10:
-                hist = hist[-10:]
-            self._user_history[user_id] = hist
-        except Exception:
-            pass
+        
+        self.user_nodes[user_id].location = new_location
+        assigned_node_id, assigned_node_distance = self._node_assignment(new_location)
+        self.user_nodes[user_id].assigned_node_id = assigned_node_id
+        self.user_nodes[user_id].latency.distance = assigned_node_distance
         
         return True
 
