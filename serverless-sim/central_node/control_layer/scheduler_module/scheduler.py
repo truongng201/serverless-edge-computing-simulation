@@ -257,7 +257,6 @@ class Scheduler:
         return nearest_node_id, min_distance * Config.DEFAULT_PIXEL_TO_METERS
 
     def _calculate_distance(self, location1: Dict[str, float], location2: Dict[str, float]) -> float:
-        """Calculate Euclidean distance between two locations"""
         dx = location1["x"] - location2["x"]
         dy = location1["y"] - location2["y"]
         return (dx ** 2 + dy ** 2) ** 0.5
