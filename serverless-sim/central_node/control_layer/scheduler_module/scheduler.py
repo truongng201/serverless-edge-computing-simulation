@@ -1,26 +1,17 @@
 import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
 import time
 from enum import Enum
 
 from config import Config
 
-from central_node.control_layer.scheduler_module.gap_solver import GAPSolver, GAPConfig
 from central_node.control_layer.models import EdgeNodeInfo, UserNodeInfo, NodeMetrics
 
 
 class AssignmentAlgorithm(Enum):
     GREEDY = "greedy"
     CVX = "convex optimization"
-
-@dataclass
-class SchedulingDecision:
-    target_node_id: str
-    execution_time_estimate: float
-    confidence: float
-    reasoning: str
 
 class Scheduler:
     def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
@@ -156,7 +147,7 @@ class Scheduler:
         except Exception:
             self._user_history[user_node.user_id] = []
 
-    def schedule_request(self, request_data: Dict[str, Any]) -> Optional[SchedulingDecision]:
+    def schedule_request(self, request_data: Dict[str, Any]):
         available_nodes = []
         
         if not available_nodes:
