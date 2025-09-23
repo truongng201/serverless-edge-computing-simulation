@@ -93,7 +93,7 @@ class Scheduler:
             return False
         
         self.user_nodes[user_id].location = new_location
-        assigned_node_id, assigned_node_distance = self._node_assignment(new_location)
+        assigned_node_id, assigned_node_distance = self.node_assignment(new_location)
         self.user_nodes[user_id].assigned_node_id = assigned_node_id
         self.user_nodes[user_id].latency.distance = assigned_node_distance
         
@@ -163,7 +163,7 @@ class Scheduler:
             "warning_node_list": list(classified_nodes["warning"]),
         }
     
-    def _node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+    def node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             return self._greedy_assignment(user_location)
         elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
@@ -176,7 +176,7 @@ class Scheduler:
         dy = location1["y"] - location2["y"]
         return (dx ** 2 + dy ** 2) ** 0.5
     
-    def _greedy_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+    def _greedy_assignment(self):
         '''
             RULE:
             1. Assign to the nearest healthy node within coverage.
@@ -184,24 +184,10 @@ class Scheduler:
             3. If no warning node is available, assign to the nearest unhealthy node within coverage.
             4. If no edge node is within coverage, assign to the central node.
         '''
-        classified_nodes = self._classify_nodes()
-        min_distance = self._calculate_distance(user_location, self.central_node["location"])
-        nearest_node_id = "central_node"  # default to central node
-
-        for node_id, edge_node in self.edge_nodes.items():
-            distance = self._calculate_distance(user_location, edge_node.location)
-            if distance < min_distance and distance <= edge_node.coverage:
-                min_distance = distance
-                nearest_node_id = node_id
-                if node_id in classified_nodes["healthy"]:
-                    break  # Found the nearest healthy node
-                elif node_id in classified_nodes["warning"] and nearest_node_id not in classified_nodes["healthy"]:
-                    nearest_node_id = node_id  # Update to nearest warning node if no healthy found yet
-                elif node_id in classified_nodes["unhealthy"] and nearest_node_id not in classified_nodes["healthy"] and nearest_node_id not in classified_nodes["warning"]:
-                    nearest_node_id = node_id  # Update to nearest unhealthy node if no healthy or warning found yet
         
-        return nearest_node_id, min_distance * Config.DEFAULT_PIXEL_TO_METERS
     
-    def _convex_optimization_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
-        pass
+    def _convex_optimization_assignment(self):
+        """
+            
+        """
         
