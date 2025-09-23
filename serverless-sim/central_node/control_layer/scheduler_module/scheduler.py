@@ -136,16 +136,6 @@ class Scheduler:
 
     def create_user_node(self, user_node: UserNodeInfo):
         self.user_nodes[user_node.user_id] = user_node
-        # initialize last_updated if missing
-        if not getattr(user_node, 'last_updated', None):
-            user_node.last_updated = time.time()
-        if not getattr(user_node, 'last_handoff', None):
-            user_node.last_handoff = user_node.created_at
-        # initialize history with current location
-        try:
-            self._user_history[user_node.user_id] = [(user_node.location['x'], user_node.location['y'])]
-        except Exception:
-            self._user_history[user_node.user_id] = []
 
     def schedule_request(self, request_data: Dict[str, Any]):
         available_nodes = []

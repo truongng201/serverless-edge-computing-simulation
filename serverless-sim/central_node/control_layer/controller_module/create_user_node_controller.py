@@ -45,9 +45,7 @@ class CreateUserNodeController:
             last_executed=0,
             size=self.user_data.get("size", 10),
             speed=self.user_data.get("speed", 5),
-            latency=latency,
-            created_at=time.time(),
-            last_updated=time.time()
+            latency=latency
         )
         self.scheduler.create_user_node(user_node)
 

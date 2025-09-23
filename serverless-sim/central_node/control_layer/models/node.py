@@ -52,8 +52,3 @@ class UserNodeInfo:
     speed: int
     last_executed: float
     latency: Latency
-    created_at: float = field(default_factory=lambda: time.time())
-    last_updated: float = field(default_factory=lambda: time.time())
-    memory_requirement: float = field(default_factory=lambda: Config.PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB * 1024 * 1024)
-    last_handoff: float = 0.0
-    predictive_debug: Optional[Dict[str, Any]] = None
