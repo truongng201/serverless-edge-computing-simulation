@@ -88,6 +88,7 @@ class Scheduler:
         
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:
+            self.logger.info(f"Edge node {node_info.node_id} is already registered")
             raise Exception(f"Node {node_info.node_id} is already registered")
         self.edge_nodes[node_info.node_id] = node_info
         self.logger.info(f"Registered edge node: {node_info.node_id}")
