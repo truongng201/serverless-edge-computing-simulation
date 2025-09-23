@@ -101,16 +101,6 @@ class Scheduler:
     def create_user_node(self, user_node: UserNodeInfo):
         self.user_nodes[user_node.user_id] = user_node
 
-    def schedule_request(self, request_data: Dict[str, Any]):
-        available_nodes = []
-        
-        if not available_nodes:
-            self.logger.warning("No healthy edge nodes available")
-            return None
-            
-        if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
-            pass
-        
     def _classify_nodes(self):
         classified_nodes = {
             "healthy": set(),
