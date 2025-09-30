@@ -1,6 +1,5 @@
 import {
   EdgeNodeSettingsCard,
-  CentralNodeSettingsCard,
   UserSettingsCard,
   EditModeCard,
   ClearControlsCard,
@@ -23,12 +22,9 @@ import { getClusterStatusAndUsersData } from "@/lib/simulation-management";
 export default function ControlPanelContent() {
   const intervalRef = useRef(null);
   const {
-    users,
     leftPanelOpen,
     setLeftPanelOpen,
     simulationSpeed,
-    edgeNodes,
-    centralNodes,
   } = useGlobalState();
 
   // GAP batch (client-side) is deprecated; backend handles assignment
@@ -77,22 +73,16 @@ export default function ControlPanelContent() {
 
         <SimulationControlsCard />
 
-        <ClearControlsCard />
+        <UserAssignmentCard />
 
         <ScenarioSelectionCard />
 
-        <NodePlacementCard />
-
-        <UserAssignmentCard />
-
-        <ZoomControlsCard />
+        <ClearControlsCard />
 
         <ModelSelectionCard />
-
         <UserSettingsCard />
-
-        <CentralNodeSettingsCard />
-
+        <NodePlacementCard />
+        <ZoomControlsCard />
         <EdgeNodeSettingsCard />
       </div>
     </>

@@ -38,7 +38,7 @@ export const setServerAssignmentAlgorithm = async (selectedAlgorithm) => {
       const response = await axios.post(
         `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/assignment_algorithm`,
         {
-          assignment_algorithm: selectedAlgorithm,
+          algorithm: selectedAlgorithm,
         }
       );
       if (!response.ok || response.data?.status !== "success") {

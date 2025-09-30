@@ -482,10 +482,7 @@ class Scheduler:
         - Migration flow consistency
         """
         
-        # For single user assignment, we solve a simplified version
-        # In practice, this would be called for the entire user set at each time step
-        
-        users = list(self.user_nodes.keys()) + ["temp_user"]  # Include current request
+        users = list(self.user_nodes.keys())
         cloudlets = list(self.edge_nodes.keys()) + ["central_node"]
         
         n_users = len(users)

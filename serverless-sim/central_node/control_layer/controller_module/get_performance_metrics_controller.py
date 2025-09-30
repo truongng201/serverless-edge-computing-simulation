@@ -1,45 +1,34 @@
 from typing import Dict, Any
-import random
-from shared import StandardResponse
+from central_node.control_layer.scheduler_module.scheduler import Scheduler
 
 
 class GetPerformanceMetricsController:
-    def __init__(self, scheduler):
+    def __init__(self, scheduler: Scheduler):
         self.scheduler = scheduler
         self.response = []
 
     def execute(self) -> Dict[str, Any]:
-        """
-        Get current performance metrics including objective function values
-        Returns total turnaround time, migration costs, cold start penalties
-        """
-        try:
-            # Get current performance summary
-            performance_summary = self.scheduler.get_performance_summary_for_frontend()
-            
-            # Get detailed objective function breakdown
-            objective_function = self.scheduler.calculate_total_objective_function()
-            
-            # Get detailed cloudlet metrics
-            detailed_metrics = self.scheduler.get_detailed_assignment_metrics()
-            
-            response_data = {
-                "performance_summary": performance_summary,
-                "objective_function": objective_function,
-                "detailed_cloudlet_metrics": detailed_metrics,
-                "algorithm_info": {
-                    "current_algorithm": self.scheduler.get_assignment_algorithm(),
-                    "available_algorithms": self.scheduler.get_all_assignment_algorithms()
-                }
+    
+        # Get current performance summary
+        performance_summary = self.scheduler.get_performance_summary_for_frontend()
+        
+        # Get detailed objective function breakdown
+        objective_function = self.scheduler.calculate_total_objective_function()
+        
+        # Get detailed cloudlet metrics
+        detailed_metrics = self.scheduler.get_detailed_assignment_metrics()
+        
+        response_data = {
+            "performance_summary": performance_summary,
+            "objective_function": objective_function,
+            "detailed_cloudlet_metrics": detailed_metrics,
+            "algorithm_info": {
+                "current_algorithm": self.scheduler.get_assignment_algorithm(),
+                "available_algorithms": self.scheduler.get_all_assignment_algorithms()
             }
-            
-            return StandardResponse.success(
-                message="Performance metrics retrieved successfully",
-                data=response_data
-            )
-            
-        except Exception as e:
-            return StandardResponse.error(f"Error retrieving performance metrics: {str(e)}")
+        }
+
+        return response_data
 
 
 class CompareAlgorithmsController:
