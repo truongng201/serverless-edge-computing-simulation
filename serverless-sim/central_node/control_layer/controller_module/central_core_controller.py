@@ -108,16 +108,5 @@ class CentralCoreController:
         return controller.execute()
 
     def get_performance_metrics(self):
-        from .get_performance_metrics_controller import GetPerformanceMetricsController
         controller = GetPerformanceMetricsController(self.scheduler)
-        return controller.execute()
-
-    def compare_algorithms(self, user_location=None):
-        from .get_performance_metrics_controller import CompareAlgorithmsController
-        controller = CompareAlgorithmsController(self.scheduler)
-        return controller.execute(user_location)
-
-    def get_algorithm_performance_diff(self):
-        from .get_performance_metrics_controller import GetAlgorithmPerformanceDiffController
-        controller = GetAlgorithmPerformanceDiffController(self.scheduler)
         return controller.execute()

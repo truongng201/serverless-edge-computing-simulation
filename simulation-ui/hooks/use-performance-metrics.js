@@ -4,7 +4,7 @@ import {
   fetchPerformanceMetrics, 
   startPerformanceMetricsAutoRefresh, 
   stopPerformanceMetricsAutoRefresh 
-} from '@/lib/performance-metrics-api';
+} from '@/lib/simulation-management/performance-metrics';
 
 /**
  * Hook to manage automatic performance metrics updates during simulation

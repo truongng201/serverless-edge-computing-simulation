@@ -8,7 +8,7 @@ import {
   fetchPerformanceMetrics, 
   startPerformanceMetricsAutoRefresh,
   stopPerformanceMetricsAutoRefresh 
-} from "@/lib/performance-metrics-api";
+} from "@/lib/simulation-management/performance-metrics";
 
 export default function PerformanceMetricsCard() {
   const { 
@@ -34,7 +34,6 @@ export default function PerformanceMetricsCard() {
     }
   }, [autoRefresh]);
 
-  // Initial load
   useEffect(() => {
     fetchPerformanceMetrics();
   }, []);
@@ -68,14 +67,14 @@ export default function PerformanceMetricsCard() {
             Performance Metrics
           </CardTitle>
           <div className="flex items-center gap-1">
-            <Button
+            {/* <Button
               size="sm"
               variant="ghost"
               onClick={() => setAutoRefresh(!autoRefresh)}
               className="h-6 px-2"
             >
               <RefreshCw className={`w-3 h-3 ${autoRefresh ? 'animate-spin' : ''}`} />
-            </Button>
+            </Button> */}
             <Button
               size="sm"
               variant="ghost"
@@ -131,54 +130,6 @@ export default function PerformanceMetricsCard() {
             </div>
           </div>
 
-          {/* Resource Utilization */}
-          <div className="space-y-1">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-600 flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                Users:
-              </span>
-              <span className="font-mono text-xs">
-                {performanceMetrics.num_users}
-              </span>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-2 text-xs">
-              <div>
-                <span className="text-gray-500">Memory:</span>
-                <span className="font-mono ml-1">
-                  {formatNumber(performanceMetrics.resource_utilization?.avg_memory_utilization)}%
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">CPU:</span>
-                <span className="font-mono ml-1">
-                  {formatNumber(performanceMetrics.resource_utilization?.avg_cpu_utilization)}%
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">Bandwidth:</span>
-                <span className="font-mono ml-1">
-                  {formatNumber(performanceMetrics.resource_utilization?.avg_bandwidth_utilization)}%
-                </span>
-              </div>
-              <div>
-                <span className="text-gray-500">Cold Starts:</span>
-                <span className="font-mono ml-1">
-                  {performanceMetrics.resource_utilization?.total_cold_starts}
-                </span>
-              </div>
-            </div>
-          </div>
-
-
-
-          {/* Efficiency Metrics */}
-          {performanceMetrics.num_users > 0 && (
-            <div className="text-xs text-gray-500 pt-1 border-t">
-              Avg cost per user: {formatMs(performanceMetrics.total_cost / performanceMetrics.num_users)}
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>

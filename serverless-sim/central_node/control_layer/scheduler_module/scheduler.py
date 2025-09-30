@@ -170,7 +170,7 @@ class Scheduler:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             return self._greedy_assignment(user_location)
         elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
-            return self._convex_optimization_assignment(user_location)
+            return self._greedy_assignment(user_location)
         else:
             raise Exception(f"Unknown assignment algorithm: {self.assignment_algorithm}")
 
@@ -463,7 +463,6 @@ class Scheduler:
         # Fallback to central node
         return "central_node", 1000.0  # Default distance to central node
         
-    
     def _convex_optimization_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
         """
         CVX Convex Optimization Assignment implementing the mathematical formulation:
@@ -726,7 +725,5 @@ class Scheduler:
                 "avg_bandwidth_utilization": round(avg_bandwidth_util, 1),
                 "total_cold_starts": total_cold_starts
             },
-            "cloudlet_breakdown": detailed,
-            "timestamp": time.time()
         }
         
