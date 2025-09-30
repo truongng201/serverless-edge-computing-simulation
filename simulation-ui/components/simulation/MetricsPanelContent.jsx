@@ -4,12 +4,11 @@ import {
   StreetMapMetricsCard,
   LiveSystemMetricsCard,
   ConnectionStatusCard,
-  PerformanceMetricsCard,
 } from "./metric-cards/MetricCards";
 import useGlobalState from "@/hooks/use-global-state";
 
 export default function MetricsPanelContent() {
-  const { rightPanelOpen, setRightPanelOpen } = useGlobalState();
+  const { rightPanelOpen, setRightPanelOpen, users } = useGlobalState();
   return (
     <>
       {/* Close panel - small right arrow button at the very top, outside all cards */}
@@ -25,16 +24,18 @@ export default function MetricsPanelContent() {
           <ChevronRight className="w-5 h-5" />
         </button>
       </div>
-      <div className="pt-8">
+      <div className="pt-8 space-y-4">
         <SystemStatusCard />
 
         <StreetMapMetricsCard />
 
         <LiveSystemMetricsCard />
 
-        <ConnectionStatusCard />
-
-        <PerformanceMetricsCard />
+        {
+          users.length > 0 && (
+            <ConnectionStatusCard />
+          )
+        }
       </div>
     </>
   );
