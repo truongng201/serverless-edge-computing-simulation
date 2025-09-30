@@ -65,7 +65,7 @@ export default function SystemStatusCard() {
 
           <div className="flex items-center justify-between text-sm">
             <span className="flex items-center gap-2">
-              Objective
+              Total Turnaround time (TAT)
             </span>
             <span className="font-mono text-xs">
               {formatMs(performanceMetrics.total_turnaround_time)}

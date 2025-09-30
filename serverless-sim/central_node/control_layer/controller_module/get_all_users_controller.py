@@ -78,10 +78,9 @@ class GetAllUsersController:
                     speed=item.get("speed", 5),
                     latency=latency,
                     # Add optimization parameters
-                    bandwidth_demand=item.get("bandwidth_demand", random.uniform(5.0, 20.0)),
-                    memory_demand=item.get("memory_demand", random.uniform(64.0, 256.0)),
-                    cpu_demand=item.get("cpu_demand", random.uniform(0.5, 2.0)),
-                    data_size_demand=item.get("data_size_demand", data_size),
+                    bandwidth_demand=bandwidth,
+                    memory_demand=Config.DEFAULT_USER_MEMORY_DEMAND,
+                    data_size_demand=data_size,
                     previous_node_id=None,
                     migration_cost=0.0,
                     cold_start_penalty=0.0
@@ -147,10 +146,9 @@ class GetAllUsersController:
                     speed=item.get("speed", 5),
                     latency=latency,
                     # Add optimization parameters
-                    bandwidth_demand=item.get("bandwidth_demand", random.uniform(5.0, 20.0)),
-                    memory_demand=item.get("memory_demand", random.uniform(64.0, 256.0)),
-                    cpu_demand=item.get("cpu_demand", random.uniform(0.5, 2.0)),
-                    data_size_demand=item.get("data_size_demand", data_size),
+                    bandwidth_demand=bandwidth,
+                    memory_demand=Config.DEFAULT_USER_MEMORY_DEMAND,
+                    data_size_demand=data_size,
                     previous_node_id=None,
                     migration_cost=0.0,
                     cold_start_penalty=0.0

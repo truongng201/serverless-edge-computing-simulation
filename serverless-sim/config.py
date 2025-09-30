@@ -82,3 +82,6 @@ class Config:
     # Dataset playback speed (Scenario 2 / vehicles)
     # Multiply timestep advancement per poll to make movements appear faster on canvas
     DATASET_STEP_MULTIPLIER = 8
+    
+    # User
+    DEFAULT_USER_MEMORY_DEMAND = 134217728 # 128 MB
