@@ -1,9 +1,7 @@
 import axios from "axios";
 import useGlobalState from "@/hooks/use-global-state";
 
-/**
- * Fetch current performance metrics from the backend
- */
+
 export const fetchPerformanceMetrics = async () => {
   const { setPerformanceMetrics, setCloudletMetrics } = useGlobalState.getState();
   
@@ -43,10 +41,7 @@ export const fetchPerformanceMetrics = async () => {
   return null;
 };
 
-/**
- * Compare algorithms performance
- * @param {object} userLocation - Optional test location {x, y}
- */
+
 export const compareAlgorithms = async (userLocation = null) => {
   const { setAlgorithmComparison } = useGlobalState.getState();
   
@@ -69,9 +64,6 @@ export const compareAlgorithms = async (userLocation = null) => {
   return null;
 };
 
-/**
- * Get algorithm performance difference analysis
- */
 export const getAlgorithmPerformanceDiff = async () => {
   try {
     if (process.env.NEXT_PUBLIC_API_URL) {
@@ -89,10 +81,6 @@ export const getAlgorithmPerformanceDiff = async () => {
   return null;
 };
 
-/**
- * Auto-refresh performance metrics at regular intervals
- * @param {number} intervalMs - Refresh interval in milliseconds (default: 5000ms)
- */
 export const startPerformanceMetricsAutoRefresh = (intervalMs = 5000) => {
   const intervalId = setInterval(() => {
     fetchPerformanceMetrics();
@@ -101,10 +89,6 @@ export const startPerformanceMetricsAutoRefresh = (intervalMs = 5000) => {
   return intervalId; // Return interval ID so it can be cleared later
 };
 
-/**
- * Stop auto-refresh
- * @param {number} intervalId - The interval ID returned by startPerformanceMetricsAutoRefresh
- */
 export const stopPerformanceMetricsAutoRefresh = (intervalId) => {
   if (intervalId) {
     clearInterval(intervalId);

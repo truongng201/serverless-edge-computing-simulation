@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
 import { useState, useEffect } from "react";
-import { compareAlgorithms } from "@/lib/performance-metrics-api";
+import { compareAlgorithms } from "@/lib/simulation-management/performance-metrics";
 
 export default function AlgorithmComparisonPanel({ isOpen, onClose }) {
   const { algorithmComparison, assignmentAlgorithm } = useGlobalState();
