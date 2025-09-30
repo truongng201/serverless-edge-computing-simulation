@@ -68,7 +68,7 @@ export default function SystemStatusCard() {
               Total Turnaround time (TAT)
             </span>
             <span className="font-mono text-xs">
-              {formatMs(performanceMetrics.total_turnaround_time)}
+              {performanceMetrics.total_turnaround_time}
             </span>
           </div>
 
