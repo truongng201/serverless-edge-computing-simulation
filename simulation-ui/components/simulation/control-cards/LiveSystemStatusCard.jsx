@@ -27,32 +27,34 @@ export default function LiveSystemStatusCard({ startLiveDataPolling }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-2">
-          <div className="text-xs text-green-600 font-medium">
-            Live Data - Connected to backend cluster
-          </div>
-
-          <div className="bg-green-50 p-2 rounded text-xs">
+          <div
+            className={`p-2 rounded text-xs ${
+              loadingData
+                ? "bg-gray-50"
+                : dataError === ""
+                ? "bg-green-50"
+                : "bg-red-50"
+            }`}
+          >
             <div className="flex items-center justify-between">
               <span>Status:</span>
-              <Badge variant="default" className="text-xs bg-green-600">
-                Connected
+              <Badge
+                variant="default"
+                className={`text-xs ${
+                  loadingData
+                    ? "bg-gray-600"
+                    : dataError === ""
+                    ? "bg-green-600"
+                    : "bg-red-600"
+                }`}
+              >
+                {loadingData
+                  ? "Loading..."
+                  : dataError === ""
+                  ? "Connected"
+                  : "Not connected"}
               </Badge>
             </div>
-            <div className="mt-1 text-gray-600">
-              📊 View detailed metrics in the right panel →
-              {loadingData && (
-                <span className="ml-1 text-xs text-blue-600">
-                  Fetching live data...
-                </span>
-              )}
-            </div>
-            {liveData && (
-              <div className="mt-2 text-gray-700">
-                <div>
-                  Central CPU: {liveData.central_node?.cpu_usage?.toFixed(1)}%
-                </div>
-              </div>
-            )}
           </div>
 
           <div className="grid grid-cols-2 gap-2">
@@ -78,12 +80,6 @@ export default function LiveSystemStatusCard({ startLiveDataPolling }) {
             </Button>
           </div>
         </div>
-
-        {dataError != "" && (
-          <div className="text-xs text-red-600 bg-red-50 p-2 rounded">
-            {dataError}
-          </div>
-        )}
       </CardContent>
     </Card>
   );
