@@ -43,7 +43,6 @@ export default function UserAssignmentCard({}) {
     fetchData();
   }, [setAssignmentAlgorithm]);
 
-  console.log("Current assignment algorithm:", assignmentAlgorithm);
   return (
     <Card className="mb-4">
       <CardHeader className="pb-2">
