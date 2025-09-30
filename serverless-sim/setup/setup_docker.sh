@@ -88,7 +88,8 @@ if docker images | grep -q "python-serverless-handler"; then
 else
     echo "Building python serverless handler image..."
 
-    if docker build -t "$HANDLER_IMAGE" -f ../function_template/Dockerfile function_template; then
+    cd ..
+    if docker build -t "$HANDLER_IMAGE" -f $PWD/function_template/Dockerfile function_template; then
         echo "✅ Python serverless handler image built successfully"
     else
         echo "❌ Failed to build python serverless handler image"
