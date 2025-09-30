@@ -161,3 +161,26 @@ def get_assignment_algorithm():
 def get_all_assignment_algorithms():
     result = central_core_controller.get_all_assignment_algorithms()
     return result
+
+@central_route.route('/performance_metrics', methods=['GET'])
+@standard_response
+def get_performance_metrics():
+    """Get current performance metrics including objective function values"""
+    result = central_core_controller.get_performance_metrics()
+    return result
+
+@central_route.route('/compare_algorithms', methods=['POST'])
+@standard_response
+def compare_algorithms():
+    """Compare performance of greedy vs CVX algorithms"""
+    request_data = request.get_json() or {}
+    user_location = request_data.get('user_location')  # Optional test location
+    result = central_core_controller.compare_algorithms(user_location)
+    return result
+
+@central_route.route('/algorithm_performance_diff', methods=['GET'])
+@standard_response
+def get_algorithm_performance_diff():
+    """Get performance difference analysis for current algorithm"""
+    result = central_core_controller.get_algorithm_performance_diff()
+    return result

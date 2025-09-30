@@ -342,6 +342,46 @@ const useGlobalState = create((set) => ({
       loadingSimulation: typeof updater === "function"
         ? updater(state.loadingSimulation)
         : updater
+    })),
+
+  // Performance Metrics state
+  performanceMetrics: {
+    algorithm: "greedy",
+    total_cost: 0,
+    total_turnaround_time: 0,
+    total_migration_cost: 0,
+    total_cold_start_penalty: 0,
+    num_users: 0,
+    resource_utilization: {
+      avg_memory_utilization: 0,
+      avg_cpu_utilization: 0,
+      avg_bandwidth_utilization: 0,
+      total_cold_starts: 0
+    }
+  },
+  setPerformanceMetrics: (updater) =>
+    set((state) => ({
+      performanceMetrics: typeof updater === "function"
+        ? updater(state.performanceMetrics)
+        : updater
+    })),
+
+  // Algorithm comparison data
+  algorithmComparison: null,
+  setAlgorithmComparison: (updater) =>
+    set((state) => ({
+      algorithmComparison: typeof updater === "function"
+        ? updater(state.algorithmComparison)
+        : updater
+    })),
+
+  // Detailed cloudlet metrics
+  cloudletMetrics: {},
+  setCloudletMetrics: (updater) =>
+    set((state) => ({
+      cloudletMetrics: typeof updater === "function"
+        ? updater(state.cloudletMetrics)
+        : updater
     }))
 }));
 

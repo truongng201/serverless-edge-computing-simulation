@@ -14,6 +14,7 @@ import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 import useGlobalState from "@/hooks/use-global-state";
 import { useSimulationLogic } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
+import { usePerformanceMetrics } from "@/hooks/use-performance-metrics";
 
 export default function Component() {
   // Get all state from the custom hook
@@ -25,6 +26,9 @@ export default function Component() {
 
   // Get canvas drawing
   const { draw } = useCanvasDrawing();
+
+  // Initialize performance metrics tracking
+  usePerformanceMetrics();
 
   // Animation loop
   useEffect(() => {
