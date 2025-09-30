@@ -112,7 +112,7 @@ export default function ConnectionStatusCard() {
                   {/* Total Latency turn around time */}
                   <div className="border-t pt-2 border-purple-200">
                     <div className="flex justify-center text-xs font-bold">
-                      <span>Total turn around time (TAT)</span>
+                      <span>Turn around time (TAT)</span>
                     </div>
                     <div className="flex justify-between text-xs font-medium">
                       <span>Value: </span>

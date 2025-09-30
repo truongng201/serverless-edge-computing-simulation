@@ -15,15 +15,9 @@ export const fetchPerformanceMetrics = async () => {
         const data = response.data.data;
         
         // Update performance metrics
-        if (data.performance_summary) {
+        if (data) {
           setPerformanceMetrics({
-            algorithm: data.performance_summary.algorithm,
-            total_cost: data.performance_summary.performance_metrics.total_cost,
-            total_turnaround_time: data.performance_summary.performance_metrics.total_turnaround_time,
-            total_migration_cost: data.performance_summary.performance_metrics.total_migration_cost,
-            total_cold_start_penalty: data.performance_summary.performance_metrics.total_cold_start_penalty,
-            num_users: data.performance_summary.resource_utilization.total_users,
-            resource_utilization: data.performance_summary.resource_utilization
+            total_turnaround_time: data.total_turnaround_time,
           });
         }
         

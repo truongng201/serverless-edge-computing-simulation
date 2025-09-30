@@ -45,7 +45,14 @@ class CreateUserNodeController:
             last_executed=0,
             size=self.user_data.get("size", 10),
             speed=self.user_data.get("speed", 5),
-            latency=latency
+            latency=latency,
+            # Add optimization parameters
+            bandwidth_demand=bandwidth,
+            memory_demand=Config.DEFAULT_USER_MEMORY_DEMAND,
+            data_size_demand=data_size,
+            previous_node_id=None,
+            migration_cost=0.0,
+            cold_start_penalty=0.0
         )
         self.scheduler.create_user_node(user_node)
 
