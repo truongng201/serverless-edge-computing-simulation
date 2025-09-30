@@ -1,23 +1,40 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Settings } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
+import { useEffect } from "react";
+import { getCurrentAssignmentAlgorithm } from "@/lib/user-management/assignment-algorithm";
 
 export default function CurrentAlgorithmCard() {
-  const { selectedModel, models } = useGlobalState();
+  const { assignmentAlgorithm } = useGlobalState();
+
+  useEffect(() => {
+    // Load current algorithm
+    getCurrentAssignmentAlgorithm();
+  }, []);
+
   return (
     <Card>
       <CardHeader className="pb-2">
-        <CardTitle className="text-sm">Current Algorithm</CardTitle>
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Settings className="w-4 h-4" />
+          Assignment Algorithm
+        </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="text-sm">
-          <div className="font-medium mb-2">{models[selectedModel]}</div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Current:</span>
+            <Badge variant={assignmentAlgorithm === "convex optimization" ? "default" : "secondary"}>
+              {assignmentAlgorithm}
+            </Badge>
+          </div>
+          
           <div className="text-xs text-gray-600">
-            {selectedModel === "lstm" &&
-              "Long Short-Term Memory (LSTM) network is a type of recurrent neural network (RNN) that is well-suited for sequence prediction problems. It can learn long-term dependencies and is effective for time series forecasting."}
-            {selectedModel === "cnn" &&
-              "Convolutional Neural Network (CNN) is a deep learning algorithm that can take in an input image, assign importance (learnable weights and biases) to various aspects/objects in the image, and be able to differentiate one from the other."}
-            {selectedModel === "rnn" &&
-              "Recurrent Neural Network (RNN) is a class of neural networks that is well-suited for sequence prediction problems. It can use its internal memory to process sequences of inputs."}
+            {assignmentAlgorithm === "greedy" &&
+              "Rule-based greedy algorithm that assigns users to the nearest healthy edge node within coverage and resource constraints. Fast but may not be globally optimal."}
+            {assignmentAlgorithm === "convex optimization" &&
+              "CVX-based convex optimization that minimizes total cost (turnaround time + migration cost + cold start penalty) subject to coverage and resource constraints. Mathematically optimal but computationally intensive."}
           </div>
         </div>
       </CardContent>

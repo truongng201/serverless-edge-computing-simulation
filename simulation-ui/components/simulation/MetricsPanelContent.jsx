@@ -4,7 +4,7 @@ import {
   StreetMapMetricsCard,
   LiveSystemMetricsCard,
   ConnectionStatusCard,
-  CurrentAlgorithmCard,
+  PerformanceMetricsCard,
 } from "./metric-cards/MetricCards";
 import useGlobalState from "@/hooks/use-global-state";
 
@@ -34,7 +34,7 @@ export default function MetricsPanelContent() {
 
         <ConnectionStatusCard />
 
-        <CurrentAlgorithmCard />
+        <PerformanceMetricsCard />
       </div>
     </>
   );

@@ -76,7 +76,15 @@ class GetAllUsersController:
                     last_executed=0,
                     size=item.get("size", 10),
                     speed=item.get("speed", 5),
-                    latency=latency
+                    latency=latency,
+                    # Add optimization parameters
+                    bandwidth_demand=item.get("bandwidth_demand", random.uniform(5.0, 20.0)),
+                    memory_demand=item.get("memory_demand", random.uniform(64.0, 256.0)),
+                    cpu_demand=item.get("cpu_demand", random.uniform(0.5, 2.0)),
+                    data_size_demand=item.get("data_size_demand", data_size),
+                    previous_node_id=None,
+                    migration_cost=0.0,
+                    cold_start_penalty=0.0
                 )
                 self.scheduler.create_user_node(user_node)
         # Advance multiple steps per tick to increase apparent speed
@@ -137,7 +145,15 @@ class GetAllUsersController:
                     last_executed=0,
                     size=item.get("size", 10),
                     speed=item.get("speed", 5),
-                    latency=latency
+                    latency=latency,
+                    # Add optimization parameters
+                    bandwidth_demand=item.get("bandwidth_demand", random.uniform(5.0, 20.0)),
+                    memory_demand=item.get("memory_demand", random.uniform(64.0, 256.0)),
+                    cpu_demand=item.get("cpu_demand", random.uniform(0.5, 2.0)),
+                    data_size_demand=item.get("data_size_demand", data_size),
+                    previous_node_id=None,
+                    migration_cost=0.0,
+                    cold_start_penalty=0.0
                 )
                 self.scheduler.create_user_node(user_node)
         step_mul = max(1, int(getattr(Config, 'DATASET_STEP_MULTIPLIER', 1)))

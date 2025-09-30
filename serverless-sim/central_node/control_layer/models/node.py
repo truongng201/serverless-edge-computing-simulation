@@ -42,6 +42,11 @@ class EdgeNodeInfo:
     last_heartbeat: float
     metrics_info: NodeMetrics
     coverage: float
+    # Resource capacities for optimization
+    memory_capacity: float = 2048.0  # r_j (MB)
+    cpu_capacity: float = 8.0        # cp_j (cores)
+    bandwidth_capacity: float = 100.0  # Ω_j (Mbps)
+    warm_containers: int = 3         # w_j^t
 
 @dataclass
 class UserNodeInfo:
@@ -52,3 +57,11 @@ class UserNodeInfo:
     speed: int
     last_executed: float
     latency: Latency
+    # Optimization parameters
+    bandwidth_demand: float = 10.0    # ω_i^t (Mbps)
+    memory_demand: float = 128.0      # m_i^t (MB)
+    cpu_demand: float = 1.0           # π_i^t (cores)
+    data_size_demand: float = 1024.0  # s_i^t (bytes) - also migration data
+    previous_node_id: Optional[str] = None  # For migration tracking
+    migration_cost: float = 0.0       # Current migration cost
+    cold_start_penalty: float = 0.0   # Cold start penalty
