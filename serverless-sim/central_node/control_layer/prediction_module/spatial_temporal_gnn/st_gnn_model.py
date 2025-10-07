@@ -9,7 +9,13 @@ import tensorflow as tf
 from tensorflow import keras
 from tensorflow.keras import layers
 from typing import Tuple, Dict, Optional, List
-import matplotlib.pyplot as plt
+# Optional plotting support for history visualization
+try:
+    import matplotlib.pyplot as plt  # type: ignore
+    _PLOT_AVAILABLE = True
+except Exception as _e:
+    _PLOT_AVAILABLE = False
+    print(f"[WARNING] Plotting disabled in ST-GNN model (matplotlib import failed): {_e}")
 import os
 
 # Import utility functions for error calculation
@@ -512,6 +518,10 @@ class SpatialTemporalGNNModel:
         if not self.history:
             raise ValueError("No training history available")
         
+        if not _PLOT_AVAILABLE:
+            print("[INFO] plot_training_history skipped (plotting not available)")
+            return
+
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         
         # Add title with model info

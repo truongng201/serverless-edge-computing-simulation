@@ -6,8 +6,16 @@ Training script for Spatial-Temporal GNN trajectory prediction models
 import numpy as np
 import os
 import sys
-import matplotlib.pyplot as plt
+import argparse
 from datetime import datetime
+
+# Optional plotting (avoid hard dependency on matplotlib)
+try:
+    import matplotlib.pyplot as plt  # type: ignore
+    _PLOT_AVAILABLE = True
+except Exception as _e:
+    _PLOT_AVAILABLE = False
+    print(f"[WARNING] Plotting disabled (matplotlib import failed): {_e}")
 
 # Add parent directories to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
@@ -16,7 +24,7 @@ sys.path.append(os.path.join(os.path.dirname(__file__), '..', '..'))
 from st_gnn_model import SpatialTemporalGNNModel
 from data.enhanced_data_loader import EnhancedDACTDataLoader
 
-def train_st_gnn_model(config, model_name):
+def train_st_gnn_model(config, model_name, csv_path, train_count: int = 30, test_count: int = 20, enable_plots: bool = True):
     """Train a single ST-GNN model"""
     print(f"\n[TRAIN] Training {model_name}")
     print("=" * 60)
@@ -26,13 +34,14 @@ def train_st_gnn_model(config, model_name):
     
     # Load data (shared across models)
     print("[DATA] Loading DACT dataset...")
+    print(f"[DATA] CSV: {csv_path}")
     data_loader = EnhancedDACTDataLoader(
-        csv_path=os.path.join(os.path.dirname(__file__), '..', '..', 'DACT Easy-Dataset.csv'),
+        csv_path=csv_path,
         sequence_length=config['sequence_length']
     )
     
     # Load and prepare data
-    data_dict = data_loader.prepare_for_training(train_count=30, test_count=20)
+    data_dict = data_loader.prepare_for_training(train_count=train_count, test_count=test_count)
     
     # Extract data from dictionary
     X_train = data_dict['X_train']
@@ -70,7 +79,11 @@ def train_st_gnn_model(config, model_name):
     # Plot training history
     plot_filename = f"{model_name.lower().replace(' ', '_').replace('(', '').replace(')', '')}_training_history.png"
     history_plot_path = os.path.join(os.path.dirname(__file__), plot_filename)
-    model.plot_training_history(history_plot_path)
+    if enable_plots and _PLOT_AVAILABLE:
+        try:
+            model.plot_training_history(history_plot_path)
+        except Exception as e:
+            print(f"[WARNING] Skipping training history plot: {e}")
     
     return {
         'model_name': model_name,
@@ -84,6 +97,21 @@ def main():
     """Main training function for ST-GNN models"""
     print("[TRAINING] Starting Spatial-Temporal GNN Trajectory Model Training")
     print("=" * 60)
+
+    # Args
+    parser = argparse.ArgumentParser(description="Train Spatial-Temporal GNN on DACT dataset")
+    # Default CSV under repo root mock_data
+    default_csv = os.path.join(
+        os.path.dirname(__file__),
+        '..', '..', '..', '..', 'mock_data', 'DACT-Easy-Dataset.csv'
+    )
+    parser.add_argument('--csv-path', default=os.path.normpath(default_csv), help='Path to DACT CSV')
+    parser.add_argument('--epochs', type=int, default=None, help='Override number of epochs')
+    parser.add_argument('--train-trips', type=int, default=None, help='Number of trips for training')
+    parser.add_argument('--test-trips', type=int, default=None, help='Number of trips for testing')
+    parser.add_argument('--quick', action='store_true', help='Quick run: fewer trips and epochs; smallest model')
+    parser.add_argument('--no-plot', action='store_true', help='Disable plotting entirely')
+    args = parser.parse_args()
     
     # Base configuration
     base_config = {
@@ -103,10 +131,25 @@ def main():
         'validation_split': 0.2,
         'patience': 20,
     }
+
+    # Apply quick/epoch overrides
+    train_trips = 30
+    test_trips = 20
+    if args.quick:
+        # Very small for smoke test
+        base_config['epochs'] = 5
+        train_trips = 6
+        test_trips = 3
+    if args.epochs is not None:
+        base_config['epochs'] = args.epochs
+    if args.train_trips is not None:
+        train_trips = args.train_trips
+    if args.test_trips is not None:
+        test_trips = args.test_trips
     
     # Model configurations to test
     model_configs = [
-        # Small ST-GNN
+        # Small ST-GNN (default first entry; used for quick mode)
         {
             **base_config,
             'num_spatial_nodes': 9,  # 3x3 grid
@@ -137,7 +180,7 @@ def main():
             'use_temporal_attention': True
         }
     ]
-    
+
     # Model names
     model_names = [
         "ST-GNN Small (9 nodes)",
@@ -146,13 +189,25 @@ def main():
         "ST-GNN Large (25 nodes)",
         "ST-GNN Large + Attention (25 nodes)"
     ]
+
+    # In quick mode, only run the smallest model for speed
+    if args.quick:
+        model_configs = [model_configs[0]]
+        model_names = [model_names[0]]
     
     all_results = []
     
     try:
         # Train each model
         for config, model_name in zip(model_configs, model_names):
-            result = train_st_gnn_model(config, model_name)
+            result = train_st_gnn_model(
+                config,
+                model_name,
+                csv_path=args.csv_path,
+                train_count=train_trips,
+                test_count=test_trips,
+                enable_plots=(not args.no_plot and _PLOT_AVAILABLE),
+            )
             all_results.append(result)
         
         # Compare results
@@ -180,7 +235,13 @@ def main():
         print(f"   Parameters: {best_model['training_results']['total_params']:,}")
         
         # Create comparison plot
-        create_comparison_plot(all_results)
+        if (not args.no_plot) and _PLOT_AVAILABLE:
+            try:
+                create_comparison_plot(all_results)
+            except Exception as e:
+                print(f"[WARNING] Skipping comparison plot: {e}")
+        else:
+            print("[INFO] Comparison plot skipped (plotting disabled)")
         
         # Save comprehensive results
         results_path = os.path.join(os.path.dirname(__file__), 'st_gnn_models_comparison.txt')
