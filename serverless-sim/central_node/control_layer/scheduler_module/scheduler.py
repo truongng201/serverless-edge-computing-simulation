@@ -370,4 +370,35 @@ class Scheduler:
         else:
             self.logger.warning(f"CVX optimization failed with status: {problem.status}")
             return self._greedy_assignment(user_location)
-    
+
+    def get_performance_summary_for_frontend(self) -> Dict[str, Any]:
+        """
+        Get a summary of performance metrics formatted for frontend display
+        """
+        objective = self.calculate_total_objective_function()
+        detailed = self.get_detailed_assignment_metrics()
+        
+        # Calculate overall utilization statistics
+        total_users = sum(metrics["num_users"] for metrics in detailed.values())
+        avg_memory_util = sum(metrics["memory_utilization_percent"] for metrics in detailed.values()) / max(1, len(detailed))
+        avg_cpu_util = sum(metrics["cpu_utilization_percent"] for metrics in detailed.values()) / max(1, len(detailed))
+        avg_bandwidth_util = sum(metrics["bandwidth_utilization_percent"] for metrics in detailed.values()) / max(1, len(detailed))
+        total_cold_starts = sum(metrics["cold_starts"] for metrics in detailed.values())
+        
+        return {
+            "algorithm": objective["algorithm"],
+            "performance_metrics": {
+                "total_cost": round(objective["total_cost"], 2),
+                "total_turnaround_time": round(objective["total_turnaround_time"], 2),
+                "total_migration_cost": round(objective["total_migration_cost"], 2),
+                "total_cold_start_penalty": round(objective["total_cold_start_penalty"], 2)
+            },
+            "resource_utilization": {
+                "total_users": total_users,
+                "avg_memory_utilization": round(avg_memory_util, 1),
+                "avg_cpu_utilization": round(avg_cpu_util, 1),
+                "avg_bandwidth_utilization": round(avg_bandwidth_util, 1),
+                "total_cold_starts": total_cold_starts
+            },
+        }
+        
