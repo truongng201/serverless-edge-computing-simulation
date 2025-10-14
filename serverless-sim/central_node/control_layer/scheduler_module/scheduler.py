@@ -18,7 +18,7 @@ class AssignmentAlgorithm(Enum):
     CVX = "convex optimization"
 
 class Scheduler:
-    def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.CVX):
+    def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
         self.assignment_algorithm = assignment_algorithm
         self.edge_nodes: Dict[str, EdgeNodeInfo] = {}
         self.central_node = {
