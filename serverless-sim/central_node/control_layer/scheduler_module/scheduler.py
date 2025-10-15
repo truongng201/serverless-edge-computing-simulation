@@ -24,7 +24,7 @@ class Scheduler:
         self.central_node = {
             "node_id": "central_node",
             "endpoint": "localhost:8000",
-            "location": {"x": 630, "y": 970}, # default location
+            "location": {"x": 730, "y": 1070}, # default location
             "coverage": 0 # default coverage
         }
         self.user_nodes: Dict[str, UserNodeInfo] = {}
