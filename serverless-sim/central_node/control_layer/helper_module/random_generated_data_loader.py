@@ -1,6 +1,7 @@
 import random
 import json
 import os
+import math
 
 
 class RandomGeneratedDataLoader:
@@ -24,6 +25,60 @@ class RandomGeneratedDataLoader:
         self.simulation_data = self._load_or_generate_simulation_data()
         self.users = self.simulation_data['initial_users']  # For current state tracking
         self.step_history = self.simulation_data['step_history']  # All computed steps
+    
+    def _random_location_around_central(self, central_node_location, min_distance=100, max_distance=700):
+        angle = random.uniform(0, 2 * math.pi)
+        
+        min_radius_squared = min_distance * min_distance
+        max_radius_squared = max_distance * max_distance
+        
+        radius_squared = random.uniform(min_radius_squared, max_radius_squared)
+        radius = math.sqrt(radius_squared)
+
+        x = central_node_location.get('x', 0) + radius * math.cos(angle)
+        y = central_node_location.get('y', 0) + radius * math.sin(angle)
+        
+        return {'x': x, 'y': y}
+    
+    def random_velocity(self, min_speed=0, max_speed=3):
+        speed = random.uniform(min_speed, max_speed)  # m/s, typical city driving
+        direction = random.uniform(0, 2 * math.pi)
+        
+        vx = speed * math.cos(direction)
+        vy = speed * math.sin(direction)
+        
+        return vx, vy, speed, direction
+    
+    def generate_car_user(self, i, radius=600):
+        """
+        Generate a car user with realistic car-like movement
+        
+        Args:
+            i: User ID
+            radius: Maximum radius around central node (default: 1000m)
+            
+        Returns:
+            dict: User data with car-like movement properties
+        """
+        # Randomly place car around central node
+        r = math.sqrt(random.uniform(0, 1)) * radius
+        theta = random.uniform(0, 2 * math.pi)
+        x = self.central_node_location.get('x', 0) + r * math.cos(theta)
+        y = self.central_node_location.get('y', 0) + r * math.sin(theta)
+
+        # Generate car-like velocity
+        vx, vy, speed, direction = self.random_velocity()
+
+        return {
+            "user_id": i,
+            "current_step": 0,
+            "location_x": x,
+            "location_y": y,
+            "velocity_x": vx,
+            "velocity_y": vy,
+            "speed": speed,
+            "direction": direction
+        }
     
     def _load_or_generate_simulation_data(self):
         """
@@ -53,14 +108,7 @@ class RandomGeneratedDataLoader:
         print(f"Generating new simulation data and saving to {self.data_file_path}")
         users = []
         for i in range(1, self.num_items + 1):  # user range from 1 -> num_items
-            user = {
-                "user_id": i,
-                "current_step": 0,
-                "location_x": self.central_node_location.get('x', 0) + random.uniform(100, 500) * random.choice([-1, 0, 0, 1]),
-                "location_y": self.central_node_location.get('y', 0) + random.uniform(100, 500) * random.choice([-1, 0, 0, 1]),
-                "velocity_x": random.uniform(-2, 2),  # Small random velocity
-                "velocity_y": random.uniform(-2, 2)   # Small random velocity
-            }
+            user = self.generate_car_user(i)
             users.append(user)
         
         simulation_data = {
@@ -147,13 +195,26 @@ class RandomGeneratedDataLoader:
             user["location_x"] += user["velocity_x"] * steps_elapsed
             user["location_y"] += user["velocity_y"] * steps_elapsed
             
-            # Add some randomness to velocity for more realistic movement
-            user["velocity_x"] += random.uniform(-0.5, 0.5)
-            user["velocity_y"] += random.uniform(-0.5, 0.5)
-            
-            # Clamp velocity to reasonable bounds
-            user["velocity_x"] = max(-5, min(5, user["velocity_x"]))
-            user["velocity_y"] = max(-5, min(5, user["velocity_y"]))
+            # Add some randomness to car movement (slight direction and speed variations)
+            if "speed" in user and "direction" in user:
+                # Slight variations in speed and direction for realistic car movement
+                speed_variation = random.uniform(-1, 1)  # ±1 m/s variation
+                direction_variation = random.uniform(-0.1, 0.1)  # ±0.1 rad variation (~6 degrees)
+                
+                user["speed"] = max(5, min(25, user["speed"] + speed_variation))  # Keep within 5-25 m/s
+                user["direction"] += direction_variation
+                
+                # Update velocity based on new speed and direction
+                user["velocity_x"] = user["speed"] * math.cos(user["direction"])
+                user["velocity_y"] = user["speed"] * math.sin(user["direction"])
+            else:
+                # Fallback to old behavior for users without speed/direction
+                user["velocity_x"] += random.uniform(-0.5, 0.5)
+                user["velocity_y"] += random.uniform(-0.5, 0.5)
+                
+                # Clamp velocity to reasonable bounds
+                user["velocity_x"] = max(-25, min(25, user["velocity_x"]))
+                user["velocity_y"] = max(-25, min(25, user["velocity_y"]))
             
             
     def get_cached_steps(self):
