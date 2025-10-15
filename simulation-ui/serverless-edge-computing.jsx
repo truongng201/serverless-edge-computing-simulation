@@ -10,31 +10,15 @@ import EditModeDescription from "@/components/simulation/EditModeDescription";
 import ControlPanelContent from "@/components/simulation/ControlPanelContent";
 import MetricsPanelContent from "@/components/simulation/MetricsPanelContent";
 
-// Import custom hooks and utilities
 import useGlobalState from "@/hooks/use-global-state";
-import { useSimulationLogic } from "@/lib/simulation-logic";
 import { useCanvasDrawing } from "@/lib/canvas-drawing";
 
 export default function Component() {
-  // Get all state from the custom hook
   const { leftPanelOpen, setLeftPanelOpen, rightPanelOpen, setRightPanelOpen } =
     useGlobalState();
 
-  // Get simulation logic
-  const { simulationStep } = useSimulationLogic();
 
-  // Get canvas drawing
   const { draw } = useCanvasDrawing();
-
-  // Animation loop
-  useEffect(() => {
-    const interval = setInterval(() => {
-      simulationStep();
-      draw();
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [simulationStep, draw]);
 
   useEffect(() => {
     const handleResize = () => draw();

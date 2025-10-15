@@ -1,104 +1,43 @@
-"""
-Central Node Control Layer - Scheduler Module
-Handles scheduling decisions, load balancing, and request routing
-"""
-
 import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
-from dataclasses import dataclass, field
 import time
 from enum import Enum
+import cvxpy as cp
+import numpy as np
+import random
+from collections import defaultdict
 
 from config import Config
 
-from central_node.control_layer.metrics_module.global_metrics import NodeMetrics
-from central_node.control_layer.scheduler_module.gap_solver import GAPSolver, GAPConfig
+from central_node.control_layer.models import EdgeNodeInfo, UserNodeInfo, NodeMetrics
 
-class SchedulingStrategy(Enum):
-    ROUND_ROBIN = "round_robin"
-    LEAST_LOADED = "least_loaded"
-    GEOGRAPHIC = "geographic"
-    PREDICTIVE = "predictive"
-    GAP_BASELINE = "gap_baseline"
 
-@dataclass
-class Latency:
-    distance: float
-    data_size: float
-    bandwidth: float
-    propagation_delay: float
-    transmission_delay: float
-    computation_delay: float
-    container_status: str
-    total_turnaround_time: float
-
-@dataclass
-class EdgeNodeInfo:
-    node_id: str
-    endpoint: str
-    location: Dict[str, float]  # {"x": ..., "y": ...}
-    system_info: Dict[str, Any]
-    last_heartbeat: float
-    metrics_info: NodeMetrics
-    coverage: float
-
-@dataclass
-class UserNodeInfo:
-    user_id: str
-    assigned_node_id: str
-    location: Dict[str, float]  # {"x": ..., "y": ...}
-    size: int
-    speed: int
-    last_executed: float
-    latency: Latency
-    created_at: float = field(default_factory=lambda: time.time())
-    last_updated: float = field(default_factory=lambda: time.time())
-    memory_requirement: float = field(default_factory=lambda: Config.PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB * 1024 * 1024)
-    last_handoff: float = 0.0
-    predictive_debug: Optional[Dict[str, Any]] = None
-
-@dataclass
-class SchedulingDecision:
-    target_node_id: str
-    execution_time_estimate: float
-    confidence: float
-    reasoning: str
+class AssignmentAlgorithm(Enum):
+    GREEDY = "greedy"
+    CVX = "convex optimization"
 
 class Scheduler:
-    def __init__(self, strategy: SchedulingStrategy = SchedulingStrategy.ROUND_ROBIN):
-        self.strategy = strategy
+    def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
+        self.assignment_algorithm = assignment_algorithm
         self.edge_nodes: Dict[str, EdgeNodeInfo] = {}
         self.central_node = {
             "node_id": "central_node",
             "endpoint": "localhost:8000",
-            "location": {"x": 600, "y": 400}, # default location
+            "location": {"x": 730, "y": 1070}, # default location
             "coverage": 0 # default coverage
         }
         self.user_nodes: Dict[str, UserNodeInfo] = {}
-        self.round_robin_index = 0
         self.logger = logging.getLogger(__name__)
         
-        # Initialize GAP solver
-        self.gap_solver = GAPSolver(GAPConfig(debug_logging=True))
         self.simulation = False
+        self.assignment_matrix = {}
         self.current_dataset = None
         self.current_step_id = None
-
-        # Assignment runtime config (overridable via API)
-        self.handoff_min_dwell_seconds: float = getattr(Config, 'HANDOFF_MIN_DWELL_SECONDS', 1.0)
-        self.handoff_improvement_threshold: float = getattr(Config, 'HANDOFF_IMPROVEMENT_THRESHOLD', 0.1)
-        self.assignment_scan_interval: float = getattr(Config, 'ASSIGNMENT_SCAN_INTERVAL', 0.5)
-        self.load_aware_alpha: float = getattr(Config, 'LOAD_AWARE_ALPHA', 1.0)
-        self.handoff_penalty: float = getattr(Config, 'PREDICTIVE_HANDOFF_COST', 0.05)
-
-        # Handoff event log (recent)
-        self.handoff_log: List[Dict[str, Any]] = []
-        self.max_handoff_log = 200
-
-        # Optional trajectory predictor and per-user history (injected by controller)
-        self.trajectory_predictor = None
-        self._user_history: Dict[str, List[Tuple[float, float]]] = {}
+        
+        # CVX optimization metrics
+        self._last_cvx_objective_value = None
+        self._last_cvx_latency_cost = None
 
     def start_simulation(self):
         self.simulation = True
@@ -114,117 +53,25 @@ class Scheduler:
             return
         self.edge_nodes[new_edge_node.node_id] = new_edge_node
         
-    def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
-        if user_id not in self.user_nodes:
-            return False
-
-        user = self.user_nodes[user_id]
-        user.location = new_location
-
-        # Keep current assignment unless it's invalid/out of coverage.
-        nearest_id, nearest_dist_m = self._node_assignment(new_location)
-        current_id = user.assigned_node_id or None
-        if not current_id:
-            # First-time assignment
-            user.assigned_node_id = nearest_id
-            user.latency.distance = nearest_dist_m
-        else:
-            # Validate coverage for current edge; if invalid, fall back to nearest
-            if current_id == 'central_node':
-                # Distance to central for latency
-                dist_px = self._calculate_distance(new_location, self.central_node["location"])
-                user.latency.distance = dist_px * Config.DEFAULT_PIXEL_TO_METERS
-            else:
-                curr_node = self.edge_nodes.get(current_id)
-                if not curr_node:
-                    user.assigned_node_id = nearest_id
-                    user.latency.distance = nearest_dist_m
-                else:
-                    dist_px = self._calculate_distance(new_location, curr_node.location)
-                    # If out of coverage, switch immediately to nearest
-                    if dist_px > curr_node.coverage:
-                        user.assigned_node_id = nearest_id
-                        user.latency.distance = nearest_dist_m
-                    else:
-                        user.latency.distance = dist_px * Config.DEFAULT_PIXEL_TO_METERS
-        user.last_updated = time.time()
-        # Append to trajectory history
-        try:
-            hist = self._user_history.get(user_id, [])
-            hist.append((new_location['x'], new_location['y']))
-            if len(hist) > 10:
-                hist = hist[-10:]
-            self._user_history[user_id] = hist
-        except Exception:
-            pass
-        
-        return True
-    
     def get_central_node_info(self) -> Dict[str, Any]:
         return self.central_node
     
-    def set_scheduling_strategy(self, strategy: SchedulingStrategy):
-        """Change the scheduling strategy"""
-        # Allow string input for convenience
-        if isinstance(strategy, str):
-            try:
-                strategy = SchedulingStrategy(strategy)
-            except Exception:
-                self.logger.warning(f"Unknown strategy '{strategy}', fallback to round_robin")
-                strategy = SchedulingStrategy.ROUND_ROBIN
-        self.strategy = strategy
-        self.logger.info(f"Scheduling strategy changed to: {self.strategy.value}")
-        
-    def get_scheduling_strategy(self) -> str:
-        """Get current scheduling strategy"""
-        return self.strategy.value
-
-    def set_assignment_config(self, **kwargs):
-        """Update handoff/assignment runtime parameters."""
-        if 'handoff_min_dwell_seconds' in kwargs:
-            self.handoff_min_dwell_seconds = float(kwargs['handoff_min_dwell_seconds'])
-        if 'handoff_improvement_threshold' in kwargs:
-            self.handoff_improvement_threshold = float(kwargs['handoff_improvement_threshold'])
-        if 'assignment_scan_interval' in kwargs:
-            self.assignment_scan_interval = float(kwargs['assignment_scan_interval'])
-        if 'load_aware_alpha' in kwargs:
-            self.load_aware_alpha = float(kwargs['load_aware_alpha'])
-        self.logger.info(
-            f"Assignment config updated: dwell={self.handoff_min_dwell_seconds}s, "
-            f"threshold={self.handoff_improvement_threshold}, scan={self.assignment_scan_interval}s, "
-            f"alpha={self.load_aware_alpha}"
-        )
-
-    def get_assignment_status(self) -> Dict[str, Any]:
-        return {
-            'strategy': self.get_scheduling_strategy(),
-            'config': {
-                'handoff_min_dwell_seconds': self.handoff_min_dwell_seconds,
-                'handoff_improvement_threshold': self.handoff_improvement_threshold,
-                'assignment_scan_interval': self.assignment_scan_interval,
-                'load_aware_alpha': self.load_aware_alpha,
-            },
-            'handoff_log_tail': self.handoff_log[-20:],
-            'users': len(self.user_nodes),
-            'edge_nodes': len(self.edge_nodes),
-        }
+    def get_assignment_algorithm(self) -> str:
+        return self.assignment_algorithm.value
     
-    def create_user_node(self, user_node: UserNodeInfo):
-        self.user_nodes[user_node.user_id] = user_node
-        # initialize last_updated if missing
-        if not getattr(user_node, 'last_updated', None):
-            user_node.last_updated = time.time()
-        if not getattr(user_node, 'last_handoff', None):
-            user_node.last_handoff = user_node.created_at
-        # initialize history with current location
-        try:
-            self._user_history[user_node.user_id] = [(user_node.location['x'], user_node.location['y'])]
-        except Exception:
-            self._user_history[user_node.user_id] = []
+    def get_all_assignment_algorithms(self) -> List[str]:
+        return [algorithm.value for algorithm in AssignmentAlgorithm]
 
+    def set_assignment_algorithm(self, assignment_algorithm: str):
+        try:
+            self.assignment_algorithm = AssignmentAlgorithm(assignment_algorithm)
+        except ValueError:
+            raise Exception(f"Invalid assignment algorithm: {assignment_algorithm}")
+        
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:
-            raise Exception(f"Node {node_info.node_id} is already registered")
+            self.logger.info(f"Edge node {node_info.node_id} is already registered")
+            return
         self.edge_nodes[node_info.node_id] = node_info
         self.logger.info(f"Registered edge node: {node_info.node_id}")
         
@@ -248,66 +95,16 @@ class Scheduler:
                 metrics_info=new_metrics,
                 coverage=300.0
             ))
+        
+    def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
+        if user_id not in self.user_nodes:
+            return False
+        self.user_nodes[user_id].location = new_location
+        return True
 
-    def schedule_request(self, request_data: Dict[str, Any]) -> Optional[SchedulingDecision]:
-        """Schedule a request to the best available edge node"""
-        available_nodes = []
-        
-        if not available_nodes:
-            self.logger.warning("No healthy edge nodes available")
-            return None
-            
-        if self.strategy == SchedulingStrategy.ROUND_ROBIN:
-            return self._schedule_round_robin(available_nodes, request_data)
-        elif self.strategy == SchedulingStrategy.LEAST_LOADED:
-            return self._schedule_least_loaded(available_nodes, request_data)
-        elif self.strategy == SchedulingStrategy.GEOGRAPHIC:
-            return self._schedule_geographic(available_nodes, request_data)
-        elif self.strategy == SchedulingStrategy.PREDICTIVE:
-            return self._schedule_predictive(available_nodes, request_data)
-        elif self.strategy == SchedulingStrategy.GAP_BASELINE:
-            return self._schedule_gap_baseline(available_nodes, request_data)
-        else:
-            return self._schedule_round_robin(available_nodes, request_data)
+    def create_user_node(self, user_node: UserNodeInfo):
+        self.user_nodes[user_node.user_id] = user_node
 
-    def _schedule_round_robin(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """Round robin scheduling"""
-        if self.round_robin_index >= len(nodes):
-            self.round_robin_index = 0
-            
-        selected_node = nodes[self.round_robin_index]
-        self.round_robin_index += 1
-        
-        return SchedulingDecision(
-            target_node_id=selected_node.node_id,
-            execution_time_estimate=1.0,  # Default estimate
-            confidence=0.8,
-            reasoning="Round robin selection"
-        )
-        
-    def _schedule_least_loaded(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """Least loaded scheduling"""
-        selected_node = min(nodes, key=lambda n: n.current_load)
-        
-        return SchedulingDecision(
-            target_node_id=selected_node.node_id,
-            execution_time_estimate=1.0 / (1.0 - selected_node.current_load),
-            confidence=0.9,
-            reasoning=f"Least loaded node (load: {selected_node.current_load:.2f})"
-        )
-        
-    def _schedule_geographic(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """Geographic-based scheduling"""
-        # For now, just use least loaded
-        # TODO: Implement actual geographic distance calculation
-        return self._schedule_least_loaded(nodes, request_data)
-        
-    def _schedule_predictive(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """Predictive scheduling using ML models"""
-        # For now, just use least loaded
-        # TODO: Integrate with prediction module
-        return self._schedule_least_loaded(nodes, request_data)
-    
     def _classify_nodes(self):
         classified_nodes = {
             "healthy": set(),
@@ -369,360 +166,284 @@ class Scheduler:
             "warning_node_list": list(classified_nodes["warning"]),
         }
     
-    def _node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
-        min_distance = self._calculate_distance(user_location, self.central_node["location"])
-        nearest_node_id = "central_node"  # default to central node
-        
-        # Check all edge nodes
-        for node_id, edge_node in self.edge_nodes.items():
-            distance = self._calculate_distance(user_location, edge_node.location)
-            if distance < min_distance and distance <= edge_node.coverage:
-                min_distance = distance
-                nearest_node_id = node_id
-
-        return nearest_node_id, min_distance * Config.DEFAULT_PIXEL_TO_METERS
-
+    
     def _calculate_distance(self, location1: Dict[str, float], location2: Dict[str, float]) -> float:
-        """Calculate Euclidean distance between two locations"""
         dx = location1["x"] - location2["x"]
         dy = location1["y"] - location2["y"]
         return (dx ** 2 + dy ** 2) ** 0.5
     
-    def _schedule_gap_baseline(self, nodes: List[EdgeNodeInfo], request_data: Dict[str, Any]) -> SchedulingDecision:
-        """GAP-based scheduling using utility optimization"""
-        user_id = request_data.get('user_id', 'unknown_user')
-        user_location = request_data.get('user_location', {'x': 0, 'y': 0})
+    def node_assignment(self) -> dict:
+        if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
+            for user_id, user_node in self.user_nodes.items():
+                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                user_node.assigned_node_id = assigned_node_id
+                user_node.latency.distance = assigned_node_distance
+                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                user_node.latency.total_turnaround_time = total_turnaround_time
+                self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+            return self.assignment_matrix
+        elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
+            self._convex_optimization_assignment_all_users()
+            print(self.assignment_matrix)
+            return self.assignment_matrix
+        else:
+            self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
+            return self.assignment_matrix
+
+    def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:
+        if cloudlet_id == "central_node":
+            return True  # Assume central node has unlimited capacity
+            
+        if cloudlet_id not in self.edge_nodes:
+            return False
+        
+        cloudlet = self.edge_nodes[cloudlet_id]
+        if cloudlet.metrics_info.cpu_usage < Config.EDGE_NODE_UNHEALTHY_CPU_THRESHOLD:
+            x = (cloudlet.metrics_info.memory_usage * cloudlet.metrics_info.memory_total / 100 + user_node.memory_demand) / cloudlet.metrics_info.memory_total * 100
+            if x < Config.EDGE_NODE_UNHEALTHY_MEMORY_THRESHOLD:
+                return True
+        return False  
+    
+    def _greedy_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+        '''
+            RULE-BASED GREEDY ASSIGNMENT:
+            1. Assign to the nearest healthy node within resource constraints.
+            2. If no healthy node is available, assign to the nearest warning node within resource constraints.
+            3. If no warning node is available, assign to the nearest unhealthy node within resource constraints.
+            4. If no edge node is within resource constraints, assign to the central node.
+        '''
+        temp_user = UserNodeInfo(
+            user_id="temp",
+            assigned_node_id="",
+            location=user_location,
+            size=10,
+            speed=5,
+            last_executed=0,
+            latency=None,
+        )
+        
+        best_node = self.central_node["node_id"]
+        min_distance = self._calculate_distance(user_location, self.central_node["location"])
+        
+        for node in self.edge_nodes.values():
+            if not self._check_resource_constraints(temp_user, node.node_id):
+                continue
+            distance = self._calculate_distance(user_location, node.location)
+            if distance < min_distance:
+                min_distance = distance
+                best_node = node.node_id
+
+        return best_node, min_distance
+
+   
+    def calculate_total_turnaround_time(self) -> Dict[str, float]:
+        total_turnaround_time = 0.0
+        
+        for _, user_node in self.user_nodes.items():
+            # Turnaround latency cost
+            distance = 0
+            turnaround_time = 0
+            cloudlet_id = user_node.assigned_node_id
+            if cloudlet_id == "central_node":
+                distance = self._calculate_distance(user_node.location, self.central_node["location"])
+            else:
+                cloudlet = self.edge_nodes[cloudlet_id]
+                distance = self._calculate_distance(user_node.location, cloudlet.location)
+            propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+            transmission_delay = user_node.data_size_demand / user_node.bandwidth_demand
+            computation_delay = user_node.latency.computation_delay if user_node.latency.computation_delay else 0
+            turnaround_time = propagation_delay + transmission_delay + computation_delay
+            total_turnaround_time += turnaround_time
+        
+        return total_turnaround_time
+
+
+    def _convex_optimization_assignment_all_users(self):
+        """
+        Convex optimization assignment for all users at once
+        """
+        if not self.user_nodes:
+            return
+            
+        users = list(self.user_nodes.keys())
+        cloudlets = list(self.edge_nodes.keys()) + ["central_node"]
+        
+        n_users = len(users)
+        n_cloudlets = len(cloudlets)
+        
+        if n_users == 0 or n_cloudlets == 0:
+            return
+        
+        # Decision variables
+        # a[i,j] = 1 if user i assigned to cloudlet j
+        a = cp.Variable((n_users, n_cloudlets), boolean=True)
+        
+        # Cost matrix: T[i,j] = turnaround time for user i on cloudlet j
+        T = np.zeros((n_users, n_cloudlets))
+        memory_demand = np.zeros(n_users)
+        
+        for i, user_id in enumerate(users):
+            user_node = self.user_nodes[user_id]
+            user_loc = user_node.location
+            memory_demand[i] = user_node.memory_demand
+            
+            for j, cloudlet_id in enumerate(cloudlets):
+                if cloudlet_id == "central_node":
+                    distance = self._calculate_distance(user_loc, self.central_node["location"])
+                else:
+                    cloudlet = self.edge_nodes[cloudlet_id]
+                    distance = self._calculate_distance(user_loc, cloudlet.location)
+                
+                # Calculate turnaround time components
+                prop_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                
+                # Use existing delays if available, otherwise use defaults
+                if user_node.latency and user_node.latency.computation_delay:
+                    comp_delay = user_node.latency.computation_delay
+                else:
+                    comp_delay = 50.0  # milliseconds
+                
+                if user_node.latency and user_node.latency.transmission_delay:
+                    trans_delay = user_node.latency.transmission_delay
+                else:
+                    trans_delay = 100.0  # milliseconds
+
+                T[i, j] = prop_delay + trans_delay + comp_delay
+    
+        # Cloudlet capacity constraints
+        memory_capacity = np.zeros(n_cloudlets)
+        
+        for j, cloudlet_id in enumerate(cloudlets):
+            if cloudlet_id == "central_node":
+                memory_capacity[j] = 999999  # Assume unlimited capacity for central node
+            else:
+                cloudlet = self.edge_nodes[cloudlet_id]
+                # Calculate available memory (total - currently used)
+                current_memory_used = (cloudlet.metrics_info.memory_usage / 100.0) * cloudlet.metrics_info.memory_total
+                memory_capacity[j] = max(0, cloudlet.metrics_info.memory_total - current_memory_used)
+
+        # Objective: minimize total latency cost
+        latency_cost = cp.sum(cp.multiply(T, a))
+        objective = cp.Minimize(latency_cost)
+        
+        # Constraints
+        constraints = []
+        
+        # Assignment constraint: each user assigned to exactly one cloudlet
+        for i in range(n_users):
+            constraints.append(cp.sum(a[i, :]) == 1)
+        
+        # Resource capacity constraints
+        for j in range(n_cloudlets):
+            # Memory constraint: sum of memory demands <= available memory capacity
+            constraints.append(cp.sum(cp.multiply(memory_demand, a[:, j])) <= memory_capacity[j])
+        
+        # Solve the optimization problem
+        problem = cp.Problem(objective, constraints)
         
         try:
-            # Prepare data for GAP solver
-            users = {
-                user_id: {
-                    'location': user_location,
-                    'data_size': request_data.get('data_size', 300)  # MB
-                }
-            }
+            problem.solve(solver=cp.ECOS_BB, verbose=False)
             
-            # Convert edge nodes to GAP format
-            edge_nodes = {}
-            for node in nodes:
-                edge_nodes[node.node_id] = {
-                    'node_id': node.node_id,
-                    'location': node.location,
-                    'endpoint': node.endpoint,
-                    'metrics': node.metrics_info.__dict__ if node.metrics_info else {}
-                }
-            
-            # Run GAP solver
-            assignments = self.gap_solver.solve_gap(users, edge_nodes, self.central_node)
-            
-            if assignments and len(assignments) > 0:
-                assignment = assignments[0]  # Get assignment for our user
+            if problem.status == cp.OPTIMAL:
+                # Store optimization results for metrics
+                self._last_cvx_objective_value = problem.value
+                self._last_cvx_latency_cost = latency_cost.value
                 
-                # Log GAP statistics
-                stats = self.gap_solver.get_assignment_stats(assignments)
-                self.logger.info(f"GAP assignment stats: {stats}")
-                
-                return SchedulingDecision(
-                    target_node_id=assignment.target_node_id,
-                    execution_time_estimate=assignment.estimated_latency / 1000.0,  # Convert to seconds
-                    confidence=0.9,  # High confidence in GAP optimization
-                    reasoning=assignment.reasoning
-                )
-            else:
-                # Fallback to round robin if GAP fails
-                self.logger.warning("GAP assignment failed, falling back to round robin")
-            return self._schedule_round_robin(nodes, request_data)
-            
-        except Exception as e:
-            self.logger.error(f"GAP scheduling error: {e}")
-            # Fallback to round robin
-            return self._schedule_round_robin(nodes, request_data)
-
-    # --- Online assignment / handoff helpers ---
-    def _score_node_distance(self, user_location: Dict[str, float], node: Optional[EdgeNodeInfo]) -> float:
-        # Lower is better
-        if node is None:
-            # central node
-            dist = self._calculate_distance(user_location, self.central_node["location"])
-            return dist
-        return self._calculate_distance(user_location, node.location)
-
-    def _score_node_load_aware(self, user_location: Dict[str, float], node: Optional[EdgeNodeInfo]) -> float:
-        # Lower is better; include CPU load factor
-        base = self._score_node_distance(user_location, node)
-        if node is None:
-            load = 0.5  # arbitrary for central
-        else:
-            try:
-                load = (node.metrics_info.cpu_usage or 0) / 100.0
-            except Exception:
-                load = 0.0
-        return base * (1.0 + self.load_aware_alpha * load)
-
-    def _estimate_available_memory_mb(self, node: Optional[EdgeNodeInfo]) -> float:
-        if node is None:
-            return float('inf')
-        metrics = getattr(node, 'metrics_info', None)
-        if not metrics:
-            return float('inf')
-        try:
-            total_bytes = float(getattr(metrics, 'memory_total', 0) or 0)
-            usage_percent = float(getattr(metrics, 'memory_usage', 0) or 0) / 100.0
-            if total_bytes <= 0:
-                return float('inf')
-            available_bytes = total_bytes * max(0.0, 1.0 - usage_percent)
-            return available_bytes / (1024 * 1024)
-        except Exception:
-            return float('inf')
-
-    def _estimate_warm_probability(self, node: Optional[EdgeNodeInfo]) -> float:
-        if node is None:
-            return getattr(Config, 'PREDICTIVE_WARM_BASE_PROB', 0.2)
-        metrics = getattr(node, 'metrics_info', None)
-        if not metrics:
-            return getattr(Config, 'PREDICTIVE_WARM_BASE_PROB', 0.2)
-        try:
-            warm = float(getattr(metrics, 'warm_container', 0) or 0)
-            running = float(getattr(metrics, 'running_container', 0) or 0)
-            total = warm + running
-            if total <= 0:
-                return getattr(Config, 'PREDICTIVE_WARM_BASE_PROB', 0.2)
-            return max(0.0, min(1.0, warm / total))
-        except Exception:
-            return getattr(Config, 'PREDICTIVE_WARM_BASE_PROB', 0.2)
-
-    def _compute_expected_latency(self, user: UserNodeInfo, node: Optional[EdgeNodeInfo], predicted_location: Dict[str, float]) -> Dict[str, float]:
-        data_size = getattr(user.latency, 'data_size', None)
-        if not data_size:
-            data_size = getattr(Config, 'PREDICTIVE_DEFAULT_DATA_SIZE_BYTES', 512 * 1024)
-        bandwidth = getattr(user.latency, 'bandwidth', None)
-        if not bandwidth:
-            bandwidth = 500.0  # bytes per ms fallback
-        try:
-            bandwidth = float(bandwidth)
-        except Exception:
-            bandwidth = 500.0
-        metrics = getattr(node, 'metrics_info', None) if node else None
-        if metrics:
-            try:
-                cpu_usage = float(getattr(metrics, 'cpu_usage', 0) or 0) / 100.0
-                bandwidth *= max(0.1, 1.0 - 0.5 * cpu_usage)
-            except Exception:
-                pass
-        distance_px = self._calculate_distance(predicted_location, node.location if node else self.central_node["location"])
-        distance_m = distance_px * Config.DEFAULT_PIXEL_TO_METERS
-        propagation_speed = getattr(Config, 'DEFAULT_PROPAGATION_SPEED_IN_METERS', 3 * 10**8)
-        try:
-            propagation_delay = (distance_m / max(propagation_speed, 1)) * 1000.0
-        except Exception:
-            propagation_delay = 0.0
-        transmission_delay = data_size / max(bandwidth, 1.0)
-        warm_prob = self._estimate_warm_probability(node)
-        base_proc = getattr(user.latency, 'computation_delay', 0.0)
-        if base_proc <= 0:
-            base_proc = data_size / 1024.0  # approx ms
-        cold_penalty = getattr(Config, 'PREDICTIVE_COLD_START_MS', 300)
-        processing_delay = warm_prob * base_proc + (1.0 - warm_prob) * (cold_penalty + base_proc)
-        total_latency = propagation_delay + transmission_delay + processing_delay
-        return {
-            'total_latency': total_latency,
-            'communication_delay': propagation_delay + transmission_delay,
-            'processing_delay': processing_delay,
-            'warm_probability': warm_prob,
-            'distance_meters': distance_m,
-            'transmission_delay': transmission_delay
-        }
-
-    def _predictive_candidate_scores(self, user: UserNodeInfo, predicted_location: Dict[str, float]) -> List[Dict[str, Any]]:
-        required_mem_mb = getattr(user, 'memory_requirement', Config.PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB * 1024 * 1024)
-        try:
-            required_mem_mb = float(required_mem_mb) / (1024 * 1024)
-        except Exception:
-            required_mem_mb = Config.PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB
-
-        cloud_metrics = self._compute_expected_latency(user, None, predicted_location)
-        cloud_latency = cloud_metrics['total_latency']
-
-        candidates: List[Dict[str, Any]] = []
-        current_node_id = user.assigned_node_id or 'central_node'
-
-        def build_candidate(node_id: str, node: Optional[EdgeNodeInfo], node_type: str) -> Optional[Dict[str, Any]]:
-            available_mb = self._estimate_available_memory_mb(node)
-            if available_mb < required_mem_mb - 1e-6 and node_id != current_node_id:
-                return None
-            metrics = self._compute_expected_latency(user, node, predicted_location)
-            utility = cloud_latency - metrics['total_latency']
-            cpu_penalty = 0.0
-            if node and getattr(node, 'metrics_info', None):
-                cpu = float(getattr(node.metrics_info, 'cpu_usage', 0) or 0) / 100.0
-                cpu_penalty = self.load_aware_alpha * cpu
-            handoff_penalty = 0.0
-            if node_id != (user.assigned_node_id or 'central_node'):
-                handoff_penalty = self.handoff_penalty
-            score = (utility / max(required_mem_mb, 1.0)) - cpu_penalty - handoff_penalty
-            return {
-                'node_id': node_id,
-                'node_type': node_type,
-                'score': score,
-                'utility': utility,
-                'latency': metrics['total_latency'],
-                'memory_required_mb': required_mem_mb,
-                'memory_available_mb': available_mb,
-                'cpu_penalty': cpu_penalty,
-                'handoff_penalty': handoff_penalty,
-                'details': metrics,
-                'cloud_latency': cloud_latency
-            }
-
-        for node_id, node in self.edge_nodes.items():
-            candidate = build_candidate(node_id, node, 'edge')
-            if candidate:
-                candidates.append(candidate)
-
-        # Include central node as fallback
-        central_candidate = build_candidate('central_node', None, 'central')
-        if central_candidate:
-            candidates.append(central_candidate)
-
-        candidates.sort(key=lambda item: item['score'], reverse=True)
-        return candidates
-
-    def _best_node_for_user(self, user: UserNodeInfo, user_location: Dict[str, float], strategy: SchedulingStrategy) -> Tuple[str, float]:
-        # returns (node_id, score). central node id is 'central_node'
-        if strategy == SchedulingStrategy.PREDICTIVE:
-            candidates = self._predictive_candidate_scores(user, user_location)
-            if not candidates:
-                return 'central_node', float('inf')
-            best = candidates[0]
-            return best['node_id'], best['score']
-        if strategy in (SchedulingStrategy.GEOGRAPHIC, SchedulingStrategy.ROUND_ROBIN, SchedulingStrategy.PREDICTIVE, SchedulingStrategy.GAP_BASELINE, SchedulingStrategy.LEAST_LOADED):
-            # Implement two simple strategies: geographic (distance) and load-aware
-            best_id = 'central_node'
-            if strategy == SchedulingStrategy.LEAST_LOADED:
-                best_score = self._score_node_load_aware(user_location, None)
-            else:
-                best_score = self._score_node_distance(user_location, None)
-
-            for node_id, node in self.edge_nodes.items():
-                # Only consider nodes within coverage
-                if self._calculate_distance(user_location, node.location) > node.coverage:
-                    continue
-                score = self._score_node_load_aware(user_location, node) if strategy == SchedulingStrategy.LEAST_LOADED else self._score_node_distance(user_location, node)
-                if score < best_score:
-                    best_score = score
-                    best_id = node_id
-            return best_id, best_score
-        # default fallback
-        return 'central_node', self._score_node_distance(user_location, None)
-
-    def maybe_reassign_user(self, user: UserNodeInfo) -> bool:
-        """Re-evaluate assignment based on current strategy and location.
-        Returns True if re-assigned.
-        """
-        try:
-            now = time.time()
-            # Dwell time to avoid thrashing
-            last_handoff = getattr(user, 'last_handoff', user.created_at)
-            if now - last_handoff < self.handoff_min_dwell_seconds:
-                return False
-
-            # Use predicted next location for PREDICTIVE strategy
-            loc_for_assignment = user.location
-            if self.strategy == SchedulingStrategy.PREDICTIVE and self.trajectory_predictor is not None:
-                hist = self._user_history.get(user.user_id, [])
-                if hist:
-                    try:
-                        px, py = self.trajectory_predictor.predict_next(hist)
-                        loc_for_assignment = {'x': px, 'y': py}
-                    except Exception:
-                        loc_for_assignment = user.location
-
-            current_id = user.assigned_node_id or 'central_node'
-
-            if self.strategy == SchedulingStrategy.PREDICTIVE:
-                candidates = self._predictive_candidate_scores(user, loc_for_assignment)
-                if not candidates:
-                    return False
-                best_candidate = candidates[0]
-                current_candidate = next((c for c in candidates if c['node_id'] == current_id), None)
-                if current_candidate is None:
-                    # Compute score for current node manually to compare
-                    current_node = None if current_id == 'central_node' else self.edge_nodes.get(current_id)
-                    metrics = self._compute_expected_latency(user, current_node, loc_for_assignment)
-                    cloud_metrics = self._compute_expected_latency(user, None, loc_for_assignment)
-                    utility = cloud_metrics['total_latency'] - metrics['total_latency']
-                    cpu_penalty = 0.0
-                    if current_node and getattr(current_node, 'metrics_info', None):
-                        cpu = float(getattr(current_node.metrics_info, 'cpu_usage', 0) or 0) / 100.0
-                        cpu_penalty = self.load_aware_alpha * cpu
-                    base_mem = getattr(user, 'memory_requirement', Config.PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB * 1024 * 1024)
-                    base_mem_mb = float(base_mem) / (1024 * 1024)
-                    current_candidate = {
-                        'node_id': current_id,
-                        'score': (utility / max(base_mem_mb, 1.0)) - cpu_penalty,
-                        'latency': metrics['total_latency'],
-                        'details': metrics
-                    }
-                improvement = best_candidate['score'] - current_candidate['score']
-                relative = improvement / max(abs(current_candidate['score']), 1e-6)
-                if best_candidate['node_id'] != current_id and relative > self.handoff_improvement_threshold:
-                    user.assigned_node_id = best_candidate['node_id']
-                    target_id = best_candidate['node_id']
-                    if target_id == 'central_node':
-                        dist_px = self._calculate_distance(user.location, self.central_node["location"])
+                # Update all user assignments
+                for i, user_id in enumerate(users):
+                    assignment_vec = a.value[i, :]
+                    assigned_cloudlet_idx = np.argmax(assignment_vec)
+                    assigned_cloudlet = cloudlets[assigned_cloudlet_idx]
+                    
+                    # Calculate actual distance
+                    user_node = self.user_nodes[user_id]
+                    if assigned_cloudlet == "central_node":
+                        distance = self._calculate_distance(user_node.location, self.central_node["location"])
                     else:
-                        dist_px = self._calculate_distance(user.location, self.edge_nodes[target_id].location)
-                    user.latency.distance = dist_px * Config.DEFAULT_PIXEL_TO_METERS
-                    user.latency.total_turnaround_time = best_candidate['latency']
-                    user.latency.computation_delay = best_candidate['details']['processing_delay']
-                    user.latency.transmission_delay = best_candidate['details']['transmission_delay']
-                    user.latency.container_status = 'warm' if best_candidate['details']['warm_probability'] > 0.5 else 'cold'
-                    user.predictive_debug = best_candidate
-                    user.last_handoff = now
-                    self.handoff_log.append({
-                        'ts': now,
-                        'user_id': user.user_id,
-                        'from': current_id,
-                        'to': target_id,
-                        'improvement': relative,
-                    })
-                    if len(self.handoff_log) > self.max_handoff_log:
-                        self.handoff_log = self.handoff_log[-self.max_handoff_log:]
-                    self.logger.info(
-                        f"User {user.user_id} predictive handoff: {current_id} -> {target_id} (relative_gain={relative:.2f})"
-                    )
-                    return True
-                return False
-
-            target_id, target_score = self._best_node_for_user(user, loc_for_assignment, self.strategy)
-            current_node = None if current_id == 'central_node' else self.edge_nodes.get(current_id)
-            if self._calculate_distance(user.location, self.central_node["location"]) > 1e9:  # defensive
-                return False
-            if self.strategy == SchedulingStrategy.LEAST_LOADED:
-                current_score = self._score_node_load_aware(loc_for_assignment, current_node)
+                        cloudlet = self.edge_nodes[assigned_cloudlet]
+                        distance = self._calculate_distance(user_node.location, cloudlet.location)
+                    
+                    # Update user node assignment
+                    user_node.assigned_node_id = assigned_cloudlet
+                    user_node.latency.distance = distance
+                    user_node.latency.propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                    total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                    user_node.latency.total_turnaround_time = total_turnaround_time
+                    
+                    # Update assignment matrix
+                    self.assignment_matrix[user_id] = (assigned_cloudlet, distance)
+                    
+                self.logger.info(f"CVX optimization completed successfully. Total cost: {problem.value}")
             else:
-                current_score = self._score_node_distance(loc_for_assignment, current_node)
-            improved = (current_score - target_score) / max(current_score, 1e-6)
-            if target_id != current_id and improved > self.handoff_improvement_threshold:
-                user.assigned_node_id = target_id
-                if target_id == 'central_node':
-                    dist_px = self._calculate_distance(user.location, self.central_node["location"])
-                else:
-                    dist_px = self._calculate_distance(user.location, self.edge_nodes[target_id].location)
-                user.latency.distance = dist_px * Config.DEFAULT_PIXEL_TO_METERS
-                user.last_handoff = now
-                self.handoff_log.append({
-                    'ts': now,
-                    'user_id': user.user_id,
-                    'from': current_id,
-                    'to': target_id,
-                    'improvement': improved,
-                })
-                if len(self.handoff_log) > self.max_handoff_log:
-                    self.handoff_log = self.handoff_log[-self.max_handoff_log:]
-                self.logger.info(f"User {user.user_id} handoff: {current_id} -> {target_id} (improvement={improved:.2f})")
-                return True
-            return False
+                self.logger.warning(f"CVX optimization failed with status: {problem.status}. Falling back to greedy assignment.")
+                # Fall back to greedy assignment
+                for user_id, user_node in self.user_nodes.items():
+                    assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                    user_node.assigned_node_id = assigned_node_id
+                    user_node.latency.distance = assigned_node_distance
+                    user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                    total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                    user_node.latency.total_turnaround_time = total_turnaround_time
+                    self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+                    
         except Exception as e:
-            self.logger.error(f"maybe_reassign_user error: {e}")
-            return False
+            self.logger.error(f"Error in CVX optimization: {str(e)}. Falling back to greedy assignment.")
+            # Fall back to greedy assignment
+            for user_id, user_node in self.user_nodes.items():
+                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                user_node.assigned_node_id = assigned_node_id
+                user_node.latency.distance = assigned_node_distance
+                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                user_node.latency.total_turnaround_time = total_turnaround_time
+                self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+       
+    def get_performance_summary_for_frontend(self) -> Dict[str, Any]:
+        """
+        Get a summary of performance metrics formatted for frontend display
+        """
+        # Calculate basic metrics
+        total_turnaround_time = self.calculate_total_turnaround_time()
+        total_users = len(self.user_nodes)
+        
+        # Calculate average resource utilization across edge nodes
+        total_memory_util = 0
+        total_cpu_util = 0
+        active_nodes = 0
+        
+        for node in self.edge_nodes.values():
+            if node.metrics_info:
+                total_memory_util += node.metrics_info.memory_usage
+                total_cpu_util += node.metrics_info.cpu_usage
+                active_nodes += 1
+        
+        avg_memory_util = total_memory_util / max(1, active_nodes)
+        avg_cpu_util = total_cpu_util / max(1, active_nodes)
+        
+        performance_summary = {
+            "algorithm": self.assignment_algorithm.value,
+            "performance_metrics": {
+                "total_cost": round(total_turnaround_time, 2),
+                "total_turnaround_time": round(total_turnaround_time, 2),
+                "total_migration_cost": 0.0,  # Placeholder - implement if migration is needed
+                "total_cold_start_penalty": 0.0  # Placeholder - implement if cold starts are tracked
+            },
+            "resource_utilization": {
+                "total_users": total_users,
+                "avg_memory_utilization": round(avg_memory_util, 1),
+                "avg_cpu_utilization": round(avg_cpu_util, 1),
+                "avg_bandwidth_utilization": 0.0,  # Placeholder - implement if bandwidth tracking is needed
+                "total_cold_starts": 0  # Placeholder - implement if cold starts are tracked
+            },
+        }
+        
+        # Add CVX-specific metrics if available
+        if self.assignment_algorithm == AssignmentAlgorithm.CVX:
+            performance_summary["cvx_metrics"] = {
+                "objective_value": self._last_cvx_objective_value,
+                "latency_cost": self._last_cvx_latency_cost
+            }
+            
+        return performance_summary
+        

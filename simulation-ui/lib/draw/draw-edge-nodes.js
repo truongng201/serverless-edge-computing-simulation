@@ -10,15 +10,15 @@ export const drawEdgeNodes = (ctx, edgeNodes, selectedEdge, editMode, visibleLef
     }
 
     // Coverage area
-    if (edge.coverage > 0) {
-      ctx.fillStyle = `rgba(16, 185, 129, ${0.12 + edge.currentLoad * 0.004})`;
-      ctx.strokeStyle = `rgba(16, 185, 129, 0.5)`;
-      ctx.lineWidth = 1.5 / zoomLevel;
-      ctx.beginPath();
-      ctx.arc(edge.x, edge.y, edge.coverage, 0, 2 * Math.PI);
-      ctx.fill();
-      ctx.stroke();
-    }
+    // if (edge.coverage > 0) {
+    //   ctx.fillStyle = `rgba(16, 185, 129, ${0.12 + edge.currentLoad * 0.004})`;
+    //   ctx.strokeStyle = `rgba(16, 185, 129, 0.5)`;
+    //   ctx.lineWidth = 1.5 / zoomLevel;
+    //   ctx.beginPath();
+    //   ctx.arc(edge.x, edge.y, edge.coverage, 0, 2 * Math.PI);
+    //   ctx.fill();
+    //   ctx.stroke();
+    // }
 
     // Edge node
     const isSelected = selectedEdge && selectedEdge.id === edge.id;
