@@ -45,7 +45,7 @@ class DataManager:
             self._load_highd_data()
         return self.highd_loader.get_data_by_frame(frame)
     
-    def get_random_generated_data(self, timestep) -> List[Dict[str, Any]]:
+    def get_random_generated_data(self, step_id, num_items=100) -> List[Dict[str, Any]]:
        if self.random_generated_data is None:
-           self._load_random_generated_data()
-       return self.random_generated_data.get_data_by_step(timestep)
+           self._load_random_generated_data(num_items)
+       return self.random_generated_data.get_data_by_step(step_id)
