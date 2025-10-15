@@ -21,7 +21,7 @@ export const startVehiclesSample = async () => {
 
   try {
     setLoadingData(true);
-    await axios.get(
+    await axios.post(
       `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_vehicles_sample`
     );
   } catch (error) {
