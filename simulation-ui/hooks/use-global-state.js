@@ -382,6 +382,15 @@ const useGlobalState = create((set) => ({
       cloudletMetrics: typeof updater === "function"
         ? updater(state.cloudletMetrics)
         : updater
+    })),
+
+  // TAT History for live charting
+  tatHistory: [],
+  setTatHistory: (updater) =>
+    set((state) => ({
+      tatHistory: typeof updater === "function"
+        ? updater(state.tatHistory)
+        : updater
     }))
 }));
 
