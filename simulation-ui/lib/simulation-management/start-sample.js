@@ -30,3 +30,18 @@ export const startVehiclesSample = async () => {
     setLoadingData(false);
   }
 };
+
+export const startRandomGeneratedSample = async () => {
+  const { setLoadingData, setDataError } = useGlobalState.getState();
+
+  try {
+    setLoadingData(true);
+    await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_random_generated_sample`
+    );
+  } catch (error) {
+    setDataError(`Failed to get Random Generated sample: ${error.message}`);
+  } finally {
+    setLoadingData(false);
+  }
+};
