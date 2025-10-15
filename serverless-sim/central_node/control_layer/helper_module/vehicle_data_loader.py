@@ -146,3 +146,6 @@ class VehicleDataLoader:
             "step_id": timestep,
             "items": items
         }
+        
+    def __len__(self):
+        return len(self._data) if self._data else 0
