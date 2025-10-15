@@ -4,7 +4,6 @@ import {
   EditModeCard,
   ClearControlsCard,
   SimulationControlsCard,
-  NodePlacementCard,
   UserAssignmentCard,
   LiveSystemStatusCard,
   ScenarioSelectionCard,
