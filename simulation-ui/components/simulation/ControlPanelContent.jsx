@@ -13,9 +13,6 @@ import {
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
 import useGlobalState from "@/hooks/use-global-state";
-// import { calculateLatency } from "@/lib/helper"; // unused here
-// Frontend assignment removed; backend is authoritative
-// import { runGAPAssignment } from "@/lib/user-management";
 import { getClusterStatusAndUsersData } from "@/lib/simulation-management";
 
 export default function ControlPanelContent() {
