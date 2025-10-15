@@ -41,8 +41,8 @@ class RegisterEdgeNodeController:
             node_id=self.node_data.get('node_id'),
             endpoint=self.node_data.get("endpoint"),
             location={
-                'x': central_node_location.get('x', 0) + random.uniform(-300, 300),
-                'y': central_node_location.get('y', 0) + random.uniform(-300, 300)
+                'x': central_node_location.get('x', 0) + random.uniform(-200, 200),
+                'y': central_node_location.get('y', 0) + random.uniform(-200, 200)
             },
             system_info=self.node_data.get("system_info", {}),
             last_heartbeat=time.time(),

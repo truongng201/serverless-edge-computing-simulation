@@ -6,4 +6,3 @@ export { drawUserConnections } from "./draw-user-connections";
 export { drawUsers } from "./draw-users";
 export { drawRoadNetwork } from "./draw-road-network";
 export { drawEdgeNodes } from "./draw-edge-nodes";
-export { drawStreetMapUser } from "./draw-street-map-user";

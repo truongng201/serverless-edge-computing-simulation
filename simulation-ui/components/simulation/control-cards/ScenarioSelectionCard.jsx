@@ -22,8 +22,6 @@ export default function ScenarioSelectionCard() {
       await startDactSample();
     } else if (value === "scenario3") {
       await startVehiclesSample();
-    } else if (value === "scenario4") {
-      await initializeStreetMap();
     } else if (value === "none") {
       await clearAllUsers();
       setRoadNetwork(null);
@@ -50,9 +48,6 @@ export default function ScenarioSelectionCard() {
               <SelectItem value="scenario2">Scenario 2: DACT Sample</SelectItem>
               <SelectItem value="scenario3">
                 Scenario 3: Vehicle Sample
-              </SelectItem>
-              <SelectItem value="scenario4">
-                Scenario 4: Street Map
               </SelectItem>
             </SelectContent>
           </Select>
