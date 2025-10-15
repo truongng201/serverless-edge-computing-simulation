@@ -6,7 +6,7 @@ import {
   SimulationControlsCard,
   UserAssignmentCard,
   LiveSystemStatusCard,
-  ScenarioSelectionCard,
+  DatasetSelectionCard,
   ZoomControlsCard,
   ModelSelectionCard,
 } from "./control-cards/ControlCards";
@@ -71,7 +71,7 @@ export default function ControlPanelContent() {
 
         <UserAssignmentCard />
 
-        <ScenarioSelectionCard />
+        <DatasetSelectionCard />
 
         <ClearControlsCard />
 
