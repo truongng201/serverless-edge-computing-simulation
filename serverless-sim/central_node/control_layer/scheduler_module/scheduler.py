@@ -31,6 +31,7 @@ class Scheduler:
         self.logger = logging.getLogger(__name__)
         
         self.simulation = False
+        self.assignment_matrix = {}
         self.current_dataset = None
         self.current_step_id = None
 
@@ -94,12 +95,7 @@ class Scheduler:
     def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
         if user_id not in self.user_nodes:
             return False
-        
         self.user_nodes[user_id].location = new_location
-        assigned_node_id, assigned_node_distance = self.node_assignment(new_location)
-        self.user_nodes[user_id].assigned_node_id = assigned_node_id
-        self.user_nodes[user_id].latency.distance = assigned_node_distance
-        
         return True
 
     def create_user_node(self, user_node: UserNodeInfo):
@@ -172,13 +168,22 @@ class Scheduler:
         dy = location1["y"] - location2["y"]
         return (dx ** 2 + dy ** 2) ** 0.5
     
-    def node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+    def node_assignment(self) -> dict:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
-            return self._greedy_assignment(user_location)
+            for user_id, user_node in self.user_nodes.items():
+                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                user_node.assigned_node_id = assigned_node_id
+                user_node.latency.distance = assigned_node_distance
+                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                user_node.latency.total_turnaround_time = total_turnaround_time
+                self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+            return self.assignment_matrix
         elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
-            return self._convex_optimization_assignment(user_location)
+            return self.assignment_matrix
         else:
-            raise Exception(f"Unknown assignment algorithm: {self.assignment_algorithm}")
+            self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
+            return self.assignment_matrix
 
     def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:
         if cloudlet_id == "central_node":
@@ -381,10 +386,7 @@ class Scheduler:
                 distance = self._calculate_distance(user_location, cloudlet.location)
                 
             return assigned_cloudlet, distance
-        else:
-            self.logger.warning(f"CVX optimization failed with status: {problem.status}. Falling back to greedy assignment.")
-            return self._greedy_assignment(user_location)
-
+       
     def get_performance_summary_for_frontend(self) -> Dict[str, Any]:
         """
         Get a summary of performance metrics formatted for frontend display
