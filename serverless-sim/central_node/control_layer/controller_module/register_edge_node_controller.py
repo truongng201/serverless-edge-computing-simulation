@@ -1,4 +1,5 @@
 import time
+import random
 
 from shared import InvalidDataException
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
@@ -15,7 +16,6 @@ class RegisterEdgeNodeController:
     def _validate_node_data(self):
         if not self.node_data or "node_id" not in self.node_data or "endpoint" not in self.node_data:
             raise InvalidDataException("Invalid node data")
-        
         
     def _mapping_node_data(self):
         self.node_metrics = NodeMetrics(
@@ -35,11 +35,15 @@ class RegisterEdgeNodeController:
             timestamp=0,
             uptime=0
         )
+        central_node_location = self.scheduler.central_node.get('location', {"x": 0, "y": 0})
         
         self.edge_node_info = EdgeNodeInfo(
             node_id=self.node_data.get('node_id'),
             endpoint=self.node_data.get("endpoint"),
-            location=self.node_data.get("location", {"x": 0.0, "y": 0.0}),
+            location={
+                'x': central_node_location.get('x', 0) + random.uniform(-300, 300),
+                'y': central_node_location.get('y', 0) + random.uniform(-300, 300)
+            },
             system_info=self.node_data.get("system_info", {}),
             last_heartbeat=time.time(),
             metrics_info=self.node_metrics,
