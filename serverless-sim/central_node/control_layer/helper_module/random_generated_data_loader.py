@@ -4,7 +4,7 @@ import os
 
 
 class RandomGeneratedDataLoader:
-    def __init__(self, num_items: int = 10000, central_node_location: dict = {"x": 730, "y": 1070}):
+    def __init__(self, num_items: int = 1000, central_node_location: dict = {"x": 730, "y": 1070}):
         if central_node_location is None:
             central_node_location = {'x': 0, 'y': 0}
         
