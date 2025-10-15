@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { startDactSample, startVehiclesSample } from "@/lib/simulation-management";
+import { startDactSample, startVehiclesSample, startRandomGeneratedSample } from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
 
 export default function DatasetSelectionCard() {
@@ -22,6 +22,8 @@ export default function DatasetSelectionCard() {
       await startDactSample();
     } else if (value === "Dataset3") {
       await startVehiclesSample();
+    } else if (value === "Dataset4") {
+      await startRandomGeneratedSample();
     } else if (value === "none") {
       await clearAllUsers();
     }
@@ -47,6 +49,9 @@ export default function DatasetSelectionCard() {
               <SelectItem value="Dataset2">Dataset 2: DACT Sample</SelectItem>
               <SelectItem value="Dataset3">
                 Dataset 3: Vehicle Sample
+              </SelectItem>
+              <SelectItem value="Dataset4">
+                Dataset 4: Random Generated Data
               </SelectItem>
             </SelectContent>
           </Select>

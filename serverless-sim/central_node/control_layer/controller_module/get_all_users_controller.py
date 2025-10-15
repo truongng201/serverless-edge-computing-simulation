@@ -161,6 +161,78 @@ class GetAllUsersController:
         step_mul = max(1, int(getattr(Config, 'DATASET_STEP_MULTIPLIER', 1)))
         self.current_step_id += step_mul
         return True
+
+    def _update_random_generated_sample(self):
+        if not self.simulation or not self.current_step_id:
+            return False
+        
+        sample_data = self.data_manager.get_random_generated_data(self.current_step_id)
+
+        if not sample_data:
+            # If no data, wrap back to the beginning for continuous playback
+            self.current_step_id = 1
+            sample_data = self.data_manager.get_random_generated_data(self.current_step_id)
+            if not sample_data:
+                return False
+        
+        for item in sample_data:
+            user_id = f"user_{item.get('user_id', 0)}"
+            location = {'x': item.get('location_x', 0), 'y': item.get('location_y', 0)}
+            
+            if user_id in self.scheduler.user_nodes:
+                # Update existing user via scheduler helper (updates last_updated & history)
+                self.scheduler.update_user_node(user_id, location)
+                user_node = self.scheduler.user_nodes[user_id]
+                # Refresh propagation delay and total time with updated distance
+                dist_m = getattr(user_node.latency, 'distance', 0)
+                user_node.latency.propagation_delay = dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.total_turnaround_time = (
+                    user_node.latency.propagation_delay
+                    + getattr(user_node.latency, 'transmission_delay', 0)
+                    + getattr(user_node.latency, 'computation_delay', 0)
+                )
+            else:
+                # Create new user node
+                nearest_node_id, nearest_distance = self.scheduler.node_assignment(location)
+                data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
+                bandwidth = Config.DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND
+                propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
+                transmission_delay = data_size / bandwidth
+                total_turnaround_time = propagation_delay + transmission_delay
+                
+                latency = Latency(
+                    distance=nearest_distance,
+                    data_size=data_size,
+                    bandwidth=bandwidth,
+                    propagation_delay=propagation_delay,
+                    transmission_delay=transmission_delay,
+                    computation_delay=0.0,
+                    container_status="unknown",
+                    total_turnaround_time=total_turnaround_time
+                )
+                
+                user_node = UserNodeInfo(
+                    user_id=user_id,
+                    assigned_node_id=nearest_node_id,
+                    location=location,
+                    last_executed=0,
+                    size=random.randint(5, 15),  # Random size between 5-15
+                    speed=random.randint(3, 8),  # Random speed between 3-8
+                    latency=latency,
+                    # Add optimization parameters
+                    bandwidth_demand=bandwidth,
+                    memory_demand=Config.DEFAULT_USER_MEMORY_DEMAND,
+                    data_size_demand=data_size,
+                    previous_node_id=None,
+                    migration_cost=0.0,
+                    cold_start_penalty=0.0
+                )
+                self.scheduler.create_user_node(user_node)
+        
+        # Advance to next step for continuous simulation
+        step_mul = max(1, int(getattr(Config, 'DATASET_STEP_MULTIPLIER', 1)))
+        self.current_step_id += step_mul
+        return True
        
         
     def _get_all_users(self):
@@ -169,6 +241,8 @@ class GetAllUsersController:
             self._update_dact_sample()
         elif self.current_dataset == "vehicles":
             self._update_vehicles_sample()
+        elif self.current_dataset == "random_generated":
+            self._update_random_generated_sample()
         for user_id, user_node in self.scheduler.user_nodes.items():
             assigned_edge = None
             assigned_central = None

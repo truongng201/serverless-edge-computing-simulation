@@ -26,7 +26,7 @@ class DataManager:
         self.highd_loader = HighDDataLoader(data_path)
         self.logger.info(f"HighD data loaded with {len(self.highd_loader)} vehicles")
 
-    def _load_random_generated_data(self, num_items: int = 100):
+    def _load_random_generated_data(self, num_items: int = 10000):
         self.random_generated_data = RandomGeneratedDataLoader(num_items)
         self.logger.info(f"Random generated data loaded with {num_items} items")
         
@@ -45,7 +45,7 @@ class DataManager:
             self._load_highd_data()
         return self.highd_loader.get_data_by_frame(frame)
     
-    def get_random_generated_data(self, step_id, num_items=100) -> List[Dict[str, Any]]:
+    def get_random_generated_data(self, step_id, num_items=10000) -> List[Dict[str, Any]]:
        if self.random_generated_data is None:
            self._load_random_generated_data(num_items)
        return self.random_generated_data.get_data_by_step(step_id)
