@@ -15,6 +15,7 @@ class GetAllUsersController:
         self.current_dataset = self.scheduler.current_dataset
         self.simulation = self.scheduler.simulation
         self.response = []
+        self.assignment_matrix = {}
        
     def _update_scheduler(self):
         self.scheduler.current_dataset = self.current_dataset
@@ -53,7 +54,7 @@ class GetAllUsersController:
                 )
             else:
                 location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                nearest_node_id, nearest_distance = self.scheduler.node_assignment(location)
+                nearest_node_id, nearest_distance = self.assignment_matrix.get(user_id, (None, None))
                 # data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
                 # bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
@@ -123,7 +124,7 @@ class GetAllUsersController:
                 )
             else:
                 location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                nearest_node_id, nearest_distance = self.scheduler.node_assignment(location)
+                nearest_node_id, nearest_distance = self.assignment_matrix.get(user_id, (None, None))
                 # data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
                 # bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
@@ -193,7 +194,7 @@ class GetAllUsersController:
                 )
             else:
                 # Create new user node
-                nearest_node_id, nearest_distance = self.scheduler.node_assignment(location)
+                nearest_node_id, nearest_distance = self.assignment_matrix.get(user_id, (None, None))
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
                 bandwidth = Config.DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND
                 propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
@@ -243,6 +244,7 @@ class GetAllUsersController:
             self._update_vehicles_sample()
         elif self.current_dataset == "random_generated":
             self._update_random_generated_sample()
+            self.scheduler.node_assignment()
         for user_id, user_node in self.scheduler.user_nodes.items():
             assigned_edge = None
             assigned_central = None
@@ -266,6 +268,7 @@ class GetAllUsersController:
 
 
     def execute(self):
+        self.assignment_matrix = self.scheduler.node_assignment()
         self._get_all_users()
         self._update_scheduler()
         return self.response

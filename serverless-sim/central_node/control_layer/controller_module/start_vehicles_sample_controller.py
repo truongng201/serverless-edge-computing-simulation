@@ -22,13 +22,15 @@ class StartVehiclesSampleController:
     def _get_vehicles_sample(self):
         sample = self.data_manager.get_vehicle_data_by_timestep(self.current_step_id)
 
+        assignment_matrix = self.scheduler.node_assignment()
+
         for item in sample.get("items", []):
             user_node = None
             if item.get(f"user_{item.get('id', 0)}") in self.scheduler.user_nodes:
                 user_node = self.scheduler.user_nodes[item.get(f"user_{item.get('id', 0)}")]
             else:
                 location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                nearest_node_id, nearest_distance = self.scheduler.node_assignment(location)
+                nearest_node_id, nearest_distance = assignment_matrix.get(f"user_{item.get('id', 0)}", (None, None))
                 # data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
                 # bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES

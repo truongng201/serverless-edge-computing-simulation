@@ -31,17 +31,16 @@ class StartRandomGeneratedSampleController:
                 user_node = self.scheduler.user_nodes[user_id]
             else:
                 location = {'x': item.get('location_x', 0), 'y': item.get('location_y', 0)}
-                nearest_node_id, nearest_distance = self.scheduler.node_assignment(location)
                 
                 # Use default configuration values for data size and bandwidth
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
                 bandwidth = Config.DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND
-                propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
+                propagation_delay = 0 / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
                 transmission_delay = data_size / bandwidth
                 total_turnaround_time = propagation_delay + transmission_delay
                 
                 latency = Latency(
-                    distance=nearest_distance,
+                    distance=0,
                     data_size=data_size,
                     bandwidth=bandwidth,
                     propagation_delay=propagation_delay,
@@ -53,15 +52,16 @@ class StartRandomGeneratedSampleController:
                 
                 user_node = UserNodeInfo(
                     user_id=user_id,
-                    assigned_node_id=nearest_node_id,
+                    assigned_node_id=None,
                     location=location,
                     last_executed=0,
-                    size=random.randint(5, 15),  # Random size between 5-15
-                    speed=random.randint(3, 8),  # Random speed between 3-8
+                    size=5,
+                    speed=5,
                     latency=latency
                 )
                 
                 self.scheduler.create_user_node(user_node)
+        self.scheduler.node_assignment()
 
     def execute(self):
         self._update_scheduler()
