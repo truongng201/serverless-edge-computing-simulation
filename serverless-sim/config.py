@@ -85,5 +85,12 @@ class Config:
     # Multiply timestep advancement per poll to make movements appear faster on canvas
     DATASET_STEP_MULTIPLIER = 8
     
+    # User Movement Configuration
+    USER_MIN_SPEED = 1  # m/s - minimum user movement speed (walking speed)
+    USER_MAX_SPEED = 3  # m/s - maximum user movement speed (slow jogging)
+    USER_MAX_DISTANCE_FROM_CENTER = 800  # meters - maximum distance from cluster center
+    USER_MAX_SPAWN_DISTANCE = 400  # meters - initial spawn radius around center
+    USER_MIN_SPAWN_DISTANCE = 100  # meters - minimum spawn distance from center
+    
     # User
     DEFAULT_USER_MEMORY_DEMAND = 134217728 # 128 MB
