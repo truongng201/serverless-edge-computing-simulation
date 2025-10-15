@@ -56,8 +56,8 @@ class RandomGeneratedDataLoader:
             user = {
                 "user_id": i,
                 "current_step": 0,
-                "location_x": self.central_node_location.get('x', 0) + random.uniform(100, 500) * random.choice([-1, 1]),
-                "location_y": self.central_node_location.get('y', 0) + random.uniform(100, 500) * random.choice([-1, 1]),
+                "location_x": self.central_node_location.get('x', 0) + random.uniform(100, 500) * random.choice([-1, 0, 0, 1]),
+                "location_y": self.central_node_location.get('y', 0) + random.uniform(100, 500) * random.choice([-1, 0, 0, 1]),
                 "velocity_x": random.uniform(-2, 2),  # Small random velocity
                 "velocity_y": random.uniform(-2, 2)   # Small random velocity
             }
