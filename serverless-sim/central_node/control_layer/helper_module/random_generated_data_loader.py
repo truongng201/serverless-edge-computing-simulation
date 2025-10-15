@@ -2,6 +2,7 @@ import random
 import json
 import os
 import math
+from config import Config
 
 
 class RandomGeneratedDataLoader:
@@ -26,7 +27,12 @@ class RandomGeneratedDataLoader:
         self.users = self.simulation_data['initial_users']  # For current state tracking
         self.step_history = self.simulation_data['step_history']  # All computed steps
     
-    def _random_location_around_central(self, central_node_location, min_distance=100, max_distance=700):
+    def _random_location_around_central(self, central_node_location, min_distance=None, max_distance=None):
+        if min_distance is None:
+            min_distance = Config.USER_MIN_SPAWN_DISTANCE
+        if max_distance is None:
+            max_distance = Config.USER_MAX_SPAWN_DISTANCE
+            
         angle = random.uniform(0, 2 * math.pi)
         
         min_radius_squared = min_distance * min_distance
@@ -40,8 +46,13 @@ class RandomGeneratedDataLoader:
         
         return {'x': x, 'y': y}
     
-    def random_velocity(self, min_speed=0, max_speed=3):
-        speed = random.uniform(min_speed, max_speed)  # m/s, typical city driving
+    def random_velocity(self, min_speed=None, max_speed=None):
+        if min_speed is None:
+            min_speed = Config.USER_MIN_SPEED
+        if max_speed is None:
+            max_speed = Config.USER_MAX_SPEED
+            
+        speed = random.uniform(min_speed, max_speed)  # m/s, slow pedestrian/vehicle speed
         direction = random.uniform(0, 2 * math.pi)
         
         vx = speed * math.cos(direction)
@@ -49,24 +60,8 @@ class RandomGeneratedDataLoader:
         
         return vx, vy, speed, direction
     
-    def generate_car_user(self, i, radius=600):
-        """
-        Generate a car user with realistic car-like movement
-        
-        Args:
-            i: User ID
-            radius: Maximum radius around central node (default: 1000m)
-            
-        Returns:
-            dict: User data with car-like movement properties
-        """
-        # Randomly place car around central node
-        r = math.sqrt(random.uniform(0, 1)) * radius
-        theta = random.uniform(0, 2 * math.pi)
-        x = self.central_node_location.get('x', 0) + r * math.cos(theta)
-        y = self.central_node_location.get('y', 0) + r * math.sin(theta)
-
-        # Generate car-like velocity
+    def generate_car_user(self, i, radius=None):
+        x, y = self._random_location_around_central(self.central_node_location).values()
         vx, vy, speed, direction = self.random_velocity()
 
         return {
@@ -195,26 +190,50 @@ class RandomGeneratedDataLoader:
             user["location_x"] += user["velocity_x"] * steps_elapsed
             user["location_y"] += user["velocity_y"] * steps_elapsed
             
-            # Add some randomness to car movement (slight direction and speed variations)
+            # Check if user is getting too far from central node and apply boundary constraints
+            central_x = self.central_node_location.get('x', 0)
+            central_y = self.central_node_location.get('y', 0)
+            distance_from_center = math.sqrt((user["location_x"] - central_x)**2 + (user["location_y"] - central_y)**2)
+            max_allowed_distance = Config.USER_MAX_DISTANCE_FROM_CENTER
+            
+            # Add some randomness to movement (slight direction and speed variations)
             if "speed" in user and "direction" in user:
-                # Slight variations in speed and direction for realistic car movement
-                speed_variation = random.uniform(-1, 1)  # ±1 m/s variation
-                direction_variation = random.uniform(-0.1, 0.1)  # ±0.1 rad variation (~6 degrees)
+                # If user is too far, redirect them back towards center
+                if distance_from_center > max_allowed_distance:
+                    # Calculate direction back to center
+                    angle_to_center = math.atan2(central_y - user["location_y"], central_x - user["location_x"])
+                    # Add some randomness to avoid straight-line movement
+                    angle_variation = random.uniform(-0.5, 0.5)  # ±30 degrees variation
+                    user["direction"] = angle_to_center + angle_variation
+                else:
+                    # Normal movement with slight variations
+                    direction_variation = random.uniform(-0.2, 0.2)  # ±0.2 rad variation (~11 degrees)
+                    user["direction"] += direction_variation
                 
-                user["speed"] = max(5, min(25, user["speed"] + speed_variation))  # Keep within 5-25 m/s
-                user["direction"] += direction_variation
+                # Slight speed variations for realistic movement
+                speed_variation = random.uniform(-0.3, 0.3)  # ±0.3 m/s variation
+                user["speed"] = max(Config.USER_MIN_SPEED, min(Config.USER_MAX_SPEED, user["speed"] + speed_variation))
                 
                 # Update velocity based on new speed and direction
                 user["velocity_x"] = user["speed"] * math.cos(user["direction"])
                 user["velocity_y"] = user["speed"] * math.sin(user["direction"])
             else:
                 # Fallback to old behavior for users without speed/direction
-                user["velocity_x"] += random.uniform(-0.5, 0.5)
-                user["velocity_y"] += random.uniform(-0.5, 0.5)
+                user["velocity_x"] += random.uniform(-0.2, 0.2)
+                user["velocity_y"] += random.uniform(-0.2, 0.2)
                 
-                # Clamp velocity to reasonable bounds
-                user["velocity_x"] = max(-25, min(25, user["velocity_x"]))
-                user["velocity_y"] = max(-25, min(25, user["velocity_y"]))
+                # Clamp velocity to reasonable bounds (much slower)
+                max_vel = Config.USER_MAX_SPEED
+                user["velocity_x"] = max(-max_vel, min(max_vel, user["velocity_x"]))
+                user["velocity_y"] = max(-max_vel, min(max_vel, user["velocity_y"]))
+                
+                # Apply boundary constraint for users without direction
+                if distance_from_center > max_allowed_distance:
+                    # Reduce velocity towards center
+                    direction_to_center_x = (central_x - user["location_x"]) / distance_from_center
+                    direction_to_center_y = (central_y - user["location_y"]) / distance_from_center
+                    user["velocity_x"] = direction_to_center_x * abs(user["velocity_x"])
+                    user["velocity_y"] = direction_to_center_y * abs(user["velocity_y"])
             
             
     def get_cached_steps(self):

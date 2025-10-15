@@ -34,6 +34,10 @@ class Scheduler:
         self.assignment_matrix = {}
         self.current_dataset = None
         self.current_step_id = None
+        
+        # CVX optimization metrics
+        self._last_cvx_objective_value = None
+        self._last_cvx_latency_cost = None
 
     def start_simulation(self):
         self.simulation = True
@@ -180,6 +184,8 @@ class Scheduler:
                 self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
             return self.assignment_matrix
         elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
+            self._convex_optimization_assignment_all_users()
+            print(self.assignment_matrix)
             return self.assignment_matrix
         else:
             self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
@@ -253,86 +259,61 @@ class Scheduler:
         return total_turnaround_time
 
 
-    def _convex_optimization_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+    def _convex_optimization_assignment_all_users(self):
         """
-        CVX Convex Optimization Assignment implementing the mathematical formulation:
-        
-        Variables:
-        - a_ij^t: binary assignment of user i to cloudlet j at time t
-        
-        Objective: Minimize total turn around time for all users including the new user
-        
-        Constraints:
-        - Assignment: each user assigned to exactly one cloudlet
-        - Resource capacity: memory constraints
+        Convex optimization assignment for all users at once
         """
-        
-        # Include existing users plus the new user
-        existing_users = list(self.user_nodes.keys())
-        users = existing_users + ["new_user"]
+        if not self.user_nodes:
+            return
+            
+        users = list(self.user_nodes.keys())
         cloudlets = list(self.edge_nodes.keys()) + ["central_node"]
         
         n_users = len(users)
         n_cloudlets = len(cloudlets)
         
+        if n_users == 0 or n_cloudlets == 0:
+            return
+        
         # Decision variables
         # a[i,j] = 1 if user i assigned to cloudlet j
         a = cp.Variable((n_users, n_cloudlets), boolean=True)
         
-        # Parameters
-        # Turnaround latency cost matrix T[i,j]
+        # Cost matrix: T[i,j] = turnaround time for user i on cloudlet j
         T = np.zeros((n_users, n_cloudlets))
-     
-        # Resource demand matrices
         memory_demand = np.zeros(n_users)
         
-        # Default values for new user
-        new_user_memory_demand = Config.DEFAULT_USER_MEMORY_DEMAND
-        new_user_bandwidth_demand = 10.0
-        new_user_data_size_demand = 1024.0
-        
-        # Fill parameter matrices
         for i, user_id in enumerate(users):
-            if user_id == "new_user":
-                # New user parameters
-                user_loc = user_location
-                mem_dem = new_user_memory_demand
-                bw_dem = new_user_bandwidth_demand
-                data_size = new_user_data_size_demand
-            else:
-                # Existing user parameters
-                user_node = self.user_nodes[user_id]
-                user_loc = user_node.location
-                mem_dem = user_node.memory_demand
-                bw_dem = user_node.bandwidth_demand
-                data_size = user_node.data_size_demand
-                
-            memory_demand[i] = mem_dem
+            user_node = self.user_nodes[user_id]
+            user_loc = user_node.location
+            memory_demand[i] = user_node.memory_demand
             
             for j, cloudlet_id in enumerate(cloudlets):
-                # Turnaround latency cost calculation
                 if cloudlet_id == "central_node":
                     distance = self._calculate_distance(user_loc, self.central_node["location"])
                 else:
                     cloudlet = self.edge_nodes[cloudlet_id]
                     distance = self._calculate_distance(user_loc, cloudlet.location)
                 
+                # Calculate turnaround time components
                 prop_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-                trans_delay = data_size / bw_dem
                 
-                # For existing users, use their computation delay if available
-                if user_id != "new_user" and self.user_nodes[user_id].latency and self.user_nodes[user_id].latency.computation_delay:
-                    comp_delay = self.user_nodes[user_id].latency.computation_delay
+                # Use existing delays if available, otherwise use defaults
+                if user_node.latency and user_node.latency.computation_delay:
+                    comp_delay = user_node.latency.computation_delay
                 else:
-                    # Default computation delay estimate
                     comp_delay = 50.0  # milliseconds
                 
+                if user_node.latency and user_node.latency.transmission_delay:
+                    trans_delay = user_node.latency.transmission_delay
+                else:
+                    trans_delay = 100.0  # milliseconds
+
                 T[i, j] = prop_delay + trans_delay + comp_delay
     
-        # Cloudlet capacities
+        # Cloudlet capacity constraints
         memory_capacity = np.zeros(n_cloudlets)
         
-        # Fill cloudlet capacity parameters
         for j, cloudlet_id in enumerate(cloudlets):
             if cloudlet_id == "central_node":
                 memory_capacity[j] = 999999  # Assume unlimited capacity for central node
@@ -342,7 +323,7 @@ class Scheduler:
                 current_memory_used = (cloudlet.metrics_info.memory_usage / 100.0) * cloudlet.metrics_info.memory_total
                 memory_capacity[j] = max(0, cloudlet.metrics_info.memory_total - current_memory_used)
 
-        # Objective function: minimize total latency cost
+        # Objective: minimize total latency cost
         latency_cost = cp.sum(cp.multiply(T, a))
         objective = cp.Minimize(latency_cost)
         
@@ -363,29 +344,60 @@ class Scheduler:
         
         try:
             problem.solve(solver=cp.ECOS_BB, verbose=False)
-        except Exception as e:
-            self.logger.error(f"CVX solver error: {e}")
-            return self._greedy_assignment(user_location)
-        
-        if problem.status == cp.OPTIMAL:
-            # Store optimization results for metrics
-            self._last_cvx_objective_value = problem.value
-            self._last_cvx_latency_cost = latency_cost.value
             
-            # Extract assignment for the new user (last user in list)
-            new_user_idx = n_users - 1  # New user is at the end of the list
-            assignment_vec = a.value[new_user_idx, :]
-            assigned_cloudlet_idx = np.argmax(assignment_vec)
-            assigned_cloudlet = cloudlets[assigned_cloudlet_idx]
-            
-            # Calculate actual distance for return value
-            if assigned_cloudlet == "central_node":
-                distance = self._calculate_distance(user_location, self.central_node["location"])
-            else:
-                cloudlet = self.edge_nodes[assigned_cloudlet]
-                distance = self._calculate_distance(user_location, cloudlet.location)
+            if problem.status == cp.OPTIMAL:
+                # Store optimization results for metrics
+                self._last_cvx_objective_value = problem.value
+                self._last_cvx_latency_cost = latency_cost.value
                 
-            return assigned_cloudlet, distance
+                # Update all user assignments
+                for i, user_id in enumerate(users):
+                    assignment_vec = a.value[i, :]
+                    assigned_cloudlet_idx = np.argmax(assignment_vec)
+                    assigned_cloudlet = cloudlets[assigned_cloudlet_idx]
+                    
+                    # Calculate actual distance
+                    user_node = self.user_nodes[user_id]
+                    if assigned_cloudlet == "central_node":
+                        distance = self._calculate_distance(user_node.location, self.central_node["location"])
+                    else:
+                        cloudlet = self.edge_nodes[assigned_cloudlet]
+                        distance = self._calculate_distance(user_node.location, cloudlet.location)
+                    
+                    # Update user node assignment
+                    user_node.assigned_node_id = assigned_cloudlet
+                    user_node.latency.distance = distance
+                    user_node.latency.propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                    total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                    user_node.latency.total_turnaround_time = total_turnaround_time
+                    
+                    # Update assignment matrix
+                    self.assignment_matrix[user_id] = (assigned_cloudlet, distance)
+                    
+                self.logger.info(f"CVX optimization completed successfully. Total cost: {problem.value}")
+            else:
+                self.logger.warning(f"CVX optimization failed with status: {problem.status}. Falling back to greedy assignment.")
+                # Fall back to greedy assignment
+                for user_id, user_node in self.user_nodes.items():
+                    assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                    user_node.assigned_node_id = assigned_node_id
+                    user_node.latency.distance = assigned_node_distance
+                    user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                    total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                    user_node.latency.total_turnaround_time = total_turnaround_time
+                    self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+                    
+        except Exception as e:
+            self.logger.error(f"Error in CVX optimization: {str(e)}. Falling back to greedy assignment.")
+            # Fall back to greedy assignment
+            for user_id, user_node in self.user_nodes.items():
+                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                user_node.assigned_node_id = assigned_node_id
+                user_node.latency.distance = assigned_node_distance
+                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                user_node.latency.total_turnaround_time = total_turnaround_time
+                self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
        
     def get_performance_summary_for_frontend(self) -> Dict[str, Any]:
         """
@@ -409,7 +421,7 @@ class Scheduler:
         avg_memory_util = total_memory_util / max(1, active_nodes)
         avg_cpu_util = total_cpu_util / max(1, active_nodes)
         
-        return {
+        performance_summary = {
             "algorithm": self.assignment_algorithm.value,
             "performance_metrics": {
                 "total_cost": round(total_turnaround_time, 2),
@@ -425,4 +437,13 @@ class Scheduler:
                 "total_cold_starts": 0  # Placeholder - implement if cold starts are tracked
             },
         }
+        
+        # Add CVX-specific metrics if available
+        if self.assignment_algorithm == AssignmentAlgorithm.CVX:
+            performance_summary["cvx_metrics"] = {
+                "objective_value": self._last_cvx_objective_value,
+                "latency_cost": self._last_cvx_latency_cost
+            }
+            
+        return performance_summary
         
