@@ -75,8 +75,8 @@ export default function ControlPanelContent() {
 
         <ClearControlsCard />
 
-        <ModelSelectionCard />
-        <UserSettingsCard />
+        {/* <ModelSelectionCard /> */}
+        {/* <UserSettingsCard /> */}
         {/* <ZoomControlsCard /> */}
         {/* <EdgeNodeSettingsCard /> */}
       </div>

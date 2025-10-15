@@ -16,7 +16,7 @@ export default function SimulationControlsCard() {
     setPredictionEnabled,
     simulationLoading,
     users,
-    setSelectedScenario
+    setSelectedDataset
   } = useGlobalState();
   return (
     <Card className="mb-4">
@@ -48,7 +48,7 @@ export default function SimulationControlsCard() {
           </Button>
           <Button size='sm' variant={"outline"} onClick={async () => {
             await resetSimulation();
-            setSelectedScenario("none");
+            setSelectedDataset("none");
           }}>
             <RotateCcw className="w-4 h-4" />
           </Button>

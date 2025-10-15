@@ -302,11 +302,11 @@ const useGlobalState = create((set) => ({
     })),
 
   // Scenario selection state
-  selectedScenario: "none",
-  setSelectedScenario: (updater) =>
+  selectedDataset: "none",
+  setSelectedDataset: (updater) =>
     set((state) => ({
-      selectedScenario: typeof updater === "function"
-        ? updater(state.selectedScenario)
+      selectedDataset: typeof updater === "function"
+        ? updater(state.selectedDataset)
         : updater
     })),
 

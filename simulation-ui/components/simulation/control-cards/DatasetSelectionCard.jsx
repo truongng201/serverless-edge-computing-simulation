@@ -9,22 +9,21 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { startDactSample, startVehiclesSample, initializeStreetMap } from "@/lib/simulation-management";
+import { startDactSample, startVehiclesSample } from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
 
-export default function ScenarioSelectionCard() {
-  const { setRoadNetwork, selectedScenario, setSelectedScenario } = useGlobalState();
+export default function DatasetSelectionCard() {
+  const { selectedDataset, setSelectedDataset } = useGlobalState();
 
-  const handleScenarioChange = async (value) => {
-    setSelectedScenario(value);
+  const handleDatasetChange = async (value) => {
+    setSelectedDataset(value);
 
-    if (value === "scenario2") {
+    if (value === "Dataset2") {
       await startDactSample();
-    } else if (value === "scenario3") {
+    } else if (value === "Dataset3") {
       await startVehiclesSample();
     } else if (value === "none") {
       await clearAllUsers();
-      setRoadNetwork(null);
     }
   };
 
@@ -33,27 +32,27 @@ export default function ScenarioSelectionCard() {
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center gap-2">
           <Navigation className="w-4 h-4" />
-          Scenario Selection
+          Dataset Selection
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
         <div className="space-y-2">
-          <Label className="text-xs">Scenario</Label>
-          <Select value={selectedScenario} onValueChange={handleScenarioChange}>
+          <Label className="text-xs">Dataset</Label>
+          <Select value={selectedDataset} onValueChange={handleDatasetChange}>
             <SelectTrigger className="h-8">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">None (Self adding user)</SelectItem>
-              <SelectItem value="scenario2">Scenario 2: DACT Sample</SelectItem>
-              <SelectItem value="scenario3">
-                Scenario 3: Vehicle Sample
+              <SelectItem value="none">Dataset 1: None (Self adding user)</SelectItem>
+              <SelectItem value="Dataset2">Dataset 2: DACT Sample</SelectItem>
+              <SelectItem value="Dataset3">
+                Dataset 3: Vehicle Sample
               </SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="text-xs text-gray-600">
-          Select a predefined scenario to load sample data, or choose "None" to
+          Select a predefined Dataset to load sample data, or choose "None" to
           manually add users.
         </div>
       </CardContent>
