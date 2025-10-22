@@ -272,8 +272,6 @@ class Scheduler:
 
         # Variables: relaxed continuous assignment
         a = cp.Variable((n_users, n_cloudlets))
-
-        # ---- Build cost matrix ----
         T = np.zeros((n_users, n_cloudlets))
         memory_demand = np.zeros(n_users)
         for i, user_id in enumerate(users):
@@ -291,12 +289,10 @@ class Scheduler:
                 transmission_delay = getattr(user_node.latency, "transmission_delay", 0.0)
                 T[i, j] = propagation_delay + transmission_delay + computation_delay
 
-        # Normalize cost matrix for numerical stability
         T_max = np.max(T)
         if T_max > 0:
             T /= T_max
 
-        # ---- Resource capacity ----
         memory_capacity = np.zeros(n_cloudlets)
         for j, cloudlet_id in enumerate(cloudlets):
             if cloudlet_id == "central_node":
@@ -306,13 +302,10 @@ class Scheduler:
                 used = (c.metrics_info.memory_usage / 100.0) * c.metrics_info.memory_total
                 memory_capacity[j] = max(0, c.metrics_info.memory_total - used)
 
-        # ---- Objective ----
         objective = cp.Minimize(cp.sum(cp.multiply(T, a)))
 
-        # ---- Constraints ----
         constraints = []
 
-        # Relax strict equality (numerical stability)
         for i in range(n_users):
             constraints.append(cp.sum(a[i, :]) == 1)
 
