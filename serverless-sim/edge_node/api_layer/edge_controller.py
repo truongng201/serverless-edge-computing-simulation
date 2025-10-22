@@ -112,7 +112,7 @@ class EdgeNodeAPIController:
 
     def get_node_status(self) -> Dict[str, Any]:
         """Get current node status"""
-        system_metrics = self.metrics_collector.collect_metrics()
+        system_metrics = self.metrics_collector.get_detailed_metrics()
         containers = self.container_manager.list_containers()
         
         container_states = {}
@@ -124,12 +124,12 @@ class EdgeNodeAPIController:
         return {
             "node_id": self.node_id,
             "status": "running",
-            "cpu_usage": system_metrics.cpu_usage if system_metrics else 0,
-            "memory_usage": system_metrics.memory_usage if system_metrics else 0,
+            "cpu_usage": system_metrics["cpu_usage"] if system_metrics else 0,
+            "memory_usage": system_metrics["memory_usage"] if system_metrics else 0,
             "containers": container_states,
             "active_requests": self.active_requests,
             "total_requests": self.total_requests,
-            "uptime": system_metrics.uptime if system_metrics else 0,
+            "uptime": system_metrics["uptime"] if system_metrics else 0,
             "timestamp": time.time()
         }
 

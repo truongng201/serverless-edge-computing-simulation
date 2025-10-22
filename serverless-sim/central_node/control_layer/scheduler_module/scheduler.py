@@ -182,10 +182,11 @@ class Scheduler:
                 total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
                 user_node.latency.total_turnaround_time = total_turnaround_time
                 self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+            print("Assignment matrix after Greedy:", self.assignment_matrix)
             return self.assignment_matrix
         elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
             self._convex_optimization_assignment_all_users()
-            print(self.assignment_matrix)
+            print("Assignment matrix after CVX:", self.assignment_matrix)
             return self.assignment_matrix
         else:
             self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
@@ -278,7 +279,6 @@ class Scheduler:
         # Decision variables
         # a[i,j] = 1 if user i assigned to cloudlet j
         a = cp.Variable((n_users, n_cloudlets), boolean=True)
-        
         # Cost matrix: T[i,j] = turnaround time for user i on cloudlet j
         T = np.zeros((n_users, n_cloudlets))
         memory_demand = np.zeros(n_users)
@@ -295,7 +295,6 @@ class Scheduler:
                     cloudlet = self.edge_nodes[cloudlet_id]
                     distance = self._calculate_distance(user_loc, cloudlet.location)
                 
-                # Calculate turnaround time components
                 prop_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
                 
                 # Use existing delays if available, otherwise use defaults
@@ -345,12 +344,10 @@ class Scheduler:
         try:
             problem.solve(solver=cp.ECOS_BB, verbose=False)
             
-            if problem.status == cp.OPTIMAL:
-                # Store optimization results for metrics
+            if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE] and a.value is not None:
                 self._last_cvx_objective_value = problem.value
                 self._last_cvx_latency_cost = latency_cost.value
-                
-                # Update all user assignments
+                print("CVX assignment matrix:\n", a.value)
                 for i, user_id in enumerate(users):
                     assignment_vec = a.value[i, :]
                     assigned_cloudlet_idx = np.argmax(assignment_vec)
@@ -373,20 +370,9 @@ class Scheduler:
                     
                     # Update assignment matrix
                     self.assignment_matrix[user_id] = (assigned_cloudlet, distance)
-                    
-                self.logger.info(f"CVX optimization completed successfully. Total cost: {problem.value}")
+                print(f"CVX optimization completed successfully. Total cost: {problem.value}")
             else:
-                self.logger.warning(f"CVX optimization failed with status: {problem.status}. Falling back to greedy assignment.")
-                # Fall back to greedy assignment
-                for user_id, user_node in self.user_nodes.items():
-                    assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
-                    user_node.assigned_node_id = assigned_node_id
-                    user_node.latency.distance = assigned_node_distance
-                    user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-                    total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
-                    user_node.latency.total_turnaround_time = total_turnaround_time
-                    self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
-                    
+                raise Exception("CVX optimization not optimal")
         except Exception as e:
             self.logger.error(f"Error in CVX optimization: {str(e)}. Falling back to greedy assignment.")
             # Fall back to greedy assignment
