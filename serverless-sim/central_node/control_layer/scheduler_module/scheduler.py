@@ -5,8 +5,6 @@ import time
 from enum import Enum
 import cvxpy as cp
 import numpy as np
-import random
-from collections import defaultdict
 
 from config import Config
 
@@ -263,7 +261,9 @@ class Scheduler:
             return
             
         users = list(self.user_nodes.keys())
-        cloudlets = list(self.edge_nodes.keys()) + ["central_node"]
+        # Include both edge nodes and central node
+        edge_cloudlets = list(self.edge_nodes.keys())
+        cloudlets = edge_cloudlets + ["central_node"]
         
         n_users = len(users)
         n_cloudlets = len(cloudlets)
@@ -274,10 +274,13 @@ class Scheduler:
         a = cp.Variable((n_users, n_cloudlets))
         T = np.zeros((n_users, n_cloudlets))
         memory_demand = np.zeros(n_users)
+        
+        # Calculate turnaround times and memory demands
         for i, user_id in enumerate(users):
             user_node = self.user_nodes[user_id]
             user_loc = user_node.location
             memory_demand[i] = user_node.memory_demand
+            
             for j, cloudlet_id in enumerate(cloudlets):
                 if cloudlet_id == "central_node":
                     distance = self._calculate_distance(user_loc, self.central_node["location"])
@@ -289,48 +292,91 @@ class Scheduler:
                 transmission_delay = getattr(user_node.latency, "transmission_delay", 0.0)
                 T[i, j] = propagation_delay + transmission_delay + computation_delay
 
+        # Normalize turnaround times to improve numerical stability
         T_max = np.max(T)
         if T_max > 0:
             T /= T_max
 
+        # Set memory capacities
         memory_capacity = np.zeros(n_cloudlets)
         for j, cloudlet_id in enumerate(cloudlets):
             if cloudlet_id == "central_node":
+                # Central node has unlimited capacity
                 memory_capacity[j] = LARGE_CAP
             else:
-                c = self.edge_nodes[cloudlet_id]
-                used = (c.metrics_info.memory_usage / 100.0) * c.metrics_info.memory_total
-                memory_capacity[j] = max(0, c.metrics_info.memory_total - used)
+                # Edge node capacity calculation
+                edge_node = self.edge_nodes[cloudlet_id]
+                used_memory = (edge_node.metrics_info.memory_usage / 100.0) * edge_node.metrics_info.memory_total
+                available_memory = max(0, edge_node.metrics_info.memory_total - used_memory)
+                memory_capacity[j] = available_memory
 
-        objective = cp.Minimize(cp.sum(cp.multiply(T, a)))
+        # Objective: minimize total weighted turnaround time
+        # Add penalty for using central node to prefer edge nodes when possible
+        penalty_weight = np.ones((n_users, n_cloudlets))
+        central_node_idx = cloudlets.index("central_node")
+        penalty_weight[:, central_node_idx] = 1.2  # Slight penalty for central node usage
+        
+        weighted_T = np.multiply(T, penalty_weight)
+        objective = cp.Minimize(cp.sum(cp.multiply(weighted_T, a)))
 
         constraints = []
 
+        # Each user must be assigned to exactly one cloudlet
         for i in range(n_users):
             constraints.append(cp.sum(a[i, :]) == 1)
 
+        # Memory capacity constraints for all cloudlets
         for j in range(n_cloudlets):
-            constraints.append(cp.sum(cp.multiply(memory_demand, a[:, j])) <= memory_capacity[j] + 1e-3)
+            constraints.append(cp.sum(cp.multiply(memory_demand, a[:, j])) <= memory_capacity[j])
 
+        # Assignment variables must be between 0 and 1
         constraints += [a >= 0, a <= 1]
 
         problem = cp.Problem(objective, constraints)
 
         try:
-            problem.solve(solver=cp.SCS, verbose=False, max_iters=5000)
+            # Try multiple solvers for better success rate
+            solvers_to_try = [cp.ECOS, cp.SCS, cp.CLARABEL] if hasattr(cp, 'CLARABEL') else [cp.ECOS, cp.SCS]
+            
+            solved = False
+            for solver in solvers_to_try:
+                try:
+                    if solver == cp.SCS:
+                        problem.solve(solver=solver, verbose=False, max_iters=5000, eps=1e-4)
+                    else:
+                        problem.solve(solver=solver, verbose=False)
+                    
+                    if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
+                        solved = True
+                        break
+                except:
+                    continue
+            
             print(f"[CVX] Status: {problem.status}, Objective: {problem.value}")
 
-            if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE] and a.value is not None:
+            if solved and a.value is not None:
                 assign_vals = a.value
+                
+                # Assign users to cloudlets based on optimization result
                 for i, user_id in enumerate(users):
+                    # Find the cloudlet with highest assignment probability
                     assigned_idx = int(np.argmax(assign_vals[i, :]))
                     assigned_cloudlet = cloudlets[assigned_idx]
+                    
+                    # Verify the assignment is valid (resource constraints)
                     user_node = self.user_nodes[user_id]
+                    if not self._check_resource_constraints(user_node, assigned_cloudlet):
+                        # If assignment violates constraints, fall back to central node
+                        assigned_cloudlet = "central_node"
+                        assigned_idx = central_node_idx
+                    
+                    # Calculate distance and latency
                     if assigned_cloudlet == "central_node":
                         distance = self._calculate_distance(user_node.location, self.central_node["location"])
                     else:
                         distance = self._calculate_distance(user_node.location, self.edge_nodes[assigned_cloudlet].location)
 
+                    # Update user node assignment and latency information
                     user_node.assigned_node_id = assigned_cloudlet
                     user_node.latency.distance = distance
                     user_node.latency.propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
@@ -348,7 +394,8 @@ class Scheduler:
                 raise Exception(f"CVX failed with status {problem.status}")
 
         except Exception as e:
-            self.logger.error(f"Error in CVX optimization: {e}. Falling back to Hungarian/greedy assignment.")
+            self.logger.error(f"Error in CVX optimization: {e}. Falling back to greedy assignment.")
+            # Fallback to greedy assignment
             for user_id, user_node in self.user_nodes.items():
                 assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
                 user_node.assigned_node_id = assigned_node_id
