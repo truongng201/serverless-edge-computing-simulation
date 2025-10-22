@@ -19,7 +19,7 @@ class Config:
     DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
-    DEFAULT_MAX_WARM_TIME = 5 # seconds
+    DEFAULT_MAX_WARM_TIME = 2  # seconds
     
     
     # Cleanup
@@ -89,7 +89,7 @@ class Config:
     USER_MIN_SPEED = 1  # m/s - minimum user movement speed (walking speed)
     USER_MAX_SPEED = 3  # m/s - maximum user movement speed (slow jogging)
     USER_MAX_DISTANCE_FROM_CENTER = 800  # meters - maximum distance from cluster center
-    USER_MAX_SPAWN_DISTANCE = 400  # meters - initial spawn radius around center
+    USER_MAX_SPAWN_DISTANCE = 600  # meters - initial spawn radius around center
     USER_MIN_SPAWN_DISTANCE = 100  # meters - minimum spawn distance from center
     
     # User
