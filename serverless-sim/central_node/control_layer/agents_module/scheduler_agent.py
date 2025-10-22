@@ -30,12 +30,10 @@ class SchedulerAgent:
                     result = requests.get(f"http://{node.endpoint}/api/v1/edge/health")
                     if result.status_code != 200:
                         raise Exception(f"Node {node_id} is unhealthy, status code: {result.status_code}")
-                    break
                 except Exception as e:
                     if attempt == self.max_attempts_call:
                         dead_nodes.append(node_id)
-            # if node.last_heartbeat is None or (current_time - node.last_heartbeat) > Config.EDGE_NODE_HEARTBEAT_TIMEOUT:
-            #     dead_nodes.append(node_id)
+                        break
 
         for node_id in dead_nodes:
             self.logger.warning(f"Removing dead node: {node_id} (last seen: {current_time - self.scheduler.edge_nodes[node_id].last_heartbeat:.1f}s ago)")
