@@ -34,10 +34,6 @@ class Scheduler:
         self.assignment_matrix = {}
         self.current_dataset = None
         self.current_step_id = None
-        
-        # CVX optimization metrics
-        self._last_cvx_objective_value = None
-        self._last_cvx_latency_cost = None
 
     def start_simulation(self):
         self.simulation = True
@@ -345,8 +341,6 @@ class Scheduler:
             problem.solve(solver=cp.ECOS_BB, verbose=False)
             
             if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE] and a.value is not None:
-                self._last_cvx_objective_value = problem.value
-                self._last_cvx_latency_cost = latency_cost.value
                 print("CVX assignment matrix:\n", a.value)
                 for i, user_id in enumerate(users):
                     assignment_vec = a.value[i, :]
@@ -384,52 +378,3 @@ class Scheduler:
                 total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
                 user_node.latency.total_turnaround_time = total_turnaround_time
                 self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
-       
-    def get_performance_summary_for_frontend(self) -> Dict[str, Any]:
-        """
-        Get a summary of performance metrics formatted for frontend display
-        """
-        # Calculate basic metrics
-        total_turnaround_time = self.calculate_total_turnaround_time()
-        total_users = len(self.user_nodes)
-        
-        # Calculate average resource utilization across edge nodes
-        total_memory_util = 0
-        total_cpu_util = 0
-        active_nodes = 0
-        
-        for node in self.edge_nodes.values():
-            if node.metrics_info:
-                total_memory_util += node.metrics_info.memory_usage
-                total_cpu_util += node.metrics_info.cpu_usage
-                active_nodes += 1
-        
-        avg_memory_util = total_memory_util / max(1, active_nodes)
-        avg_cpu_util = total_cpu_util / max(1, active_nodes)
-        
-        performance_summary = {
-            "algorithm": self.assignment_algorithm.value,
-            "performance_metrics": {
-                "total_cost": round(total_turnaround_time, 2),
-                "total_turnaround_time": round(total_turnaround_time, 2),
-                "total_migration_cost": 0.0,  # Placeholder - implement if migration is needed
-                "total_cold_start_penalty": 0.0  # Placeholder - implement if cold starts are tracked
-            },
-            "resource_utilization": {
-                "total_users": total_users,
-                "avg_memory_utilization": round(avg_memory_util, 1),
-                "avg_cpu_utilization": round(avg_cpu_util, 1),
-                "avg_bandwidth_utilization": 0.0,  # Placeholder - implement if bandwidth tracking is needed
-                "total_cold_starts": 0  # Placeholder - implement if cold starts are tracked
-            },
-        }
-        
-        # Add CVX-specific metrics if available
-        if self.assignment_algorithm == AssignmentAlgorithm.CVX:
-            performance_summary["cvx_metrics"] = {
-                "objective_value": self._last_cvx_objective_value,
-                "latency_cost": self._last_cvx_latency_cost
-            }
-            
-        return performance_summary
-        
