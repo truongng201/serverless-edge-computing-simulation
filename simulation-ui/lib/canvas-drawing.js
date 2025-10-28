@@ -2,8 +2,6 @@ import { useCallback } from "react";
 import {
   drawGrid,
   drawUsers,
-  drawRoads,
-  drawRoadNetwork,
   drawConnections,
   drawUserConnections,
   drawCentralNodes,
@@ -58,30 +56,6 @@ export const useCanvasDrawing = () => {
       visibleBottom,
       zoomLevel
     );
-
-    if (showRoads && roads.length > 0) {
-      drawRoads(
-        ctx,
-        roads,
-        visibleLeft,
-        visibleTop,
-        visibleRight,
-        visibleBottom,
-        zoomLevel
-      );
-    }
-
-    if (roadNetwork) {
-      drawRoadNetwork(
-        ctx,
-        roadNetwork,
-        visibleLeft,
-        visibleTop,
-        visibleRight,
-        visibleBottom,
-        zoomLevel
-      );
-    }
 
     drawConnections(ctx, centralNodes, edgeNodes, zoomLevel);
 

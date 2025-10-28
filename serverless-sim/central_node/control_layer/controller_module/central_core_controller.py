@@ -95,6 +95,11 @@ class CentralCoreController:
         controller.execute()
         return "Start using vehicles sample"
 
+    def start_random_generated_sample(self):
+        controller = StartRandomGeneratedSampleController(self.data_manager, self.scheduler)
+        controller.execute()
+        return "Start using random generated sample"
+
     def set_assignment_algorithm(self, request_data):
         controller = SetAssignmentAlgorithmController(self.scheduler, request_data)
         return controller.execute()

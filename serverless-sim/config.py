@@ -19,7 +19,7 @@ class Config:
     DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
-    DEFAULT_MAX_WARM_TIME = 5 # seconds
+    DEFAULT_MAX_WARM_TIME = 2  # seconds
     
     
     # Cleanup
@@ -58,6 +58,8 @@ class Config:
     DEFAULT_EXECUTION_TIME_INTERVAL = 15 # seconds: every 3 seconds all user in simulation call it assigned node
     DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES = (1024, 10240)  # 1 KB to 10 KB
     DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (100, 1000)  # 100 B/ms to 1 KB/ms
+    DEFAULT_DATA_SIZE_IN_BYTES = 512 * 1024  # 512 KB
+    DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND = 512  # 512 B/ms
     DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s)
     DEFAULT_PIXEL_TO_METERS = 10 # 1 pixel = 10 m
 
@@ -82,6 +84,13 @@ class Config:
     # Dataset playback speed (Scenario 2 / vehicles)
     # Multiply timestep advancement per poll to make movements appear faster on canvas
     DATASET_STEP_MULTIPLIER = 8
+    
+    # User Movement Configuration
+    USER_MIN_SPEED = 1  # m/s - minimum user movement speed (walking speed)
+    USER_MAX_SPEED = 3  # m/s - maximum user movement speed (slow jogging)
+    USER_MAX_DISTANCE_FROM_CENTER = 800  # meters - maximum distance from cluster center
+    USER_MAX_SPAWN_DISTANCE = 600  # meters - initial spawn radius around center
+    USER_MIN_SPAWN_DISTANCE = 100  # meters - minimum spawn distance from center
     
     # User
     DEFAULT_USER_MEMORY_DEMAND = 134217728 # 128 MB

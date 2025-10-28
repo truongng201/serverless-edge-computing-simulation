@@ -10,6 +10,7 @@ from .delete_all_users_controller import DeleteAllUsersController
 from .delete_user_controller import DeleteUserController
 from .start_dact_sample_controller import StartDactSampleController
 from .start_vehicles_sample_controller import StartVehiclesSampleController
+from .start_random_generated_sample_controller import StartRandomGeneratedSampleController
 from .start_simulation_controller import StartSimulationController
 from .stop_simulation_controller import StopSimulationController
 from .execute_function_controller import ExecuteFunctionController
