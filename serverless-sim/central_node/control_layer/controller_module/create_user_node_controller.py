@@ -21,8 +21,10 @@ class CreateUserNodeController:
     def _create_user_node(self):
         user_location = self.user_data.get("location", {"x": 0.0, "y": 0.0})
         assigned_node_id, assigned_node_distance = self.scheduler.node_assignment(user_location)
-        data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
-        bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
+        # data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
+        # bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
+        data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
+        bandwidth = Config.DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND
         propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
         transmission_delay = data_size / bandwidth
         total_turnaround_time = propagation_delay + transmission_delay

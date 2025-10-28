@@ -136,6 +136,12 @@ def start_vehicles_sample():
     result = central_core_controller.start_vehicles_sample()
     return result
 
+@central_route.route('/start_random_generated_sample', methods=['POST'])
+@standard_response
+def start_random_generated_sample():
+    result = central_core_controller.start_random_generated_sample()
+    return result
+
 @central_route.route('/execute', methods=['POST'])
 @standard_response
 def execute_function():

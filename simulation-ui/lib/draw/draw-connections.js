@@ -14,18 +14,18 @@ export const drawConnections = (ctx, centralNodes, edgeNodes, zoomLevel) => {
   });
 
   // Draw connections between edge nodes
-  for (let i = 0; i < edgeNodes.length; i++) {
-    for (let j = i + 1; j < edgeNodes.length; j++) {
-      const edgeA = edgeNodes[i];
-      const edgeB = edgeNodes[j];
-      ctx.strokeStyle = "rgba(16, 185, 129, 0.6)"; // subtle green
-      ctx.lineWidth = 1.5 / zoomLevel;
-      ctx.setLineDash([6 / zoomLevel, 4 / zoomLevel]);
-      ctx.beginPath();
-      ctx.moveTo(edgeA.x, edgeA.y);
-      ctx.lineTo(edgeB.x, edgeB.y);
-      ctx.stroke();
-      ctx.setLineDash([]);
-    }
-  }
+  // for (let i = 0; i < edgeNodes.length; i++) {
+  //   for (let j = i + 1; j < edgeNodes.length; j++) {
+  //     const edgeA = edgeNodes[i];
+  //     const edgeB = edgeNodes[j];
+  //     ctx.strokeStyle = "rgba(16, 185, 129, 0.6)"; // subtle green
+  //     ctx.lineWidth = 1.5 / zoomLevel;
+  //     ctx.setLineDash([6 / zoomLevel, 4 / zoomLevel]);
+  //     ctx.beginPath();
+  //     ctx.moveTo(edgeA.x, edgeA.y);
+  //     ctx.lineTo(edgeB.x, edgeB.y);
+  //     ctx.stroke();
+  //     ctx.setLineDash([]);
+  //   }
+  // }
 };
