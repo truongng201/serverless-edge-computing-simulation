@@ -90,25 +90,23 @@ class CentralNodeAPIController:
         return None, None
     
     def get_central_node_status(self) -> Dict[str, Any]:
-        system_metrics = self.metrics_collector.collect_metrics()
+        system_metrics = self.metrics_collector.get_detailed_metrics()
         containers = self.container_manager.list_containers()
         running_container = len([c for c in containers if c.state == ContainerState.RUNNING])
         warm_container = len([c for c in containers if c.state == ContainerState.WARM])
         return {
             "node_id": "central_node",
-            "cpu_usage": system_metrics.cpu_usage if system_metrics else 0,
-            "memory_usage": system_metrics.memory_usage if system_metrics else 0,
-            "memory_total": system_metrics.memory_total if system_metrics else 0,
+            "cpu_usage": system_metrics["cpu_usage"] if system_metrics else 0,
+            "memory_usage": system_metrics["memory_usage"] if system_metrics else 0,
+            "memory_total": system_metrics["memory_total"] if system_metrics else 0,
             "running_container": running_container,
             "warm_container": warm_container,
             "active_requests": self.active_requests,
             "total_requests": self.total_requests,
             "response_time_avg": sum(self.response_times) / len(self.response_times) if self.response_times else 0,
-            "energy_consumption": system_metrics.cpu_energy_kwh if system_metrics else 0,
-            "load_average": system_metrics.load_average if system_metrics else [],
-            "network_io": {},
-            "disk_io": {},
+            "energy_consumption": system_metrics["cpu_energy_kwh"] if system_metrics else 0,
+            "load_average": system_metrics["load_average"] if system_metrics else [],
             "timestamp": time.time(),
-            "uptime": system_metrics.uptime if system_metrics else 0,
+            "uptime": system_metrics["uptime"] if system_metrics else 0,
             "system_info": self.metrics_collector.get_system_info() if system_metrics else {}
         }

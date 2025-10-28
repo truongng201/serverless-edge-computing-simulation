@@ -33,3 +33,6 @@ next-env.d.ts
 .vscode
 
 *.log
+
+highD-dataset-v1.0/
+random_generated.txt

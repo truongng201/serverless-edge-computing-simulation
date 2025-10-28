@@ -5,7 +5,8 @@ import { Activity, Clock, Users, RefreshCw, Timer } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
 import { useState, useEffect } from "react";
 import { fetchPerformanceMetrics } from "@/lib/simulation-management";
-import { formatMs } from "@/lib/helper"
+import { formatMs } from "@/lib/helper";
+import TATChart from "./TATChart";
 
 export default function SystemStatusCard() {
   const { performanceMetrics, assignmentAlgorithm, liveData, users } =
@@ -62,14 +63,24 @@ export default function SystemStatusCard() {
             <span className="flex items-center gap-2">Algorithm:</span>
             <Badge variant="outline">{assignmentAlgorithm}</Badge>
           </div>
-
+          
           <div className="flex items-center justify-between text-sm">
             <span className="flex items-center gap-2">
               Total Turnaround time (TAT)
             </span>
-            <span className="font-mono text-xs">
-              {performanceMetrics.total_turnaround_time}
+            <div className="flex items-center gap-2">
+              <span className="font-mono text-xs">
+                {Math.round(performanceMetrics.total_turnaround_time, 3)}ms
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center justify-between text-sm">
+            <span className="flex items-center gap-2">
+              Detail chart for TAT
             </span>
+            <div className="flex items-center gap-2">
+              <TATChart />
+            </div>
           </div>
 
 

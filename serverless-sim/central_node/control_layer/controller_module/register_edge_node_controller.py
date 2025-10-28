@@ -1,4 +1,6 @@
 import time
+import random
+import math
 
 from shared import InvalidDataException
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
@@ -16,7 +18,20 @@ class RegisterEdgeNodeController:
         if not self.node_data or "node_id" not in self.node_data or "endpoint" not in self.node_data:
             raise InvalidDataException("Invalid node data")
         
+    def _random_location_around_central(self, central_node_location, min_distance=100, max_distance=700):
+        angle = random.uniform(0, 2 * math.pi)
         
+        min_radius_squared = min_distance * min_distance
+        max_radius_squared = max_distance * max_distance
+        
+        radius_squared = random.uniform(min_radius_squared, max_radius_squared)
+        radius = math.sqrt(radius_squared)
+
+        x = central_node_location.get('x', 0) + radius * math.cos(angle)
+        y = central_node_location.get('y', 0) + radius * math.sin(angle)
+        
+        return {'x': x, 'y': y}
+
     def _mapping_node_data(self):
         self.node_metrics = NodeMetrics(
             node_id=self.node_data.get("node_id"),
@@ -35,11 +50,12 @@ class RegisterEdgeNodeController:
             timestamp=0,
             uptime=0
         )
+        central_node_location = self.scheduler.central_node.get('location', {"x": 0, "y": 0})
         
         self.edge_node_info = EdgeNodeInfo(
             node_id=self.node_data.get('node_id'),
             endpoint=self.node_data.get("endpoint"),
-            location=self.node_data.get("location", {"x": 0.0, "y": 0.0}),
+            location=self._random_location_around_central(central_node_location),
             system_info=self.node_data.get("system_info", {}),
             last_heartbeat=time.time(),
             metrics_info=self.node_metrics,

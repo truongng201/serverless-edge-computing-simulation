@@ -40,7 +40,7 @@ export const clearAllUsers = async () => {
       setSelectedUser, 
       setLastStreetSpawnAt,
       setIsSimulating,
-      setSelectedScenario,
+      setSelectedDataset,
       setRoadNetwork,
     } = useGlobalState.getState();
     try {
@@ -61,6 +61,6 @@ export const clearAllUsers = async () => {
 
   // Stop local spawning and street-map loop to avoid immediate repopulation
   setIsSimulating(false);
-  setSelectedScenario('none');
+  setSelectedDataset('none');
   setRoadNetwork(null);
 };

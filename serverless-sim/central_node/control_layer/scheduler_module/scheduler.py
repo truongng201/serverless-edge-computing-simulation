@@ -5,32 +5,32 @@ import time
 from enum import Enum
 import cvxpy as cp
 import numpy as np
-import random
-from collections import defaultdict
 
 from config import Config
 
 from central_node.control_layer.models import EdgeNodeInfo, UserNodeInfo, NodeMetrics
 
+LARGE_CAP = 1e12
 
 class AssignmentAlgorithm(Enum):
     GREEDY = "greedy"
     CVX = "convex optimization"
 
 class Scheduler:
-    def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.CVX):
+    def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
         self.assignment_algorithm = assignment_algorithm
         self.edge_nodes: Dict[str, EdgeNodeInfo] = {}
         self.central_node = {
             "node_id": "central_node",
             "endpoint": "localhost:8000",
-            "location": {"x": 600, "y": 400}, # default location
+            "location": {"x": 730, "y": 1070}, # default location
             "coverage": 0 # default coverage
         }
         self.user_nodes: Dict[str, UserNodeInfo] = {}
         self.logger = logging.getLogger(__name__)
         
         self.simulation = False
+        self.assignment_matrix = {}
         self.current_dataset = None
         self.current_step_id = None
 
@@ -94,12 +94,7 @@ class Scheduler:
     def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
         if user_id not in self.user_nodes:
             return False
-        
         self.user_nodes[user_id].location = new_location
-        assigned_node_id, assigned_node_distance = self.node_assignment(new_location)
-        self.user_nodes[user_id].assigned_node_id = assigned_node_id
-        self.user_nodes[user_id].latency.distance = assigned_node_distance
-        
         return True
 
     def create_user_node(self, user_node: UserNodeInfo):
@@ -172,13 +167,24 @@ class Scheduler:
         dy = location1["y"] - location2["y"]
         return (dx ** 2 + dy ** 2) ** 0.5
     
-    def node_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
+    def node_assignment(self) -> dict:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
-            return self._greedy_assignment(user_location)
+            for user_id, user_node in self.user_nodes.items():
+                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                user_node.assigned_node_id = assigned_node_id
+                user_node.latency.distance = assigned_node_distance
+                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+                user_node.latency.total_turnaround_time = total_turnaround_time
+                self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+            return self.assignment_matrix
         elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
-            return self._greedy_assignment(user_location)
+            self._convex_optimization_assignment_all_users()
+            # print("Assignment matrix after CVX:", self.assignment_matrix)
+            return self.assignment_matrix
         else:
-            raise Exception(f"Unknown assignment algorithm: {self.assignment_algorithm}")
+            self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
+            return self.assignment_matrix
 
     def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:
         if cloudlet_id == "central_node":
@@ -237,6 +243,8 @@ class Scheduler:
             if cloudlet_id == "central_node":
                 distance = self._calculate_distance(user_node.location, self.central_node["location"])
             else:
+                if not cloudlet_id or cloudlet_id not in self.edge_nodes:
+                    continue
                 cloudlet = self.edge_nodes[cloudlet_id]
                 distance = self._calculate_distance(user_node.location, cloudlet.location)
             propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
@@ -248,126 +256,155 @@ class Scheduler:
         return total_turnaround_time
 
 
-    def _convex_optimization_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
-        """
-        CVX Convex Optimization Assignment implementing the mathematical formulation:
-        
-        Variables:
-        - a_ij^t: binary assignment of user i to cloudlet j at time t
-        
-        Objective: Minimize total turn around time
-        
-        Constraints:
-        - Assignment: each user assigned to exactly one cloudlet
-        - Resource capacity: memory, 
-        """
-        
+    def _convex_optimization_assignment_all_users(self):
+        if not self.user_nodes:
+            return
+            
         users = list(self.user_nodes.keys())
-        cloudlets = list(self.edge_nodes.keys()) + ["central_node"]
+        # Include both edge nodes and central node
+        edge_cloudlets = list(self.edge_nodes.keys())
+        cloudlets = edge_cloudlets + ["central_node"]
         
         n_users = len(users)
         n_cloudlets = len(cloudlets)
-        
-        # Decision variables
-        # a[i,j] = 1 if user i assigned to cloudlet j
-        a = cp.Variable((n_users, n_cloudlets), boolean=True)
-        
-        # Parameters
-        # Turnaround latency cost matrix T[i,j]
+        if n_users == 0 or n_cloudlets == 0:
+            return
+
+        # Variables: relaxed continuous assignment
+        a = cp.Variable((n_users, n_cloudlets))
         T = np.zeros((n_users, n_cloudlets))
-     
-        # Resource demand matrices
         memory_demand = np.zeros(n_users)
-        # bandwidth_demand = np.zeros(n_users)
         
-        # Cloudlet capacities
-        memory_capacity = np.zeros(n_cloudlets)
-        # bandwidth_capacity = np.zeros(n_cloudlets)
-        warm_containers = np.zeros(n_cloudlets)
-        
-        # Fill parameter matrices
+        # Calculate turnaround times and memory demands
         for i, user_id in enumerate(users):
             user_node = self.user_nodes[user_id]
-            if user_id == "temp_user":
-                user_loc = user_location
-                mem_dem = 128.0
-                # cpu_dem = 1.0
-                # bw_dem = 10.0
-            else:
-                user_node = self.user_nodes[user_id]
-                user_loc = user_node.location
-                mem_dem = user_node.memory_demand
-                # cpu_dem = user_node.cpu_demand
-                # bw_dem = user_node.bandwidth_demand
-                
-            memory_demand[i] = mem_dem
-            
+            user_loc = user_node.location
+            memory_demand[i] = user_node.memory_demand
             
             for j, cloudlet_id in enumerate(cloudlets):
-                # Turnaround latency cost
-                distance = 0
                 if cloudlet_id == "central_node":
                     distance = self._calculate_distance(user_loc, self.central_node["location"])
                 else:
-                    cloudlet = self.edge_nodes[cloudlet_id]
-                    distance = self._calculate_distance(user_loc, cloudlet.location)
-                prop_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-                trans_delay = user_node.data_size_demand / user_node.bandwidth_demand
-                comp_delay = user_node.latency.computation_delay if user_node.latency.computation_delay else 0
-                T[i, j] = prop_delay + trans_delay + comp_delay
-    
-        # Fill cloudlet capacity parameters
+                    distance = self._calculate_distance(user_loc, self.edge_nodes[cloudlet_id].location)
+
+                propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                computation_delay = getattr(user_node.latency, "computation_delay", 0.0)
+                transmission_delay = getattr(user_node.latency, "transmission_delay", 0.0)
+                T[i, j] = propagation_delay + transmission_delay + computation_delay
+
+        # Normalize turnaround times to improve numerical stability
+        T_max = np.max(T)
+        if T_max > 0:
+            T /= T_max
+
+        # Set memory capacities
+        memory_capacity = np.zeros(n_cloudlets)
         for j, cloudlet_id in enumerate(cloudlets):
             if cloudlet_id == "central_node":
-                memory_capacity[j] = 999999
-                warm_containers[j] = 999999
+                # Central node has unlimited capacity
+                memory_capacity[j] = LARGE_CAP
             else:
-                cloudlet = self.edge_nodes[cloudlet_id]
-                memory_capacity[j] = cloudlet.metrics_info.memory_total
-                warm_containers[j] = cloudlet.metrics_info.warm_container
+                # Edge node capacity calculation
+                edge_node = self.edge_nodes[cloudlet_id]
+                used_memory = (edge_node.metrics_info.memory_usage / 100.0) * edge_node.metrics_info.memory_total
+                available_memory = max(0, edge_node.metrics_info.memory_total - used_memory)
+                memory_capacity[j] = available_memory
 
-        # Objective function: minimize total cost
-        latency_cost = cp.sum(cp.multiply(T, a))
-        objective = cp.Minimize(latency_cost)
+        # Objective: minimize total weighted turnaround time
+        # Add penalty for using central node to prefer edge nodes when possible
+        penalty_weight = np.ones((n_users, n_cloudlets))
+        central_node_idx = cloudlets.index("central_node")
+        penalty_weight[:, central_node_idx] = 1.2  # Slight penalty for central node usage
         
-        # Constraints
+        weighted_T = np.multiply(T, penalty_weight)
+        objective = cp.Minimize(cp.sum(cp.multiply(weighted_T, a)))
+
         constraints = []
-        
-        # Assignment constraint: each user to exactly one cloudlet
+
+        # Each user must be assigned to exactly one cloudlet
         for i in range(n_users):
             constraints.append(cp.sum(a[i, :]) == 1)
-        
-        # Resource capacity constraints
+
+        # Memory capacity constraints for all cloudlets
         for j in range(n_cloudlets):
-            # Memory constraint
             constraints.append(cp.sum(cp.multiply(memory_demand, a[:, j])) <= memory_capacity[j])
-        
-      
-        
-        # Solve the optimization problem
+
+        # Assignment variables must be between 0 and 1
+        constraints += [a >= 0, a <= 1]
+
         problem = cp.Problem(objective, constraints)
-        problem.solve(solver=cp.ECOS_BB, verbose=False)
-        
-        if problem.status == cp.OPTIMAL:
-            # Store optimization results for metrics
-            self._last_cvx_objective_value = problem.value
-            self._last_cvx_latency_cost = latency_cost.value
+
+        try:
+            # Try multiple solvers for better success rate
+            solvers_to_try = [cp.ECOS, cp.SCS, cp.CLARABEL] if hasattr(cp, 'CLARABEL') else [cp.ECOS, cp.SCS]
             
-            # Extract assignment for the new user (last user in list)
-            new_user_idx = n_users - 1
-            assignment_vec = a.value[new_user_idx, :]
-            assigned_cloudlet_idx = np.argmax(assignment_vec)
-            assigned_cloudlet = cloudlets[assigned_cloudlet_idx]
+            solved = False
+            for solver in solvers_to_try:
+                try:
+                    if solver == cp.SCS:
+                        problem.solve(solver=solver, verbose=False, max_iters=5000, eps=1e-4)
+                    else:
+                        problem.solve(solver=solver, verbose=False)
+                    
+                    if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
+                        solved = True
+                        break
+                except:
+                    continue
             
-            # Calculate distance
-            if assigned_cloudlet == "central_node":
-                distance = 1000.0
-            else:
-                cloudlet = self.edge_nodes[assigned_cloudlet]
-                distance = self._calculate_distance(user_location, cloudlet.location)
+            print(f"[CVX] Status: {problem.status}, Objective: {problem.value}")
+
+            if solved and a.value is not None:
+                assign_vals = a.value
                 
-            return assigned_cloudlet, distance
-        else:
-            self.logger.warning(f"CVX optimization failed with status: {problem.status}")
-            return self._greedy_assignment(user_location)
-    
+                # Assign users to cloudlets based on optimization result
+                for i, user_id in enumerate(users):
+                    # Find the cloudlet with highest assignment probability
+                    assigned_idx = int(np.argmax(assign_vals[i, :]))
+                    assigned_cloudlet = cloudlets[assigned_idx]
+                    
+                    # Verify the assignment is valid (resource constraints)
+                    user_node = self.user_nodes[user_id]
+                    if not self._check_resource_constraints(user_node, assigned_cloudlet):
+                        # If assignment violates constraints, fall back to central node
+                        assigned_cloudlet = "central_node"
+                        assigned_idx = central_node_idx
+                    
+                    # Calculate distance and latency
+                    if assigned_cloudlet == "central_node":
+                        distance = self._calculate_distance(user_node.location, self.central_node["location"])
+                    else:
+                        distance = self._calculate_distance(user_node.location, self.edge_nodes[assigned_cloudlet].location)
+
+                    # Update user node assignment and latency information
+                    user_node.assigned_node_id = assigned_cloudlet
+                    user_node.latency.distance = distance
+                    user_node.latency.propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                    total_turnaround_time = (
+                        user_node.latency.propagation_delay +
+                        getattr(user_node.latency, "transmission_delay", 0.0) +
+                        getattr(user_node.latency, "computation_delay", 0.0)
+                    )
+                    user_node.latency.total_turnaround_time = total_turnaround_time
+                    self.assignment_matrix[user_id] = (assigned_cloudlet, distance)
+                
+                print(f"[CVX] Optimization successful, total normalized cost: {problem.value:.4f}")
+
+            else:
+                raise Exception(f"CVX failed with status {problem.status}")
+
+        except Exception as e:
+            self.logger.error(f"Error in CVX optimization: {e}. Falling back to greedy assignment.")
+            # Fallback to greedy assignment
+            for user_id, user_node in self.user_nodes.items():
+                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                user_node.assigned_node_id = assigned_node_id
+                user_node.latency.distance = assigned_node_distance
+                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                total_turnaround_time = (
+                    user_node.latency.propagation_delay +
+                    getattr(user_node.latency, "transmission_delay", 0.0) +
+                    getattr(user_node.latency, "computation_delay", 0.0)
+                )
+                user_node.latency.total_turnaround_time = total_turnaround_time
+                self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)

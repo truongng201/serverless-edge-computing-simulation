@@ -1,7 +1,6 @@
 import { ChevronRight } from "lucide-react";
 import {
   SystemStatusCard,
-  StreetMapMetricsCard,
   LiveSystemMetricsCard,
   ConnectionStatusCard,
 } from "./metric-cards/MetricCards";
@@ -27,7 +26,6 @@ export default function MetricsPanelContent() {
       <div className="pt-8 space-y-4">
         <SystemStatusCard />
 
-        <StreetMapMetricsCard />
 
         <LiveSystemMetricsCard />
 
