@@ -21,10 +21,11 @@ yarn-error.log*
 
 # env files
 .env*
-
+.venv
 # vercel
 .vercel
-
+# Ignore T-drive 2008 logs directory (use forward slashes and escape spaces)
+/predict-model-with-taxi/T-drive\ Taxi\ Trajectories/release/taxi_log_2008_by_id/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
