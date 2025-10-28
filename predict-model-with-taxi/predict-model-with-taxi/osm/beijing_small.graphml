@@ -1,0 +1,538 @@
+<?xml version='1.0' encoding='utf-8'?>
+<graphml xmlns="http://graphml.graphdrawing.org/xmlns" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://graphml.graphdrawing.org/xmlns http://graphml.graphdrawing.org/xmlns/1.0/graphml.xsd">
+  <key id="d15" for="edge" attr.name="bridge" attr.type="string" />
+  <key id="d14" for="edge" attr.name="geometry" attr.type="string" />
+  <key id="d13" for="edge" attr.name="length" attr.type="string" />
+  <key id="d12" for="edge" attr.name="reversed" attr.type="string" />
+  <key id="d11" for="edge" attr.name="oneway" attr.type="string" />
+  <key id="d10" for="edge" attr.name="name" attr.type="string" />
+  <key id="d9" for="edge" attr.name="highway" attr.type="string" />
+  <key id="d8" for="edge" attr.name="osmid" attr.type="string" />
+  <key id="d7" for="node" attr.name="street_count" attr.type="string" />
+  <key id="d6" for="node" attr.name="x" attr.type="string" />
+  <key id="d5" for="node" attr.name="y" attr.type="string" />
+  <key id="d4" for="graph" attr.name="crs_is_projected" attr.type="string" />
+  <key id="d3" for="graph" attr.name="simplified" attr.type="string" />
+  <key id="d2" for="graph" attr.name="crs" attr.type="string" />
+  <key id="d1" for="graph" attr.name="created_with" attr.type="string" />
+  <key id="d0" for="graph" attr.name="created_date" attr.type="string" />
+  <graph edgedefault="directed">
+    <node id="336386819">
+      <data key="d5">4417103.381103172</data>
+      <data key="d6">452780.79653795843</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="3451002462">
+      <data key="d5">4417118.552967165</data>
+      <data key="d6">452780.9502125323</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="746966202">
+      <data key="d5">4417092.252833056</data>
+      <data key="d6">452602.75676973414</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="528980369">
+      <data key="d5">4417040.228515334</data>
+      <data key="d6">451496.6946272096</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="701760294">
+      <data key="d5">4417133.802935437</data>
+      <data key="d6">451295.15194563207</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="534079898">
+      <data key="d5">4417126.10742818</data>
+      <data key="d6">451250.5054166263</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="701760169">
+      <data key="d5">4417030.197185004</data>
+      <data key="d6">451648.539219957</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634509644">
+      <data key="d5">4417043.198280571</data>
+      <data key="d6">452050.97671094176</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634509657">
+      <data key="d5">4417090.094482084</data>
+      <data key="d6">452557.11152197997</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634509650">
+      <data key="d5">4417061.85287795</data>
+      <data key="d6">452604.354685032</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="754397824">
+      <data key="d5">4416986.597099995</data>
+      <data key="d6">451956.50946836604</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="754398507">
+      <data key="d5">4416979.391164157</data>
+      <data key="d6">452335.86924385076</data>
+      <data key="d7">4</data>
+    </node>
+    <node id="10248187592">
+      <data key="d5">4416933.315469375</data>
+      <data key="d6">452350.4562922655</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634509645">
+      <data key="d5">4417043.452965032</data>
+      <data key="d6">452324.01910242654</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634491162">
+      <data key="d5">4416816.573067163</data>
+      <data key="d6">451830.2935072701</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="1634491260">
+      <data key="d5">4417063.801659583</data>
+      <data key="d6">452431.9943737214</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634491217">
+      <data key="d5">4417020.722978697</data>
+      <data key="d6">451329.8730591872</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="1634509658">
+      <data key="d5">4417095.690160711</data>
+      <data key="d6">452965.8577222726</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634491263">
+      <data key="d5">4417068.340936829</data>
+      <data key="d6">452098.30539275653</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="9768296750">
+      <data key="d5">4416817.244861721</data>
+      <data key="d6">451824.09130558994</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="1647461757">
+      <data key="d5">4417045.768284636</data>
+      <data key="d6">452365.6307897708</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634509648">
+      <data key="d5">4417059.762384301</data>
+      <data key="d6">452558.50451342406</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1647461759">
+      <data key="d5">4417082.181778175</data>
+      <data key="d6">452362.6351907003</data>
+      <data key="d7">4</data>
+    </node>
+    <node id="1634509660">
+      <data key="d5">4417103.186692618</data>
+      <data key="d6">452956.1244578759</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634509664">
+      <data key="d5">4417112.772243458</data>
+      <data key="d6">452879.42691631604</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="1634509666">
+      <data key="d5">4417119.964659693</data>
+      <data key="d6">452960.4165815728</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="1647461743">
+      <data key="d5">4416920.427074875</data>
+      <data key="d6">452484.35940549645</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="6286241959">
+      <data key="d5">4417024.342274019</data>
+      <data key="d6">451740.6388075388</data>
+      <data key="d7">1</data>
+    </node>
+    <node id="6286241961">
+      <data key="d5">4416988.073032411</data>
+      <data key="d6">451318.73122080497</data>
+      <data key="d7">3</data>
+    </node>
+    <node id="10248187590">
+      <data key="d5">4416903.563205225</data>
+      <data key="d6">452354.9724017378</data>
+      <data key="d7">1</data>
+    </node>
+    <edge source="336386819" target="3451002462" id="0">
+      <data key="d8">63530615</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">恒惠西路</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">15.20048522599209</data>
+    </edge>
+    <edge source="336386819" target="746966202" id="0">
+      <data key="d8">150552517</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">178.01307413772557</data>
+      <data key="d14">LINESTRING (452780.79653795843 4417103.381103172, 452604.8096370598 4417092.45097665, 452602.75676973414 4417092.252833056)</data>
+    </edge>
+    <edge source="3451002462" target="336386819" id="0">
+      <data key="d8">63530615</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">恒惠西路</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">15.20048522599209</data>
+    </edge>
+    <edge source="746966202" target="1634509657" id="0">
+      <data key="d8">150552517</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">45.59976073974548</data>
+    </edge>
+    <edge source="746966202" target="1634509650" id="0">
+      <data key="d8">60121481</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">永安东里</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">30.500721415339815</data>
+      <data key="d14">LINESTRING (452602.75676973414 4417092.252833056, 452603.65202264895 4417079.48301631, 452604.354685032 4417061.85287795)</data>
+    </edge>
+    <edge source="528980369" target="701760294" id="0">
+      <data key="d8">104129571</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">建国门南大街</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">263.43856621113787</data>
+      <data key="d14">LINESTRING (451496.6946272096 4417040.228515334, 451355.41339803976 4417043.080856486, 451338.33187041146 4417045.531678452, 451326.7475941945 4417050.744535601, 451315.17603322474 4417060.630170068, 451306.76078588364 4417072.14949988, 451302.17037151085 4417085.57573502, 451296.4525761009 4417121.940494675, 451295.15194563207 4417133.802935437)</data>
+    </edge>
+    <edge source="534079898" target="701760169" id="0">
+      <data key="d8">42709810</data>
+      <data key="d9">trunk_link</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">451.75979076365815</data>
+      <data key="d14">LINESTRING (451250.5054166263 4417126.10742818, 451253.52639869275 4417102.535241663, 451258.56117116695 4417086.420087285, 451265.112944115 4417077.609748169, 451280.1900446741 4417055.780926486, 451300.37529289303 4417041.36723867, 451326.7055278879 4417033.418666657, 451368.2717146999 4417031.200298757, 451585.83753316826 4417027.841884936, 451648.539219957 4417030.197185004)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="701760169" target="1634509644" id="0">
+      <data key="d8">1301409324</data>
+      <data key="d9">trunk</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">401.9723218037506</data>
+      <data key="d14">LINESTRING (451648.539219957 4417030.197185004, 451728.83496514783 4417034.084448722, 451816.72263008717 4417039.467452223, 451890.0625165234 4417042.456863471, 451941.7677976996 4417044.384396823, 451977.18383871316 4417044.283642404, 452028.8241591358 4417042.68257445, 452050.97671094176 4417043.198280571)</data>
+    </edge>
+    <edge source="1634509644" target="1634509645" id="0">
+      <data key="d8">150552516</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">272.55095927735783</data>
+      <data key="d14">LINESTRING (452050.97671094176 4417043.198280571, 452091.9923042989 4417041.775367534, 452107.75369188155 4417041.432296405, 452260.46077521064 4417040.7422998855, 452324.01910242654 4417043.452965032)</data>
+    </edge>
+    <edge source="1634509644" target="1634491260" id="0">
+      <data key="d8">[150550385, 1301409324]</data>
+      <data key="d9">trunk</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">381.13675382890796</data>
+      <data key="d14">LINESTRING (452050.97671094176 4417043.198280571, 452062.01908296347 4417044.1833791165, 452075.4861708913 4417046.041222386, 452091.29783053073 4417048.261755176, 452104.2123172926 4417049.246266593, 452146.511932802 4417049.469396458, 452271.7886646945 4417050.483312917, 452347.77238072845 4417056.646105423, 452431.9943737214 4417063.801659583)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="1634509657" target="1634509648" id="0">
+      <data key="d8">150552508</data>
+      <data key="d9">unclassified</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">30.41945807077362</data>
+    </edge>
+    <edge source="1634509657" target="1647461759" id="0">
+      <data key="d8">150552517</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">194.22573831833245</data>
+      <data key="d14">LINESTRING (452557.11152197997 4417090.094482084, 452372.89590615575 4417082.583935996, 452362.6351907003 4417082.181778175)</data>
+    </edge>
+    <edge source="1634509650" target="746966202" id="0">
+      <data key="d8">60121481</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">永安东里</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">30.500721415339815</data>
+      <data key="d14">LINESTRING (452604.354685032 4417061.85287795, 452603.65202264895 4417079.48301631, 452602.75676973414 4417092.252833056)</data>
+    </edge>
+    <edge source="1634509650" target="1634509658" id="0">
+      <data key="d8">150552516</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">362.84614870778563</data>
+      <data key="d14">LINESTRING (452604.354685032 4417061.85287795, 452902.3882076206 4417082.30714041, 452965.8577222726 4417095.690160711)</data>
+    </edge>
+    <edge source="754397824" target="754398507" id="0">
+      <data key="d8">60495788</data>
+      <data key="d9">residential</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">379.06461967520636</data>
+      <data key="d14">LINESTRING (451956.50946836604 4416986.597099995, 452184.27291557135 4416973.357562854, 452215.8362783607 4416975.013549997, 452335.86924385076 4416979.391164157)</data>
+    </edge>
+    <edge source="754398507" target="10248187592" id="0">
+      <data key="d8">151823428</data>
+      <data key="d9">residential</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">48.400206763041</data>
+    </edge>
+    <edge source="754398507" target="754397824" id="0">
+      <data key="d8">60495788</data>
+      <data key="d9">residential</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">379.06461967520636</data>
+      <data key="d14">LINESTRING (452335.86924385076 4416979.391164157, 452215.8362783607 4416975.013549997, 452184.27291557135 4416973.357562854, 451956.50946836604 4416986.597099995)</data>
+    </edge>
+    <edge source="754398507" target="1634509645" id="0">
+      <data key="d8">150552492</data>
+      <data key="d9">tertiary</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">65.32290274211718</data>
+      <data key="d14">LINESTRING (452335.86924385076 4416979.391164157, 452328.5854026932 4417010.814530475, 452328.5446018358 4417011.125567319, 452324.01910242654 4417043.452965032)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="10248187592" target="754398507" id="0">
+      <data key="d8">151823428</data>
+      <data key="d9">residential</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">48.400206763041</data>
+    </edge>
+    <edge source="10248187592" target="10248187590" id="0">
+      <data key="d8">151823428</data>
+      <data key="d9">residential</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">30.149146811559312</data>
+      <data key="d14">LINESTRING (452350.4562922655 4416933.315469375, 452354.33108716825 4416909.016991937, 452354.9724017378 4416903.563205225)</data>
+    </edge>
+    <edge source="10248187592" target="1647461743" id="0">
+      <data key="d8">151906787</data>
+      <data key="d9">residential</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">134.2413864023188</data>
+      <data key="d14">LINESTRING (452350.4562922655 4416933.315469375, 452420.4863631911 4416926.352321793, 452484.35940549645 4416920.427074875)</data>
+    </edge>
+    <edge source="1634509645" target="1647461757" id="0">
+      <data key="d8">150552516</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">41.58820058201566</data>
+    </edge>
+    <edge source="1634509645" target="754398507" id="0">
+      <data key="d8">150552492</data>
+      <data key="d9">tertiary</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">65.32290274211718</data>
+      <data key="d14">LINESTRING (452324.01910242654 4417043.452965032, 452328.5446018358 4417011.125567319, 452328.5854026932 4417010.814530475, 452335.86924385076 4416979.391164157)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="1634491162" target="1634491260" id="0">
+      <data key="d8">150550321</data>
+      <data key="d9">trunk_link</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">727.6387595572904</data>
+      <data key="d14">LINESTRING (451830.2935072701 4416816.573067163, 451833.7079986379 4416844.233350956, 451839.2945567932 4416867.939660219, 451844.90523693716 4416883.27689764, 451854.9336095548 4416905.079412217, 451865.42537996045 4416924.459355934, 451876.4609170347 4416941.960093102, 451891.1379701388 4416960.792022701, 451903.0225297064 4416974.669053486, 451917.3128881261 4416989.130316997, 451932.90348428383 4417001.019466545, 451945.2575336729 4417009.377219764, 451959.2153861387 4417018.568452976, 451980.1784760833 4417031.112055171, 452013.36325616797 4417041.86958572, 452049.1340491415 4417050.613131127, 452084.1033275897 4417055.61028733, 452116.6480996102 4417057.048812662, 452248.14495312795 4417058.933478858, 452431.9943737214 4417063.801659583)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="1634491260" target="1634509658" id="0">
+      <data key="d8">[150550385, 29316243]</data>
+      <data key="d9">trunk</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">533.7212281451752</data>
+      <data key="d14">LINESTRING (452431.9943737214 4417063.801659583, 452506.32068560674 4417068.799820612, 452690.25945323793 4417077.136656186, 452852.65038589353 4417087.409047032, 452965.8577222726 4417095.690160711)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="1634491217" target="701760169" id="0">
+      <data key="d8">150550329</data>
+      <data key="d9">trunk_link</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">318.6715764176069</data>
+      <data key="d14">LINESTRING (451329.8730591872 4417020.722978697, 451348.52232323715 4417022.812895307, 451556.3547125066 4417021.302674803, 451610.6220200821 4417024.13296182, 451648.539219957 4417030.197185004)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="1634491263" target="9768296750" id="0">
+      <data key="d8">150550290</data>
+      <data key="d9">trunk_link</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">408.01962566701656</data>
+      <data key="d14">LINESTRING (452098.30539275653 4417068.340936829, 452056.74768339936 4417063.7291665925, 452022.39400167996 4417057.385243904, 451991.6479164619 4417046.989718529, 451960.1767259407 4417031.415473028, 451934.8349451319 4417014.515239014, 451911.1641285499 4416995.551179753, 451892.1593749925 4416976.369101274, 451874.0609542714 4416954.517507619, 451856.7387018125 4416925.624061685, 451847.28967248136 4416906.215354499, 451837.46372451267 4416881.270451306, 451831.9172964334 4416862.569705068, 451826.3771758462 4416836.743128633, 451824.09130558994 4416817.244861721)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="1647461757" target="1647461759" id="0">
+      <data key="d8">151906780</data>
+      <data key="d9">tertiary_link</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">36.60241573223952</data>
+    </edge>
+    <edge source="1647461757" target="1634509648" id="0">
+      <data key="d8">150552516</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">193.02742704308776</data>
+      <data key="d14">LINESTRING (452365.6307897708 4417045.768284636, 452476.11611383874 4417056.012624483, 452558.50451342406 4417059.762384301)</data>
+    </edge>
+    <edge source="1634509648" target="1634509657" id="0">
+      <data key="d8">150552508</data>
+      <data key="d9">unclassified</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">30.41945807077362</data>
+    </edge>
+    <edge source="1634509648" target="1634509650" id="0">
+      <data key="d8">150552516</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">45.80085912178277</data>
+    </edge>
+    <edge source="1647461759" target="1647461757" id="0">
+      <data key="d8">151906780</data>
+      <data key="d9">tertiary_link</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">36.60241573223952</data>
+    </edge>
+    <edge source="1647461759" target="1634491263" id="0">
+      <data key="d8">[1301409323, 150552495]</data>
+      <data key="d9">trunk_link</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">264.7728932319556</data>
+      <data key="d14">LINESTRING (452362.6351907003 4417082.181778175, 452323.81343245244 4417077.595884764, 452296.5152843875 4417077.155935288, 452220.3366885819 4417078.076268825, 452153.3281317573 4417077.230586643, 452098.30539275653 4417068.340936829)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="1647461759" target="528980369" id="0">
+      <data key="d8">150552517</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">866.3074055706101</data>
+      <data key="d14">LINESTRING (452362.6351907003 4417082.181778175, 452309.0013957624 4417086.212704747, 452132.271223604 4417082.379491683, 452063.64535849873 4417078.547907985, 451987.26543543313 4417069.204915169, 451928.17982010933 4417062.706204538, 451911.4536199151 4417060.513968212, 451845.6753937169 4417052.8260207195, 451765.6469392731 4417046.549478223, 451713.18977202143 4417043.340364829, 451640.1726211547 4417041.382849183, 451496.6946272096 4417040.228515334)</data>
+    </edge>
+    <edge source="1634509660" target="1634509664" id="0">
+      <data key="d8">150552502</data>
+      <data key="d9">trunk_link</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">77.13442249493957</data>
+    </edge>
+    <edge source="1634509660" target="1634491263" id="0">
+      <data key="d8">[29262811, 150550382]</data>
+      <data key="d9">trunk</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">856.9347463738625</data>
+      <data key="d14">LINESTRING (452956.1244578759 4417103.186692618, 452845.64408083353 4417094.888881616, 452534.0389922913 4417077.695618225, 452426.1428310897 4417072.706507437, 452098.30539275653 4417068.340936829)</data>
+      <data key="d15">yes</data>
+    </edge>
+    <edge source="1634509664" target="336386819" id="0">
+      <data key="d8">150552517</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">98.87016926234124</data>
+    </edge>
+    <edge source="1634509666" target="1634509664" id="0">
+      <data key="d8">150552517</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">通惠河北路</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">81.14085009629436</data>
+      <data key="d14">LINESTRING (452960.4165815728 4417119.964659693, 452941.98305891396 4417118.080374121, 452879.42691631604 4417112.772243458)</data>
+    </edge>
+    <edge source="1647461743" target="10248187592" id="0">
+      <data key="d8">151906787</data>
+      <data key="d9">residential</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">134.2413864023188</data>
+      <data key="d14">LINESTRING (452484.35940549645 4416920.427074875, 452420.4863631911 4416926.352321793, 452350.4562922655 4416933.315469375)</data>
+    </edge>
+    <edge source="6286241959" target="6286241961" id="0">
+      <data key="d8">671269861</data>
+      <data key="d9">unclassified</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">434.86555319541014</data>
+      <data key="d14">LINESTRING (451740.6388075388 4417024.342274019, 451659.30339562125 4416991.281210273, 451640.30007189064 4416984.575437392, 451579.95673388464 4416980.762323744, 451526.9805045688 4416975.3267987035, 451492.7412446084 4416975.022582264, 451459.8481146005 4416980.725824521, 451433.01782190654 4416985.369497552, 451393.3397093623 4416999.529521557, 451372.01989713643 4417002.284734371, 451357.7655195391 4416997.658298438, 451340.5211842881 4416990.675676266, 451318.73122080497 4416988.073032411)</data>
+    </edge>
+    <edge source="6286241961" target="528980369" id="0">
+      <data key="d8">104129571</data>
+      <data key="d9">tertiary</data>
+      <data key="d10">建国门南大街</data>
+      <data key="d11">True</data>
+      <data key="d12">False</data>
+      <data key="d13">216.81299558671566</data>
+      <data key="d14">LINESTRING (451318.73122080497 4416988.073032411, 451322.0313691043 4416996.176739028, 451327.97075889347 4417006.605591403, 451335.2605685237 4417011.631540767, 451344.67307436804 4417014.390794685, 451459.20294024097 4417012.363157586, 451485.29321773845 4417012.352718458, 451497.6097293971 4417016.070452953, 451496.6946272096 4417040.228515334)</data>
+    </edge>
+    <edge source="6286241961" target="6286241959" id="0">
+      <data key="d8">671269861</data>
+      <data key="d9">unclassified</data>
+      <data key="d11">False</data>
+      <data key="d12">False</data>
+      <data key="d13">434.86555319541026</data>
+      <data key="d14">LINESTRING (451318.73122080497 4416988.073032411, 451340.5211842881 4416990.675676266, 451357.7655195391 4416997.658298438, 451372.01989713643 4417002.284734371, 451393.3397093623 4416999.529521557, 451433.01782190654 4416985.369497552, 451459.8481146005 4416980.725824521, 451492.7412446084 4416975.022582264, 451526.9805045688 4416975.3267987035, 451579.95673388464 4416980.762323744, 451640.30007189064 4416984.575437392, 451659.30339562125 4416991.281210273, 451740.6388075388 4417024.342274019)</data>
+    </edge>
+    <edge source="10248187590" target="10248187592" id="0">
+      <data key="d8">151823428</data>
+      <data key="d9">residential</data>
+      <data key="d11">False</data>
+      <data key="d12">True</data>
+      <data key="d13">30.149146811559312</data>
+      <data key="d14">LINESTRING (452354.9724017378 4416903.563205225, 452354.33108716825 4416909.016991937, 452350.4562922655 4416933.315469375)</data>
+    </edge>
+    <data key="d0">2025-10-22 15:20:21</data>
+    <data key="d1">OSMnx 2.0.6</data>
+    <data key="d2">EPSG:32650</data>
+    <data key="d3">True</data>
+    <data key="d4">True</data>
+  </graph>
+</graphml>
