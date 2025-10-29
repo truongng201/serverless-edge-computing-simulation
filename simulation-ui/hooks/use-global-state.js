@@ -313,8 +313,8 @@ const useGlobalState = create((set) => ({
   datasetInfo: {},
   setDatasetInfo: (updater) =>
     set((state) => ({
-      selectedDataset: typeof updater === "function"
-        ? updater(state.selectedDataset)
+      datasetInfo: typeof updater === "function"
+        ? updater(state.datasetInfo)
         : updater
     })),
   

@@ -32,14 +32,14 @@ export const startRandomGeneratedSample = async () => {
 };
 
 export const getDatasetInfo = async () => {
-  const {setLoadingData, setDataError, setDatasetInfo } = useGlobalState.getState();
+  const {setLoadingData, setDataError } = useGlobalState.getState();
 
   try {
     setLoadingData(true);
     const response = await axios.get(
       `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/get_dataset_info`
     );
-    setDatasetInfo(response.data)
+    return response.data?.data;
   } catch (error) {
     setDataError(`Failed to get dataset info: ${error.message}`);
   } finally {

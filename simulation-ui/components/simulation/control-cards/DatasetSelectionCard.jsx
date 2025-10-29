@@ -15,7 +15,6 @@ import { useEffect } from "react";
 
 export default function DatasetSelectionCard() {
   const { selectedDataset, setSelectedDataset, datasetInfo, setDatasetInfo } = useGlobalState();
-  console.log(datasetInfo)
   const handleDatasetChange = async (value) => {
     setSelectedDataset(value);
 
@@ -28,8 +27,12 @@ export default function DatasetSelectionCard() {
     }
   };
 
-  useEffect(async () => {
-    await getDatasetInfo();
+  useEffect(() => {
+    const fetchDatasetInfo = async () => {
+      const response = await getDatasetInfo();
+      setDatasetInfo(response);
+    };
+    fetchDatasetInfo();
   }, []);
 
   return (
@@ -48,11 +51,15 @@ export default function DatasetSelectionCard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              {datasetInfo?.dataset_list?.map((dataset) => (
-                <SelectItem key={dataset.name} value={dataset.name}>
-                  {dataset.ui_name}
-                </SelectItem>
-              ))}
+              {datasetInfo?.dataset_list?.length > 0 ? (
+                datasetInfo.dataset_list.map((dataset) => (
+                  <SelectItem key={dataset.name} value={dataset.name}>
+                    {dataset.ui_name}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="none">No datasets available</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
