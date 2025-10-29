@@ -40,6 +40,12 @@ Notes:
 - You can use `--graphml predict-model-with-taxi\osm\beijing.graphml` to cache/load the graph.
 - Use `--bbox N S E W` to restrict the area if needed.
 - Set `--use-shortest-path` to enable graph shortest paths for transitions (slower but more faithful).
+- To resample along roads (curvilinear) instead of time-only footpoints, add `--road-resample` in `prepare`.
+- HMM tuning flags (optional, for quality/perf):
+  - `--beam-size 10` (keep top-B candidates in Viterbi)
+  - `--turn-penalty 0.1` (penalize turning in transitions)
+  - `--speed-scale-mps 20` (scale for transition length penalty)
+  - `--adaptive-radius A B MIN MAX` (r = clip(A + B*v, MIN, MAX), v in m/s)
 - Offline option: if Overpass is unreliable, download a local OSM XML (e.g., from BBBike) that covers your bbox and build the graph offline:
   - `python -c "import osmnx as ox; G=ox.graph_from_xml('beijing.osm', bidirectional=True, simplify=True); G=ox.project_graph(G); ox.save_graphml(G, 'predict-model-with-taxi\\osm\\beijing_offline.graphml')"`
   - Then run prepare with `--graphml predict-model-with-taxi\osm\beijing_offline.graphml` or directly with `--xml beijing.osm`.

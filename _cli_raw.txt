@@ -1,4 +1,4 @@
-import argparse
+﻿import argparse
 import os
 
 from .prepare import prepare_phase_a, prepare_phase_b
@@ -34,13 +34,6 @@ def main():
     p_prep.add_argument('--use-shortest-path', action='store_true', help='Use graph shortest-path for transitions')
     p_prep.add_argument('--overpass-endpoint', type=str, default=None, help='Custom Overpass API endpoint URL')
     p_prep.add_argument('--overpass-timeout', type=int, default=None, help='Overpass timeout (seconds)')
-    p_prep.add_argument('--road-resample', action='store_true', help='Resample along road segments (curvilinear) instead of time-only footpoints')
-    # HMM tuning flags
-    p_prep.add_argument('--beam-size', type=int, default=10, help='HMM Viterbi beam size')
-    p_prep.add_argument('--turn-penalty', type=float, default=0.0, help='Penalty weight for turning (radians) in HMM transitions')
-    p_prep.add_argument('--speed-scale-mps', type=float, default=20.0, help='Speed scale (m/s) in transition length penalty')
-    p_prep.add_argument('--adaptive-radius', type=float, nargs=4, default=None, metavar=('A','B','MIN','MAX'),
-                        help='Adaptive candidate radius params: r = clip(A + B*v, MIN, MAX)')
 
     p_train = sub.add_parser('train', help='Train GRU baseline for Phase A')
     p_train.add_argument('--data-dir', type=str, default='tdrive_predictor_artifacts/phase_a')
@@ -65,8 +58,7 @@ def main():
     p_ctrv.add_argument('--q-v', type=float, default=0.5)
     p_ctrv.add_argument('--q-psi', type=float, default=0.01)
     p_ctrv.add_argument('--q-omega', type=float, default=0.005)
-    p_ctrv.add_argument('--snap', action='store_true', help='Snap rollout points to roads (requires OSM graph)')
-    p_ctrv.add_argument('--snap-mode', type=str, choices=['horizon','step-topo'], default='horizon', help='Snap mode: per-horizon nearest, or stepwise with topology')
+    p_ctrv.add_argument('--snap', action='store_true', help='Snap rollout points to nearest road (requires OSM graph)')
     p_ctrv.add_argument('--graphml', type=str, default=None)
     p_ctrv.add_argument('--place', type=str, default=None)
     p_ctrv.add_argument('--bbox', type=float, nargs=4, default=None, metavar=('NORTH','SOUTH','EAST','WEST'))
@@ -100,11 +92,6 @@ def main():
                 sigma_gps_m=args.sigma_gps_m,
                 use_shortest_path=args.use_shortest_path,
                 xml=args.xml,
-                use_road_resample=args.road_resample,
-                beam_size=args.beam_size,
-                turn_penalty=args.turn_penalty,
-                speed_scale_mps=args.speed_scale_mps,
-                adaptive_radius=tuple(args.adaptive_radius) if args.adaptive_radius is not None else None,
             )
         else:
             prepare_phase_a(
@@ -146,7 +133,7 @@ def main():
             G = load_graph(graphml_path=args.graphml, place=args.place, bbox=tuple(args.bbox) if args.bbox else None)
             from .mapmatch.hmm import CandidateGenerator
             cand = CandidateGenerator(G, radius_m=args.cand_radius_m, k=args.k_candidates)
-            # snap predicted displacements to roads
+            # snap each predicted displacement to nearest road around base pos incrementally
             import torch
             pred_t = torch.tensor(y_pred)
             true_t = torch.tensor(y_true)
@@ -161,10 +148,6 @@ def main():
             ds = SequenceHorizonDataset(test_df, feature_cols, lookback=args.lookback)
             import numpy as np
             idx = 0
-            # helper to compute heading from dx,dy
-            def _heading(dx, dy):
-                import math
-                return math.atan2(dy, dx)
             for trip_id, g in test_df.sort_values(['trip_id','ts']).groupby('trip_id'):
                 g = g.reset_index(drop=True)
                 n = len(g)
@@ -172,60 +155,21 @@ def main():
                     continue
                 for end in range(args.lookback - 1, n - max(steps)):
                     x0 = float(g['x'].iloc[end]); y0=float(g['y'].iloc[end])
+                    # accumulate per-minute predicted positions
                     base = (x0, y0)
+                    # expand pred_t row to per-step
                     row_pred = pred_t[idx].numpy().reshape(4,2)
-                    if args.snap_mode == 'horizon':
-                        snapped = []
-                        for h,(dx,dy) in zip(steps, row_pred):
-                            px,py = base[0]+dx, base[1]+dy
-                            cands = cand.query(px,py)
-                            if cands:
-                                fxy = cands[0]['foot_xy']
-                                snapped.append((fxy[0]-base[0], fxy[1]-base[1]))
-                            else:
-                                snapped.append((dx,dy))
-                        abs_preds.append(np.array(snapped).reshape(-1))
-                    else:  # step-topo
-                        snapped = []
-                        prev_edge = None
-                        prev_xy = base
-                        prev_heading = None
-                        for h,(dx,dy) in zip(steps, row_pred):
-                            px,py = base[0]+dx, base[1]+dy
-                            # restrict to neighbor edges if we have prev_edge
-                            if prev_edge is not None:
-                                neigh = set(tuple(e) for e in cand.neighbor_edges(prev_edge))
-                            else:
-                                neigh = None
-                            cands = cand.query(px,py)
-                            best = None; best_score = -1e18
-                            for c in cands:
-                                e = c['edge']
-                                if neigh is not None and e not in neigh:
-                                    continue
-                                fx,fy = c['foot_xy']
-                                # heading alignment
-                                h_pred = _heading(px - prev_xy[0], py - prev_xy[1]) if prev_heading is None else prev_heading
-                                h_edge = cand.tangent_heading(e, c['s'])
-                                if h_edge is None:
-                                    align = 0.0
-                                else:
-                                    import math
-                                    dhead = ((h_edge - h_pred + math.pi) % (2*math.pi)) - math.pi
-                                    align = abs(math.cos(dhead))
-                                # score: prefer closer + aligned
-                                score = -c['dist'] + 5.0*align
-                                if score > best_score:
-                                    best_score = score; best = c
-                            if best is None:
-                                snapped.append((dx,dy))
-                            else:
-                                fxy = best['foot_xy']
-                                snapped.append((fxy[0]-base[0], fxy[1]-base[1]))
-                                prev_edge = best['edge']
-                                prev_xy = fxy
-                                prev_heading = cand.tangent_heading(prev_edge, best['s'])
-                        abs_preds.append(np.array(snapped).reshape(-1))
+                    # generate per-minute by repeating nearest per-step; to keep simple, snap horizons only
+                    snapped = []
+                    for h,(dx,dy) in zip(steps, row_pred):
+                        px,py = base[0]+dx, base[1]+dy
+                        cands = cand.query(px,py)
+                        if cands:
+                            fxy = cands[0]['foot_xy']
+                            snapped.append((fxy[0]-base[0], fxy[1]-base[1]))
+                        else:
+                            snapped.append((dx,dy))
+                    abs_preds.append(np.array(snapped).reshape(-1))
                     # truths unchanged
                     row_true = true_t[idx].numpy()
                     abs_trues.append(row_true)
@@ -264,3 +208,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+

@@ -26,6 +26,11 @@ yarn-error.log*
 .vercel
 # Ignore T-drive 2008 logs directory (use forward slashes and escape spaces)
 /predict-model-with-taxi/T-drive\ Taxi\ Trajectories/release/taxi_log_2008_by_id/
+# OSM/Graph cache and large artifacts
+/predict-model-with-taxi/osm/*.graphml
+/predict-model-with-taxi/osm/*.osm*
+/predict-model-with-taxi/tdrive_predictor_artifacts/
+/predict-model-with-taxi/predict-model-with-taxi/tdrive_predictor_artifacts/
 # typescript
 *.tsbuildinfo
 next-env.d.ts
