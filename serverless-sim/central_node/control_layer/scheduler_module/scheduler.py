@@ -32,7 +32,7 @@ class Scheduler:
         self.simulation = False
         self.assignment_matrix = {}
         self.current_dataset = None
-        self.random_sample_size = 100
+        self.random_sample_size = 0
         self.current_step_id = None
 
     def start_simulation(self):
@@ -69,6 +69,12 @@ class Scheduler:
     
     def set_random_sample_size(self, sample_size=100):
         self.random_sample_size = sample_size
+        
+    def get_current_dataset(self):
+        return self.current_dataset
+    
+    def set_current_dataset(self, dataset_name):
+        self.current_dataset = dataset_name
         
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:

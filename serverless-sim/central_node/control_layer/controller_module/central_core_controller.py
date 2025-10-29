@@ -110,3 +110,7 @@ class CentralCoreController:
     def get_performance_metrics(self):
         controller = GetPerformanceMetricsController(self.scheduler)
         return controller.execute()
+    
+    def get_dataset_info(self):
+        controller = GetDatasetListController(self.scheduler, self.data_manager)
+        return controller.execute()

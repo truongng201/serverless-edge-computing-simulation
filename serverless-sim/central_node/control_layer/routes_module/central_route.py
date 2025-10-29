@@ -167,3 +167,9 @@ def get_all_assignment_algorithms():
 def get_performance_metrics():
     result = central_core_controller.get_performance_metrics()
     return result
+
+@central_route.route('/get_dataset_info', methods=['GET'])
+@standard_response
+def get_dataset_info():
+    result = central_core_controller.get_dataset_info()
+    return result
