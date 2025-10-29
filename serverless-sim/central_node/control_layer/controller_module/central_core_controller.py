@@ -85,15 +85,6 @@ class CentralCoreController:
         response = controller.execute()
         return response
 
-    def start_dact_sample(self):
-        controller = StartDactSampleController(self.data_manager, self.scheduler)
-        controller.execute()
-        return "Start using dact sample"
-    
-    def start_random_generated_sample(self):
-        controller = StartRandomGeneratedSampleController(self.data_manager, self.scheduler)
-        controller.execute()
-        return "Start using random generated sample"
 
     def set_assignment_algorithm(self, request_data):
         controller = SetAssignmentAlgorithmController(self.scheduler, request_data)
@@ -113,4 +104,8 @@ class CentralCoreController:
     
     def get_dataset_info(self):
         controller = GetDatasetListController(self.scheduler, self.data_manager)
+        return controller.execute()
+    
+    def set_dataset(self, request_data):
+        controller = SetDatasetController(self.scheduler, self.data_manager, request_data)
         return controller.execute()

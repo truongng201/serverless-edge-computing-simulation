@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { startDactSample, startRandomGeneratedSample, getDatasetInfo } from "@/lib/simulation-management";
+import { setDataset, getDatasetInfo } from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
 import { useEffect, useState } from "react";
 
@@ -20,11 +20,8 @@ export default function DatasetSelectionCard() {
   const handleDatasetChange = async (value) => {
     setSelectedDataset(value);
 
-    if (value === "Dataset2") {
-      await startDactSample();
-    } else if (value === "Dataset3") {
-      await startRandomGeneratedSample();
-    } else if (value === "none") {
+    await setDataset(value, value === "random_generated" ? sampleSize : null);
+    if (value === "none") {
       await clearAllUsers();
     }
   };
@@ -69,7 +66,10 @@ export default function DatasetSelectionCard() {
         {selectedDataset === "random_generated" && (
           <div className="space-y-2">
             <Label className="text-xs">Sample Size</Label>
-            <Select value={sampleSize.toString()} onValueChange={(value) => setSampleSize(Number(value))}>
+            <Select value={sampleSize.toString()} onValueChange={(value) => {
+              setSampleSize(Number(value));
+              handleDatasetChange("random_generated");
+            }}>
               <SelectTrigger className="h-8">
                 <SelectValue placeholder="Select a sample size" />
               </SelectTrigger>

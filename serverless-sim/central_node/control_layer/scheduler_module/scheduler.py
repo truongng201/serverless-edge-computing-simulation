@@ -31,7 +31,7 @@ class Scheduler:
         
         self.simulation = False
         self.assignment_matrix = {}
-        self.current_dataset = None
+        self.current_dataset = "none"
         self.random_sample_size = 0
         self.current_step_id = None
 
@@ -112,6 +112,9 @@ class Scheduler:
 
     def create_user_node(self, user_node: UserNodeInfo):
         self.user_nodes[user_node.user_id] = user_node
+        
+    def clear_all_users(self):
+        self.user_nodes = {}
 
     def _classify_nodes(self):
         classified_nodes = {

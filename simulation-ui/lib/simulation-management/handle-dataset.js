@@ -1,35 +1,25 @@
 import useGlobalState from "@/hooks/use-global-state";
 import axios from "axios";
 
-export const startDactSample = async () => {
+export const setDataset = async (datasetName, sampleSize = null) => {
   const { setLoadingData, setDataError } = useGlobalState.getState();
 
   try {
     setLoadingData(true);
+    const payload = { dataset_name: datasetName };
+    if (sampleSize !== null) {
+      payload.sample_size = sampleSize;
+    }
     await axios.post(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_dact_sample`
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/set_dataset`,
+      payload
     );
   } catch (error) {
-    setDataError(`Failed to get DACT sample: ${error.message}`);
+    setDataError(`Failed to set dataset: ${error.message}`);
   } finally {
     setLoadingData(false);
   }
-};
-
-export const startRandomGeneratedSample = async () => {
-  const { setLoadingData, setDataError } = useGlobalState.getState();
-
-  try {
-    setLoadingData(true);
-    await axios.post(
-      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_random_generated_sample`
-    );
-  } catch (error) {
-    setDataError(`Failed to get Random Generated sample: ${error.message}`);
-  } finally {
-    setLoadingData(false);
-  }
-};
+}
 
 export const getDatasetInfo = async () => {
   const {setLoadingData, setDataError } = useGlobalState.getState();

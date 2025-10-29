@@ -108,8 +108,8 @@ class GetAllUsersController:
                 return False
         
         for item in sample_data:
-            user_id = f"user_{item.get('user_id', 0)}"
-            location = {'x': item.get('location_x', 0), 'y': item.get('location_y', 0)}
+            user_id = f"user_{item.get('id', 0)}"
+            location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
             
             if user_id in self.scheduler.user_nodes:
                 # Update existing user via scheduler helper (updates last_updated & history)

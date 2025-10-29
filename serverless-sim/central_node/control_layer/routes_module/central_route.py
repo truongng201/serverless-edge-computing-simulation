@@ -124,18 +124,6 @@ def delete_user(user_id):
     result = central_core_controller.delete_user(user_id)
     return result
 
-@central_route.route('/start_dact_sample', methods=['POST'])
-@standard_response
-def start_dact_sample():
-    result = central_core_controller.start_dact_sample()
-    return result
-
-@central_route.route('/start_random_generated_sample', methods=['POST'])
-@standard_response
-def start_random_generated_sample():
-    result = central_core_controller.start_random_generated_sample()
-    return result
-
 @central_route.route('/execute', methods=['POST'])
 @standard_response
 def execute_function():
@@ -172,4 +160,11 @@ def get_performance_metrics():
 @standard_response
 def get_dataset_info():
     result = central_core_controller.get_dataset_info()
+    return result
+
+@central_route.route('/set_dataset', methods=['POST'])
+@standard_response
+def set_dataset():
+    request_data = request.get_json()
+    result = central_core_controller.set_dataset(request_data)
     return result
