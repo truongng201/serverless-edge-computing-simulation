@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { startDactSample, startVehiclesSample, startRandomGeneratedSample, startTaxiDSample, loadTaxiDRoads } from "@/lib/simulation-management";
+import { startDactSample, startVehiclesSample, startRandomGeneratedSample, startTaxiDSample, loadTaxiDRoads, loadTaxiDRoadsPreprocessed } from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
 
 export default function DatasetSelectionCard() {
@@ -26,8 +26,15 @@ export default function DatasetSelectionCard() {
       await startRandomGeneratedSample();
     } else if (value === "TaxiD") {
       await startTaxiDSample();
-      // load and fit roads for visualization
-      try { await loadTaxiDRoads(); } catch (e) { /* noop */ }
+      // Prefer preprocessed fast path; fallback to dynamic
+      try {
+        const ok = await loadTaxiDRoadsPreprocessed();
+        if (!ok) {
+          await loadTaxiDRoads();
+        }
+      } catch (_e) {
+        try { await loadTaxiDRoads(); } catch (_e2) {}
+      }
     } else if (value === "none") {
       await clearAllUsers();
     }

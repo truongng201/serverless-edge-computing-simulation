@@ -120,3 +120,14 @@ class Config:
     TAXID_VIEWPORT_WIDTH_PX = int(os.getenv("TAXID_VIEWPORT_WIDTH_PX", "1800"))
     TAXID_VIEWPORT_HEIGHT_PX = int(os.getenv("TAXID_VIEWPORT_HEIGHT_PX", "1200"))
     TAXID_VIEWPORT_MARGIN_PX = int(os.getenv("TAXID_VIEWPORT_MARGIN_PX", "80"))
+
+    # Preprocessed roads JSON (gz) path for fast UI serving
+    TAXID_ROADS_JSON_GZ_PATH = os.getenv(
+        "TAXID_ROADS_JSON_GZ_PATH",
+        os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "predict-model-with-taxi",
+            "osm",
+            "beijing_taxid_roads.json.gz",
+        ),
+    )

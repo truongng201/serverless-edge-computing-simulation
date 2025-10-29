@@ -1,11 +1,17 @@
-from typing import Optional, Tuple, Any, Dict
+from typing import Optional, Tuple, Any
 import os
+import logging
 
 
 try:
     import osmnx as ox  # type: ignore
 except Exception:  # pragma: no cover
     ox = None
+from xml.etree import ElementTree as ET
+from shared.custom_exception import BadRequestException
+
+# In-process cache to avoid re-parsing/loading repeatedly
+_GRAPH_CACHE = {}
 
 
 def load_graph(
@@ -26,25 +32,67 @@ def load_graph(
         raise ImportError(
             "osmnx is not installed. Install with `pip install osmnx` to use TaxiD scenario."
         )
+    logger = logging.getLogger(__name__)
 
-    if xml_path and os.path.exists(xml_path):
-        G = ox.graph_from_xml(xml_path, bidirectional=True, simplify=True)
-    elif graphml_path and os.path.exists(graphml_path):
+    key = (xml_path or "", graphml_path or "")
+    if key in _GRAPH_CACHE:
+        return _GRAPH_CACHE[key]
+
+    # Prefer GraphML if present (fast path)
+    if graphml_path and os.path.exists(graphml_path):
+        logger.info(f"OSM loader: loading GraphML '{graphml_path}'")
         G = ox.load_graphml(graphml_path)
-    else:
-        raise ValueError(
-            f"No valid OSM source found. xml_path={xml_path} graphml_path={graphml_path}"
-        )
+        if project:
+            try:
+                if not G.graph.get('crs_is_projected', False):
+                    G = ox.project_graph(G)
+                    G.graph['crs_is_projected'] = True
+            except Exception:
+                pass
+        _GRAPH_CACHE[key] = G
+        return G
 
-    if project:
+    # Fallback to XML if provided
+    if xml_path and os.path.exists(xml_path):
+        # Detect Git LFS pointer files to return a helpful error
         try:
-            # Project to a metric CRS for accurate geometry in meters
-            Gp = ox.project_graph(G)
-            Gp.graph["crs_is_projected"] = True
-            return Gp
+            with open(xml_path, 'rb') as f:
+                head = f.read(128)
+            if head.startswith(b"version https://git-lfs.github.com/spec/v1"):
+                raise BadRequestException(
+                    f"OSM XML at '{xml_path}' is a Git LFS pointer. Run 'git lfs pull' or set TAXID_OSM_XML_PATH to a real .osm file."
+                )
+        except BadRequestException:
+            raise
         except Exception:
             pass
-    return G
+        try:
+            logger.info(f"OSM loader: parsing XML '{xml_path}' (this may take time)")
+            G = ox.graph_from_xml(xml_path, bidirectional=True, simplify=True)
+        except ET.ParseError as e:
+            raise BadRequestException(
+                f"Failed to parse OSM XML at '{xml_path}': {e}. Ensure it is a valid .osm (not a pointer)."
+            )
+        if project:
+            try:
+                G = ox.project_graph(G)
+                G.graph['crs_is_projected'] = True
+            except Exception:
+                pass
+        # Save GraphML to speed up next loads
+        if graphml_path:
+            try:
+                os.makedirs(os.path.dirname(graphml_path), exist_ok=True)
+                ox.save_graphml(G, graphml_path)
+                logger.info(f"OSM loader: cached GraphML '{graphml_path}'")
+            except Exception:
+                pass
+        _GRAPH_CACHE[key] = G
+        return G
+
+    raise BadRequestException(
+        f"No valid OSM source found. Provide TAXID_GRAPHML_PATH or TAXID_OSM_XML_PATH."
+    )
 
 
 def graph_bounds_meters(G: Any) -> Tuple[float, float, float, float]:
@@ -67,5 +115,3 @@ def edge_geometries(G: Any):
             vx = G.nodes[v].get("x")
             vy = G.nodes[v].get("y")
             yield [(float(ux), float(uy)), (float(vx), float(vy))], data
-
-
