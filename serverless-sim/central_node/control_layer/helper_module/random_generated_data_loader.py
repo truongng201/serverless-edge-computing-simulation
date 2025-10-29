@@ -76,9 +76,6 @@ class RandomGeneratedDataLoader:
         }
     
     def _load_or_generate_simulation_data(self):
-        """
-        Load complete simulation data from file if it exists, otherwise generate new data
-        """
         if os.path.exists(self.data_file_path):
             # Load existing data
             try:
@@ -118,9 +115,6 @@ class RandomGeneratedDataLoader:
         return simulation_data
     
     def _save_simulation_data(self, simulation_data):
-        """
-        Save complete simulation data to the file
-        """
         try:
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(self.data_file_path), exist_ok=True)
@@ -132,9 +126,6 @@ class RandomGeneratedDataLoader:
             print(f"Error saving data to file: {e}")
     
     def _save_step_to_file(self, step: int, step_data):
-        """
-        Save a specific timestep data to the file
-        """
         try:
             self.simulation_data['step_history'][str(step)] = step_data
             self._save_simulation_data(self.simulation_data)
@@ -142,16 +133,6 @@ class RandomGeneratedDataLoader:
             print(f"Error saving step {step} to file: {e}")
     
     def get_data_by_step(self, step: int):
-        """
-        Get user data for a specific timestep, updating positions based on movement
-        
-        Args:
-            step: The current simulation timestep
-            
-        Returns:
-            List of user data with updated positions
-        """
-        # Check if we already have this step cached
         step_key = str(step)
         if step_key in self.step_history:
             print(f"Returning cached data for step {step}")
@@ -235,40 +216,5 @@ class RandomGeneratedDataLoader:
                     user["velocity_x"] = direction_to_center_x * abs(user["velocity_x"])
                     user["velocity_y"] = direction_to_center_y * abs(user["velocity_y"])
             
-            
-    def get_cached_steps(self):
-        """
-        Get list of all cached timesteps
-        
-        Returns:
-            List of integers representing cached timesteps
-        """
-        return sorted([int(step) for step in self.step_history.keys()])
-    
-    def get_max_cached_step(self):
-        """
-        Get the maximum cached timestep
-        
-        Returns:
-            Integer representing the maximum cached timestep, or -1 if no steps cached
-        """
-        cached_steps = self.get_cached_steps()
-        return max(cached_steps) if cached_steps else -1
-    
-    def clear_cache_after_step(self, step: int):
-        """
-        Clear cached data after a specific step (useful for restarting simulation from a point)
-        
-        Args:
-            step: The step after which to clear cache
-        """
-        steps_to_remove = [s for s in self.step_history.keys() if int(s) > step]
-        for step_key in steps_to_remove:
-            del self.step_history[step_key]
-        
-        # Save updated data
-        self._save_simulation_data(self.simulation_data)
-        print(f"Cleared cached data after step {step}")
-    
     def __len__(self):
         return self.num_items
