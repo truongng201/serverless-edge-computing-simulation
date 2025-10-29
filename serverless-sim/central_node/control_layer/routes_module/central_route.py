@@ -142,6 +142,18 @@ def start_random_generated_sample():
     result = central_core_controller.start_random_generated_sample()
     return result
 
+@central_route.route('/start_taxid_sample', methods=['POST'])
+@standard_response
+def start_taxid_sample():
+    result = central_core_controller.start_taxid_sample()
+    return result
+
+@central_route.route('/taxid/roads', methods=['GET'])
+@standard_response
+def get_taxid_roads():
+    result = central_core_controller.get_taxid_roads()
+    return result
+
 @central_route.route('/execute', methods=['POST'])
 @standard_response
 def execute_function():

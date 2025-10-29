@@ -115,3 +115,12 @@ class CentralCoreController:
     def get_performance_metrics(self):
         controller = GetPerformanceMetricsController(self.scheduler)
         return controller.execute()
+
+    def start_taxid_sample(self):
+        controller = StartTaxiDSampleController(self.scheduler)
+        controller.execute()
+        return "Start TaxiD (Beijing OSM) sample"
+
+    def get_taxid_roads(self):
+        controller = GetTaxiDRoadsController(self.scheduler)
+        return controller.execute()

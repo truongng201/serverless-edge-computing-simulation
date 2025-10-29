@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { startDactSample, startVehiclesSample, startRandomGeneratedSample } from "@/lib/simulation-management";
+import { startDactSample, startVehiclesSample, startRandomGeneratedSample, startTaxiDSample, loadTaxiDRoads } from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
 
 export default function DatasetSelectionCard() {
@@ -24,6 +24,10 @@ export default function DatasetSelectionCard() {
       await startVehiclesSample();
     } else if (value === "Dataset4") {
       await startRandomGeneratedSample();
+    } else if (value === "TaxiD") {
+      await startTaxiDSample();
+      // load and fit roads for visualization
+      try { await loadTaxiDRoads(); } catch (e) { /* noop */ }
     } else if (value === "none") {
       await clearAllUsers();
     }
@@ -53,6 +57,7 @@ export default function DatasetSelectionCard() {
               <SelectItem value="Dataset4">
                 Dataset 4: Random Generated Data
               </SelectItem>
+              <SelectItem value="TaxiD">Dataset 5: TaxiD (Beijing OSM)</SelectItem>
             </SelectContent>
           </Select>
         </div>

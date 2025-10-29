@@ -1,0 +1,120 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="800" viewBox="0 0 1200 800">
+  <defs>
+    <style>
+      .bg { fill: #ffffff; }
+      .grid { stroke: #f3f4f6; stroke-width: 1; }
+      .road-major { stroke: #9ca3af; stroke-width: 8; stroke-linecap: round; }
+      .road-minor { stroke: #d1d5db; stroke-width: 3; stroke-linecap: round; }
+      .node-edge { fill: #10b981; stroke: #065f46; stroke-width: 2; }
+      .node-central { fill: #8b5cf6; stroke: #5b21b6; stroke-width: 2; }
+      .user { fill: #3b82f6; stroke: #1e40af; stroke-width: 1.5; }
+      .conn-edge { stroke: rgba(16,185,129,0.9); stroke-width: 3; stroke-dasharray: 8 4; }
+      .conn-central { stroke: rgba(99,102,241,0.9); stroke-width: 3; stroke-dasharray: 10 5; }
+      .label { font: 12px sans-serif; fill: #374151; }
+      .legend-title { font: 14px sans-serif; font-weight: bold; fill: #111827; }
+      .legend-text { font: 12px sans-serif; fill: #374151; }
+    </style>
+  </defs>
+
+  <!-- Background -->
+  <rect class="bg" x="0" y="0" width="1200" height="800"/>
+
+  <!-- Light grid -->
+  <g>
+    <!-- vertical -->
+    <g>
+      <line class="grid" x1="100" y1="0" x2="100" y2="800"/>
+      <line class="grid" x1="300" y1="0" x2="300" y2="800"/>
+      <line class="grid" x1="500" y1="0" x2="500" y2="800"/>
+      <line class="grid" x1="700" y1="0" x2="700" y2="800"/>
+      <line class="grid" x1="900" y1="0" x2="900" y2="800"/>
+      <line class="grid" x1="1100" y1="0" x2="1100" y2="800"/>
+    </g>
+    <!-- horizontal -->
+    <g>
+      <line class="grid" x1="0" y1="100" x2="1200" y2="100"/>
+      <line class="grid" x1="0" y1="300" x2="1200" y2="300"/>
+      <line class="grid" x1="0" y1="500" x2="1200" y2="500"/>
+      <line class="grid" x1="0" y1="700" x2="1200" y2="700"/>
+    </g>
+  </g>
+
+  <!-- Major roads (simplified, thicker) -->
+  <g stroke-linejoin="round">
+    <line class="road-major" x1="100" y1="250" x2="1100" y2="250"/>
+    <line class="road-major" x1="100" y1="550" x2="1100" y2="550"/>
+    <line class="road-major" x1="350" y1="100" x2="350" y2="700"/>
+    <line class="road-major" x1="850" y1="100" x2="850" y2="700"/>
+  </g>
+
+  <!-- Minor roads (thinner, lighter) -->
+  <g>
+    <line class="road-minor" x1="200" y1="400" x2="1000" y2="400"/>
+    <line class="road-minor" x1="600" y1="150" x2="600" y2="650"/>
+    <line class="road-minor" x1="250" y1="200" x2="500" y2="350"/>
+    <line class="road-minor" x1="700" y1="600" x2="1000" y2="450"/>
+  </g>
+
+  <!-- Nodes: central and edges -->
+  <g>
+    <!-- Central node -->
+    <circle class="node-central" cx="600" cy="400" r="14"/>
+    <text class="label" x="600" y="380" text-anchor="middle">central_node</text>
+
+    <!-- Edge nodes at major intersections -->
+    <circle class="node-edge" cx="350" cy="250" r="12"/>
+    <text class="label" x="350" y="230" text-anchor="middle">edge_A</text>
+
+    <circle class="node-edge" cx="850" cy="250" r="12"/>
+    <text class="label" x="850" y="230" text-anchor="middle">edge_B</text>
+
+    <circle class="node-edge" cx="350" cy="550" r="12"/>
+    <text class="label" x="350" y="570" text-anchor="middle">edge_C</text>
+
+    <circle class="node-edge" cx="850" cy="550" r="12"/>
+    <text class="label" x="850" y="570" text-anchor="middle">edge_D</text>
+  </g>
+
+  <!-- Users and connections (example) -->
+  <g>
+    <!-- Users -->
+    <circle class="user" cx="500" cy="300" r="7"/>
+    <circle class="user" cx="720" cy="460" r="7"/>
+    <circle class="user" cx="280" cy="520" r="7"/>
+    <circle class="user" cx="930" cy="240" r="7"/>
+
+    <!-- Connections: edge vs central (dashed) -->
+    <line class="conn-edge" x1="500" y1="300" x2="350" y2="250"/>
+    <line class="conn-central" x1="720" y1="460" x2="600" y2="400"/>
+    <line class="conn-edge" x1="280" y1="520" x2="350" y2="550"/>
+    <line class="conn-edge" x1="930" y1="240" x2="850" y2="250"/>
+  </g>
+
+  <!-- Legend -->
+  <g transform="translate(940, 40)">
+    <rect x="0" y="0" width="240" height="160" fill="#ffffff" stroke="#e5e7eb"/>
+    <text class="legend-title" x="16" y="26">Legend</text>
+
+    <g transform="translate(16, 44)">
+      <line class="road-major" x1="0" y1="0" x2="40" y2="0"/>
+      <text class="legend-text" x="52" y="4">Major road (kept at low zoom)</text>
+    </g>
+    <g transform="translate(16, 68)">
+      <line class="road-minor" x1="0" y1="0" x2="40" y2="0"/>
+      <text class="legend-text" x="52" y="4">Minor road (hide until closer)</text>
+    </g>
+    <g transform="translate(16, 92)">
+      <circle class="node-edge" cx="8" cy="0" r="6"/>
+      <text class="legend-text" x="24" y="4">Edge node</text>
+    </g>
+    <g transform="translate(16, 116)">
+      <circle class="node-central" cx="8" cy="0" r="6"/>
+      <text class="legend-text" x="24" y="4">Central node</text>
+    </g>
+    <g transform="translate(16, 140)">
+      <circle class="user" cx="8" cy="0" r="5"/>
+      <text class="legend-text" x="24" y="4">User</text>
+    </g>
+  </g>
+</svg>
+

@@ -41,6 +41,11 @@ def setup_logging(log_level: str = "INFO"):
     # Create formatter
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
+    # Ensure logs directory exists
+    try:
+        os.makedirs('logs', exist_ok=True)
+    except Exception:
+        pass
     # File handler
     file_handler = logging.FileHandler('logs/central_node.log')
     file_handler.setLevel(getattr(logging, log_level.upper()))

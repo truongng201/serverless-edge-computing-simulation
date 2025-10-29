@@ -59,7 +59,7 @@ out_dir/
 import os
 import re
 import math
-from typing import List, Tuple, Dict
+from typing import List, Tuple, Dict, Optional
 
 import numpy as np
 import pandas as pd
@@ -368,6 +368,13 @@ def prepare_phase_a(
     val_df_s.to_pickle(os.path.join(out_dir, 'val.pkl'))
     test_df_s.to_pickle(os.path.join(out_dir, 'test.pkl'))
     pd.to_pickle(scaler, os.path.join(out_dir, 'scaler.pkl'))
+    # save split info for reproducibility
+    split = {
+        'train_trip_ids': sorted(list(set(train_df['trip_id'].astype(str).unique()))),
+        'val_trip_ids': sorted(list(set(val_df['trip_id'].astype(str).unique()))),
+        'test_trip_ids': sorted(list(set(test_df['trip_id'].astype(str).unique()))),
+    }
+    pd.Series(split).to_json(os.path.join(out_dir, 'split.json'))
     # meta
     meta = {
         'num_taxis': int(num_taxis),
@@ -398,6 +405,11 @@ def prepare_phase_b(
     sigma_gps_m: float = 12.0,
     max_speed_kmh: float = 160.0,
     use_shortest_path: bool = False,
+    use_road_resample: bool = False,
+    beam_size: int = 10,
+    turn_penalty: float = 0.0,
+    speed_scale_mps: float = 20.0,
+    adaptive_radius: Optional[Tuple[float, float, float, float]] = None,
 ) -> None:
     """Phase B: Map-matching + on-road resampling + features/splits.
 
@@ -423,36 +435,60 @@ def prepare_phase_b(
     )
     # 3) Build candidate generator + matcher
     cand_gen = CandidateGenerator(G, radius_m=candidate_radius_m, k=k_candidates)
-    matcher = HMMMapMatcher(G, cand_gen, sigma_gps=sigma_gps_m, max_speed_kmh=max_speed_kmh,
-                            use_shortest_path=use_shortest_path)
-    # 4) Map-match per trip, then on-road resample to 60s using footpoints
-    #    We reuse _resample_trip_minutely by feeding matched x,y at original ts
+    matcher = HMMMapMatcher(
+        G,
+        cand_gen,
+        sigma_gps=sigma_gps_m,
+        max_speed_kmh=max_speed_kmh,
+        use_shortest_path=use_shortest_path,
+        beam_size=beam_size,
+        turn_penalty=turn_penalty,
+        speed_scale_mps=speed_scale_mps,
+        adaptive_radius=adaptive_radius,
+    )
+    # 4) Map-match per trip, then resample to 60s
+    #    - If use_road_resample: resample along road footpoints segment-by-segment
+    #    - Else: reuse _resample_trip_minutely by feeding matched x,y at original ts
     matched_resampled = []
+    total_obs = 0
+    total_nomatch = 0
     for trip_id, trip in raw.groupby('trip_id'):
         trip = trip.sort_values('ts')
         xs = trip['x'].tolist()
         ys = trip['y'].tolist()
         ts = trip['ts'].tolist()
         matched = matcher.match_trip(xs, ys, ts)
-        # build DataFrame with matched xy (fallback to original if None)
-        mx = []
-        my = []
-        for i, m in enumerate(matched):
-            if m is None:
-                mx.append(xs[i])
-                my.append(ys[i])
-            else:
-                fx, fy = m['foot_xy']
-                mx.append(fx)
-                my.append(fy)
-        mtrip = pd.DataFrame({
-            'taxi_id': trip['taxi_id'].iloc[0],
-            'trip_id': trip_id,
-            'ts': trip['ts'].values,
-            'x': mx,
-            'y': my,
-        })
-        sub = _resample_trip_minutely(mtrip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
+        total_obs += len(matched)
+        total_nomatch += sum(1 for m in matched if m is None)
+        if use_road_resample:
+            try:
+                from .resample.road_resample import resample_on_road
+                rdf = resample_on_road(matched, ts, dt_sec=60)
+                if not rdf.empty:
+                    rdf['taxi_id'] = trip['taxi_id'].iloc[0]
+                    rdf['trip_id'] = trip_id
+                    sub = rdf.rename(columns={'ts': 'ts', 'x': 'x', 'y': 'y'})[['taxi_id', 'trip_id', 'ts', 'x', 'y']]
+                else:
+                    sub = pd.DataFrame()
+            except Exception:
+                sub = pd.DataFrame()
+        else:
+            # build DataFrame with matched xy (fallback to original if None)
+            mx = []
+            my = []
+            for i, m in enumerate(matched):
+                if m is None:
+                    mx.append(xs[i]); my.append(ys[i])
+                else:
+                    fx, fy = m['foot_xy']; mx.append(fx); my.append(fy)
+            mtrip = pd.DataFrame({
+                'taxi_id': trip['taxi_id'].iloc[0],
+                'trip_id': trip_id,
+                'ts': trip['ts'].values,
+                'x': mx,
+                'y': my,
+            })
+            sub = _resample_trip_minutely(mtrip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
         if not sub.empty:
             matched_resampled.append(sub)
     if not matched_resampled:
@@ -479,6 +515,13 @@ def prepare_phase_b(
     val_df_s.to_pickle(os.path.join(out_dir, 'val.pkl'))
     test_df_s.to_pickle(os.path.join(out_dir, 'test.pkl'))
     pd.to_pickle(scaler, os.path.join(out_dir, 'scaler.pkl'))
+    # save split info for reproducibility
+    split = {
+        'train_trip_ids': sorted(list(set(train_df['trip_id'].astype(str).unique()))),
+        'val_trip_ids': sorted(list(set(val_df['trip_id'].astype(str).unique()))),
+        'test_trip_ids': sorted(list(set(test_df['trip_id'].astype(str).unique()))),
+    }
+    pd.Series(split).to_json(os.path.join(out_dir, 'split.json'))
     meta = {
         'num_taxis': int(num_taxis),
         'phase': 'B',
@@ -491,6 +534,12 @@ def prepare_phase_b(
         'candidate_radius_m': float(candidate_radius_m),
         'k_candidates': int(k_candidates),
         'use_shortest_path': bool(use_shortest_path),
+        'use_road_resample': bool(use_road_resample),
+        'graph_source': 'graphml' if graphml else ('xml' if xml else ('place/bbox' if (place or bbox) else 'unknown')),
+        'beam_size': int(beam_size),
+        'turn_penalty': float(turn_penalty),
+        'speed_scale_mps': float(speed_scale_mps),
+        'adaptive_radius': list(adaptive_radius) if adaptive_radius is not None else None,
         'created': pd.Timestamp.utcnow().isoformat(),
     }
     pd.Series(meta).to_json(os.path.join(out_dir, 'meta.json'))

@@ -45,3 +45,18 @@ export const startRandomGeneratedSample = async () => {
     setLoadingData(false);
   }
 };
+
+export const startTaxiDSample = async () => {
+  const { setLoadingData, setDataError } = useGlobalState.getState();
+
+  try {
+    setLoadingData(true);
+    await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_taxid_sample`
+    );
+  } catch (error) {
+    setDataError(`Failed to start TaxiD sample: ${error.message}`);
+  } finally {
+    setLoadingData(false);
+  }
+};
