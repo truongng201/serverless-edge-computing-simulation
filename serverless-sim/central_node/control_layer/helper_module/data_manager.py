@@ -10,6 +10,10 @@ class DataManager:
         self.dact_loader = None
         self.highd_loader = None
         self.random_generated_data = None
+        self.dataset_list = {
+            "Dataset1": "DACT",
+            "Dataset2": "Random generated"
+        }
     
     def _load_dact_data(self, data_path: str = None):
         self.dact_loader = DactDataLoader(data_path)

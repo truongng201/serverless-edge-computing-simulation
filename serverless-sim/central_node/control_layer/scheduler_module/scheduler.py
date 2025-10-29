@@ -32,6 +32,7 @@ class Scheduler:
         self.simulation = False
         self.assignment_matrix = {}
         self.current_dataset = None
+        self.random_sample_size = 100
         self.current_step_id = None
 
     def start_simulation(self):
@@ -62,6 +63,12 @@ class Scheduler:
             self.assignment_algorithm = AssignmentAlgorithm(assignment_algorithm)
         except ValueError:
             raise Exception(f"Invalid assignment algorithm: {assignment_algorithm}")
+    
+    def get_random_sample_size(self):
+        return self.random_sample_size
+    
+    def set_random_sample_size(self, sample_size=100):
+        self.random_sample_size = sample_size
         
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:
