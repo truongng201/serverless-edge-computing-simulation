@@ -10,10 +10,23 @@ class DataManager:
         self.dact_loader = None
         self.highd_loader = None
         self.random_generated_data = None
-        self.dataset_list = ["dact", "random_generated"]
+        self.dataset_info = [
+            {
+               "name": "none",
+               "ui_name": "None (add user in frontend)" 
+            },
+            {
+               "name": "dact",
+               "ui_name": "DACT Sample"
+            },
+            {
+               "name": "random_generated",
+               "ui_name": "Random Generated Data"
+            },
+        ]
         
     def get_dataset_info(self):
-        return self.dataset_list
+        return self.dataset_info
     
     def _load_dact_data(self, data_path: str = None):
         self.dact_loader = DactDataLoader(data_path)

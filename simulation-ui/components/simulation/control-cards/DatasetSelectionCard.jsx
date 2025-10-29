@@ -9,12 +9,13 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { startDactSample, startRandomGeneratedSample } from "@/lib/simulation-management";
+import { startDactSample, startRandomGeneratedSample, getDatasetInfo } from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
+import { useEffect } from "react";
 
 export default function DatasetSelectionCard() {
-  const { selectedDataset, setSelectedDataset } = useGlobalState();
-
+  const { selectedDataset, setSelectedDataset, datasetInfo, setDatasetInfo } = useGlobalState();
+  console.log(datasetInfo)
   const handleDatasetChange = async (value) => {
     setSelectedDataset(value);
 
@@ -26,6 +27,10 @@ export default function DatasetSelectionCard() {
       await clearAllUsers();
     }
   };
+
+  useEffect(async () => {
+    await getDatasetInfo();
+  }, []);
 
   return (
     <Card className="mb-4">
@@ -43,11 +48,11 @@ export default function DatasetSelectionCard() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Dataset 1: None (Self adding user)</SelectItem>
-              <SelectItem value="Dataset2">Dataset 2: DACT Sample</SelectItem>
-              <SelectItem value="Dataset3">
-                Dataset 3: Random Generated Data
-              </SelectItem>
+              {datasetInfo?.dataset_list?.map((dataset) => (
+                <SelectItem key={dataset.name} value={dataset.name}>
+                  {dataset.ui_name}
+                </SelectItem>
+              ))}
             </SelectContent>
           </Select>
         </div>

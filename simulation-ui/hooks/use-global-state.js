@@ -310,15 +310,13 @@ const useGlobalState = create((set) => ({
         : updater
     })),
 
-  // Simulation data
-  simulationData: null,
-  setSimulationData: (updater) =>
+  datasetInfo: {},
+  setDatasetInfo: (updater) =>
     set((state) => ({
-      simulationData: typeof updater === "function"
-        ? updater(state.simulationData)
+      selectedDataset: typeof updater === "function"
+        ? updater(state.selectedDataset)
         : updater
     })),
-
   
 
   // Loading and error request
