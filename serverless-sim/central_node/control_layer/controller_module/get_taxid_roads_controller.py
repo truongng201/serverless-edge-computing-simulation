@@ -1,4 +1,5 @@
 from typing import Any, Dict, List, Tuple
+import logging
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.helper_module.osm_loader import load_graph, graph_bounds_meters, edge_geometries
@@ -9,6 +10,7 @@ from config import Config
 class GetTaxiDRoadsController:
     def __init__(self, scheduler: Scheduler):
         self.scheduler = scheduler
+        self.logger = logging.getLogger(__name__)
 
     def _meters_to_pixels_transform(self, bounds: Tuple[float, float, float, float]):
         minx, miny, maxx, maxy = bounds
@@ -30,6 +32,9 @@ class GetTaxiDRoadsController:
 
     def execute(self) -> Dict[str, Any]:
         # Load and project graph
+        self.logger.info(
+            f"TaxiD: roads request xml='{Config.TAXID_OSM_XML_PATH}' graphml='{Config.TAXID_GRAPHML_PATH}'"
+        )
         G = load_graph(
             xml_path=Config.TAXID_OSM_XML_PATH,
             graphml_path=Config.TAXID_GRAPHML_PATH,
@@ -41,12 +46,15 @@ class GetTaxiDRoadsController:
         # Prepare simplified road polylines
         roads: List[List[List[float]]] = []
         allowed = {"motorway", "trunk", "primary", "secondary", "tertiary", "residential", "unclassified"}
+        count_edges = 0
         for coords, data in edge_geometries(G):
             hwy = data.get("highway")
             hwys = set(hwy if isinstance(hwy, list) else [hwy]) if hwy else set()
             if not hwys or hwys & allowed:
                 poly_px = [list(to_px(x, y)) for x, y in coords]
                 roads.append(poly_px)
+                count_edges += 1
+        self.logger.info(f"TaxiD: prepared {count_edges} road polylines for UI")
 
         return {
             "bounds": bounds_px,
@@ -54,4 +62,3 @@ class GetTaxiDRoadsController:
             "pixel_per_meter": 1.0 / Config.DEFAULT_PIXEL_TO_METERS,
             "roads": roads,
         }
-

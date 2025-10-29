@@ -124,3 +124,7 @@ class CentralCoreController:
     def get_taxid_roads(self):
         controller = GetTaxiDRoadsController(self.scheduler)
         return controller.execute()
+
+    def get_taxid_roads_preprocessed(self):
+        controller = GetTaxiDRoadsPreprocessedController(self.scheduler)
+        return controller.execute()

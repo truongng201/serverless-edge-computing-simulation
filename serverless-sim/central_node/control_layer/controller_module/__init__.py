@@ -21,3 +21,4 @@ from .get_all_assignment_algorithms_controller import GetAllAssignmentAlgorithms
 from .get_performance_metrics_controller import GetPerformanceMetricsController
 from .start_taxid_sample_controller import StartTaxiDSampleController
 from .get_taxid_roads_controller import GetTaxiDRoadsController
+from .get_taxid_roads_preprocessed_controller import GetTaxiDRoadsPreprocessedController
