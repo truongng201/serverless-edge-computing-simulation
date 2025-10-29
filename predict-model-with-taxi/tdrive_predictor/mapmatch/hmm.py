@@ -12,6 +12,8 @@ Implements:
 from typing import List, Tuple, Optional, Any, Dict
 
 import math
+import pandas as pd
+from functools import lru_cache
 
 try:
     import networkx as nx
@@ -64,14 +66,15 @@ class CandidateGenerator:
         self._edge_len = edge_len
         self._geoms = geoms
 
-    def query(self, x: float, y: float) -> List[Dict[str, Any]]:
+    def query(self, x: float, y: float, radius_override: Optional[float] = None) -> List[Dict[str, Any]]:
         """Return up to K candidates: dicts with edge, dist, s, foot (x,y).
 
         We first get rough candidates by querying the bounding box of a radius
         buffer, then compute exact distances and return the best K within radius.
         """
         p = Point(float(x), float(y))
-        env = p.buffer(self.radius_m).envelope
+        rad = float(radius_override) if radius_override is not None else self.radius_m
+        env = p.buffer(rad).envelope
         rough = self._tree.query(env)
         cands: List[Tuple[float, int]] = []  # (distance, idx)
         for geom in rough:
@@ -79,7 +82,7 @@ class CandidateGenerator:
             if idx is None:
                 continue
             d = geom.distance(p)
-            if d <= self.radius_m:
+            if d <= rad:
                 cands.append((d, idx))
         if not cands:
             return []
@@ -109,22 +112,91 @@ class CandidateGenerator:
     def edge_endpoints(self, edge: Tuple[int, int, int]) -> Tuple[int, int]:
         return (edge[0], edge[1])
 
+    def _edge_geom(self, edge: Tuple[int, int, int]) -> LineString:
+        try:
+            u, v, key = edge
+            data = self.graph.get_edge_data(u, v, key)
+            geom = data.get('geometry', None)
+            if geom is None:
+                ux = self.graph.nodes[u]['x']; uy = self.graph.nodes[u]['y']
+                vx = self.graph.nodes[v]['x']; vy = self.graph.nodes[v]['y']
+                geom = LineString([(ux, uy), (vx, vy)])
+            return geom
+        except Exception:
+            # fallback straight line
+            u, v, _ = edge
+            ux = self.graph.nodes[u].get('x'); uy = self.graph.nodes[u].get('y')
+            vx = self.graph.nodes[v].get('x'); vy = self.graph.nodes[v].get('y')
+            return LineString([(ux, uy), (vx, vy)])
+
+    def tangent_heading(self, edge: Tuple[int, int, int], s: float, eps: float = 1.0) -> Optional[float]:
+        """Approximate local tangent heading (radians) at curvilinear s along edge."""
+        try:
+            geom = self._edge_geom(edge)
+            s0 = max(0.0, min(float(s), float(geom.length)))
+            s1 = min(geom.length, s0 + eps)
+            s2 = max(0.0, s0 - eps)
+            p1 = geom.interpolate(s2)
+            p2 = geom.interpolate(s1)
+            dx = float(p2.x - p1.x); dy = float(p2.y - p1.y)
+            if dx == 0.0 and dy == 0.0:
+                return None
+            return math.atan2(dy, dx)
+        except Exception:
+            return None
+
+    def neighbor_edges(self, edge: Tuple[int, int, int]) -> List[Tuple[int, int, int]]:
+        """Edges sharing endpoints with given edge (topological neighbors)."""
+        try:
+            u, v, _ = edge
+            neigh = []
+            for uu, vv, k in self.graph.out_edges(u, keys=True):
+                neigh.append((uu, vv, k))
+            for uu, vv, k in self.graph.out_edges(v, keys=True):
+                neigh.append((uu, vv, k))
+            for uu, vv, k in self.graph.in_edges(u, keys=True):
+                neigh.append((uu, vv, k))
+            for uu, vv, k in self.graph.in_edges(v, keys=True):
+                neigh.append((uu, vv, k))
+            # include the same edge itself
+            neigh.append(edge)
+            # dedup
+            seen = set(); out = []
+            for e in neigh:
+                if e not in seen:
+                    seen.add(e); out.append(e)
+            return out
+        except Exception:
+            return [edge]
+
 
 class HMMMapMatcher:
     """Hidden Markov Model map-matcher with Viterbi decoding (initial version)."""
 
     def __init__(self, graph: Any, cand_gen: CandidateGenerator, sigma_gps: float = 10.0,
                  max_speed_kmh: float = 160.0, speed_scale_mps: float = 20.0,
-                 use_shortest_path: bool = False):
+                 use_shortest_path: bool = False, beam_size: int = 10,
+                 turn_penalty: float = 0.0,
+                 adaptive_radius: Optional[Tuple[float, float, float, float]] = None):
         self.graph = graph
         self.cand_gen = cand_gen
         self.sigma_gps = float(sigma_gps)
         self.max_speed_mps = float(max_speed_kmh) / 3.6
         self.speed_scale_mps = float(speed_scale_mps)
         self.use_shortest_path = bool(use_shortest_path)
+        self.beam_size = int(beam_size)
+        self.turn_penalty = float(turn_penalty)
+        self.adaptive_radius = adaptive_radius  # (a,b,min_r,max_r) or None
 
     def _emission_logp(self, d: float) -> float:
         return - (d * d) / (2.0 * self.sigma_gps * self.sigma_gps + 1e-9)
+
+    @lru_cache(maxsize=100000)
+    def _sp_length(self, ni: int, nj: int) -> float:
+        try:
+            return nx.shortest_path_length(self.graph, ni, nj, weight='length')
+        except Exception:
+            return float('inf')
 
     def _path_length(self, prev: Dict[str, Any], curr: Dict[str, Any]) -> float:
         # Same edge: along-edge distance
@@ -153,10 +225,7 @@ class HMMMapMatcher:
         best = float('inf')
         for di, ni in tails:
             for dj, nj in heads:
-                try:
-                    sp = nx.shortest_path_length(self.graph, ni, nj, weight='length')
-                except Exception:
-                    sp = float('inf')
+                sp = self._sp_length(ni, nj)
                 total = di + sp + dj
                 if total < best:
                     best = total
@@ -169,8 +238,26 @@ class HMMMapMatcher:
         """
         T = len(xs)
         cand_list: List[List[Dict[str, Any]]] = []
+        # precompute speeds for adaptive radius (if enabled)
+        speeds = [0.0]
+        for i in range(1, T):
+            try:
+                dt = pd.Timedelta(pd.Timestamp(ts[i]) - pd.Timestamp(ts[i - 1])).total_seconds()
+            except Exception:
+                dt = 60.0
+            dx = float(xs[i] - xs[i - 1]); dy = float(ys[i] - ys[i - 1])
+            v = math.hypot(dx, dy) / max(1.0, dt)
+            speeds.append(v)
         for i in range(T):
-            cands = self.cand_gen.query(xs[i], ys[i])
+            rad = None
+            if self.adaptive_radius is not None:
+                a, b, rmin, rmax = self.adaptive_radius
+                rad = max(rmin, min(rmax, a + b * speeds[i]))
+            cands = self.cand_gen.query(xs[i], ys[i], radius_override=rad)
+            # attach heading
+            for c in cands:
+                hd = self.cand_gen.tangent_heading(c['edge'], c['s'])
+                c['heading'] = hd
             cand_list.append(cands)
         if not any(cand_list):
             return [None] * T
@@ -198,22 +285,32 @@ class HMMMapMatcher:
                     for k in range(Kt):
                         dp[t][k] = em[k]
                 else:
-                    dt = (ts[t] - ts[t - 1]).total_seconds() if hasattr(ts[t], 'to_pydatetime') or hasattr(ts[t], 'timestamp') else float(ts[t] - ts[t - 1]).total_seconds()
-                    if not isinstance(dt, float):
-                        try:
-                            dt = float(dt)
-                        except Exception:
-                            dt = 60.0
+                    # robust dt in seconds for pandas/py datetime-like
+                    try:
+                        dt = pd.Timedelta(pd.Timestamp(ts[t]) - pd.Timestamp(ts[t - 1])).total_seconds()
+                    except Exception:
+                        dt = 60.0
+                    # beam pruning: consider only top B prev
+                    B = max(1, self.beam_size)
+                    prev_scores = dp[t - 1]
+                    beam_prev = sorted(range(Kp), key=lambda i: prev_scores[i], reverse=True)[:B]
                     for k in range(Kt):
                         best = float('-inf')
                         best_i = None
-                        for i in range(Kp):
+                        for i in beam_prev:
                             L = self._path_length(prev_cands[i], cands[k])
                             if not math.isfinite(L):
                                 continue
                             if L > self.max_speed_mps * max(1.0, dt) * 1.5:  # feasibility with margin
                                 continue
                             log_trans = - L / (self.speed_scale_mps * max(1.0, dt))
+                            # turn penalty
+                            if self.turn_penalty > 0.0:
+                                h1 = prev_cands[i].get('heading')
+                                h2 = cands[k].get('heading')
+                                if h1 is not None and h2 is not None:
+                                    dhead = ((h2 - h1 + math.pi) % (2 * math.pi)) - math.pi
+                                    log_trans -= self.turn_penalty * abs(dhead)
                             score = dp[t - 1][i] + log_trans + em[k]
                             if score > best:
                                 best = score

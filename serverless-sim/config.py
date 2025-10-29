@@ -94,3 +94,29 @@ class Config:
     
     # User
     DEFAULT_USER_MEMORY_DEMAND = 134217728 # 128 MB
+
+    # TaxiD (Beijing OSM) scenario
+    # Path to the OSM XML for Beijing bounding box used by TaxiD scenario
+    TAXID_OSM_XML_PATH = os.getenv(
+        "TAXID_OSM_XML_PATH",
+        os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "predict-model-with-taxi",
+            "planet_116.127,39.756_116.813,40.084.osm",
+            "planet_116.127,39.756_116.813,40.084.osm",
+        ),
+    )
+    # Optional GraphML cache (speeds up repeated loads if present)
+    TAXID_GRAPHML_PATH = os.getenv(
+        "TAXID_GRAPHML_PATH",
+        os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "predict-model-with-taxi",
+            "osm",
+            "beijing_taxid.graphml",
+        ),
+    )
+    # Initial viewport for mapping meters->pixels (used for road rendering)
+    TAXID_VIEWPORT_WIDTH_PX = int(os.getenv("TAXID_VIEWPORT_WIDTH_PX", "1800"))
+    TAXID_VIEWPORT_HEIGHT_PX = int(os.getenv("TAXID_VIEWPORT_HEIGHT_PX", "1200"))
+    TAXID_VIEWPORT_MARGIN_PX = int(os.getenv("TAXID_VIEWPORT_MARGIN_PX", "80"))

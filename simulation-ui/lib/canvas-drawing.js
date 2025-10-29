@@ -6,6 +6,7 @@ import {
   drawUserConnections,
   drawCentralNodes,
   drawEdgeNodes,
+  drawRoads,
 } from "./draw";
 import useGlobalState from "@/hooks/use-global-state";
 
@@ -56,6 +57,19 @@ export const useCanvasDrawing = () => {
       visibleBottom,
       zoomLevel
     );
+
+    // Optional: draw roads first so nodes overlay
+    if (showRoads && roads && roads.length > 0) {
+      drawRoads(
+        ctx,
+        roads,
+        visibleLeft,
+        visibleTop,
+        visibleRight,
+        visibleBottom,
+        zoomLevel
+      );
+    }
 
     drawConnections(ctx, centralNodes, edgeNodes, zoomLevel);
 
