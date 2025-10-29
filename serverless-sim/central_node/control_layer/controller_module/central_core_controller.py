@@ -90,11 +90,6 @@ class CentralCoreController:
         controller.execute()
         return "Start using dact sample"
     
-    def start_vehicles_sample(self):
-        controller = StartVehiclesSampleController(self.data_manager, self.scheduler)
-        controller.execute()
-        return "Start using vehicles sample"
-
     def start_random_generated_sample(self):
         controller = StartRandomGeneratedSampleController(self.data_manager, self.scheduler)
         controller.execute()

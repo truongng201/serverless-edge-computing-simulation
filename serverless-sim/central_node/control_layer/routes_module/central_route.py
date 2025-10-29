@@ -130,12 +130,6 @@ def start_dact_sample():
     result = central_core_controller.start_dact_sample()
     return result
 
-@central_route.route('/start_vehicles_sample', methods=['POST'])
-@standard_response
-def start_vehicles_sample():
-    result = central_core_controller.start_vehicles_sample()
-    return result
-
 @central_route.route('/start_random_generated_sample', methods=['POST'])
 @standard_response
 def start_random_generated_sample():

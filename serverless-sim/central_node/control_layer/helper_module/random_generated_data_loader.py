@@ -52,7 +52,7 @@ class RandomGeneratedDataLoader:
         if max_speed is None:
             max_speed = Config.USER_MAX_SPEED
             
-        speed = random.uniform(min_speed, max_speed)  # m/s, slow pedestrian/vehicle speed
+        speed = random.uniform(min_speed, max_speed)
         direction = random.uniform(0, 2 * math.pi)
         
         vx = speed * math.cos(direction)
