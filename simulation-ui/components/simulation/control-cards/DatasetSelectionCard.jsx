@@ -17,10 +17,10 @@ export default function DatasetSelectionCard() {
   const { selectedDataset, setSelectedDataset, datasetInfo, setDatasetInfo } = useGlobalState();
   const [sampleSize, setSampleSize] = useState(100);
 
-  const handleDatasetChange = async (value) => {
+  const handleDatasetChange = async (value, sampleSizeOverride = null) => {
     setSelectedDataset(value);
-
-    await setDataset(value, value === "random_generated" ? sampleSize : null);
+    const effectiveSampleSize = sampleSizeOverride !== null ? sampleSizeOverride : sampleSize;
+    await setDataset(value, value === "random_generated" ? effectiveSampleSize : null);
     if (value === "none") {
       await clearAllUsers();
     }
@@ -66,10 +66,14 @@ export default function DatasetSelectionCard() {
         {selectedDataset === "random_generated" && (
           <div className="space-y-2">
             <Label className="text-xs">Sample Size</Label>
-            <Select value={sampleSize.toString()} onValueChange={(value) => {
-              setSampleSize(Number(value));
-              handleDatasetChange("random_generated");
-            }}>
+            <Select
+              value={sampleSize.toString()}
+              onValueChange={(value) => {
+                const newSampleSize = Number(value);
+                setSampleSize(newSampleSize);
+                handleDatasetChange("random_generated", newSampleSize);
+              }}
+            >
               <SelectTrigger className="h-8">
                 <SelectValue placeholder="Select a sample size" />
               </SelectTrigger>

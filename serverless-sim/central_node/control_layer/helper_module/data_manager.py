@@ -44,4 +44,6 @@ class DataManager:
     def get_random_generated_data(self, step_id, num_items = 1000) -> List[Dict[str, Any]]:
         if self.random_generated_data is None:
            self._load_random_generated_data(num_items)
+        if self.random_generated_data and self.random_generated_data.num_items != num_items:
+            self._load_random_generated_data(num_items)       
         return self.random_generated_data.get_data_by_step(step_id)

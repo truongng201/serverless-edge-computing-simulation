@@ -28,6 +28,7 @@ class SetDatasetController:
             sample_data = self.data_manager.get_dact_data_by_step(self.scheduler.current_step_id)
         elif self.dataset_name == "random_generated":
             self.scheduler.current_step_id = 1
+            print(self.sample_size)
             self.scheduler.set_random_sample_size(self.sample_size)
             sample_data = self.data_manager.get_random_generated_data(self.scheduler.current_step_id, self.sample_size)
 
@@ -66,11 +67,10 @@ class SetDatasetController:
         self.scheduler.node_assignment()
                 
     def execute(self):
+        self.scheduler.set_current_dataset(self.dataset_name)
         if self.dataset_name == "none":
             self.scheduler.clear_all_users()
             return "Dataset cleared successfully"
-        if self.dataset_name == "random_generated" and self.sample_size is not None:
-            self.scheduler.set_random_sample_size(self.sample_size)
 
         self.start_sample_data()
         return f"Dataset set to {self.dataset_name} successfully"
