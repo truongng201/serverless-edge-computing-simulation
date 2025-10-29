@@ -154,6 +154,12 @@ def get_taxid_roads():
     result = central_core_controller.get_taxid_roads()
     return result
 
+@central_route.route('/taxid/roads_preprocessed', methods=['GET'])
+@standard_response
+def get_taxid_roads_preprocessed():
+    result = central_core_controller.get_taxid_roads_preprocessed()
+    return result
+
 @central_route.route('/execute', methods=['POST'])
 @standard_response
 def execute_function():

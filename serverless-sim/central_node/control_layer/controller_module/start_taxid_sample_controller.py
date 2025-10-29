@@ -1,4 +1,5 @@
 import random
+import logging
 from typing import List, Tuple
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
@@ -14,6 +15,7 @@ class StartTaxiDSampleController:
         self.current_dataset = "taxid"
         # Clear existing users
         self.scheduler.user_nodes.clear()
+        self.logger = logging.getLogger(__name__)
 
     def _update_scheduler(self):
         self.scheduler.current_dataset = self.current_dataset
@@ -54,6 +56,9 @@ class StartTaxiDSampleController:
         self._update_scheduler()
 
         # Load graph (projected), compute bounds and transform
+        self.logger.info(
+            f"TaxiD: loading graph xml='{Config.TAXID_OSM_XML_PATH}' graphml='{Config.TAXID_GRAPHML_PATH}'"
+        )
         G = load_graph(
             xml_path=Config.TAXID_OSM_XML_PATH,
             graphml_path=Config.TAXID_GRAPHML_PATH,
@@ -79,6 +84,9 @@ class StartTaxiDSampleController:
         # Sample user spawn points along roads (meters)
         spawn_count = 40
         spawn_m = self._sample_points_on_edges(polylines_m, spawn_count)
+        self.logger.info(
+            f"TaxiD: sampled {len(spawn_m)} user points from {len(polylines_m)} road polylines"
+        )
 
         # Create users at sampled points (convert to pixels for UI/scheduler)
         for idx, (xm, ym) in enumerate(spawn_m):
@@ -113,4 +121,6 @@ class StartTaxiDSampleController:
 
         # Compute initial assignment and update latencies
         self.scheduler.node_assignment()
-
+        self.logger.info(
+            f"TaxiD: created {len(self.scheduler.user_nodes)} users; central at {self.scheduler.central_node['location']}"
+        )
