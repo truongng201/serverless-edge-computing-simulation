@@ -146,8 +146,7 @@ class ExperimentRunner:
             print(f"Failed to set dataset: {e}")
             return False
     
-    def run_simulation_workload(self, duration: int = 60) -> Dict[str, Any]:
-        """Run simulation workload for specified duration"""
+    def run_simulation_workload(self, duration: int = 300, delay_time: int = 5) -> Dict[str, Any]:
         print(f"Running simulation workload for {duration} seconds...")
         
         # Start simulation
@@ -155,16 +154,22 @@ class ExperimentRunner:
         if start_response.status_code != 200:
             print(f"Failed to start simulation: {start_response.text}")
             return {}
-        
-        # Let simulation run
-        time.sleep(duration)
-        
-        # Get performance metrics
-        metrics_response = requests.get(f"{self.api_base}/performance_metrics")
+        else:
+            print("Simulation started successfully")
         metrics = {}
-        if metrics_response.status_code == 200:
-            metrics = metrics_response.json().get('data', {})
-        
+        for timestep in range(duration // delay_time):
+            res = requests.get(f"{self.api_base}/get_all_users")
+            if res.status_code != 200:
+                print(f"Failed to update users at timestep {timestep + 1}")
+                continue
+            metrics_response = requests.get(f"{self.api_base}/performance_metrics")
+            if metrics_response.status_code == 200:
+                metrics[timestep + 1] = metrics_response.json().get('data', {}).get("total_turnaround_time", 0)
+                print(f"Timestep {timestep + 1}: Total Turnaround Time = {metrics[timestep + 1]}")
+            else:
+                print(f"Failed to get metrics at timestep {timestep + 1}: {metrics_response.text}")
+            time.sleep(delay_time)
+
         # Stop simulation
         stop_response = requests.post(f"{self.api_base}/stop_simulation")
         if stop_response.status_code != 200:
@@ -173,7 +178,7 @@ class ExperimentRunner:
         return metrics
     
     def run_single_experiment(self, num_users: int, num_edges: int, algorithm: str, 
-                            experiment_duration: int = 60) -> Dict[str, Any]:
+                            experiment_duration: int = 300) -> Dict[str, Any]:
         """Run a single experiment configuration"""
         experiment_start = time.time()
         print(f"\n{'='*60}")
@@ -195,6 +200,8 @@ class ExperimentRunner:
         if not self.set_dataset(num_users):
             return {"error": f"Failed to set dataset random_generated for {num_users} users"}
         
+        metrics = self.run_simulation_workload(duration=experiment_duration)
+        
         experiment_time = time.time() - experiment_start
         
         result = {
@@ -204,8 +211,8 @@ class ExperimentRunner:
             "algorithm": algorithm,
             "experiment_duration": experiment_duration,
             "total_experiment_time": experiment_time,
-            # "metrics": metrics,
-            # "success": bool(metrics and "error" not in metrics)
+            "metrics": metrics,
+            "success": True if metrics and len(metrics) > 0 else False
         }
         
         print(f"Experiment completed in {experiment_time:.2f} seconds")
@@ -248,13 +255,13 @@ class ExperimentRunner:
         
         print(f"Results saved to {filename}")
     
-    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 600):
+    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 300):
         if not user_ranges:
-            user_ranges = [100, 200, 300, 400, 500]
+            user_ranges = [100]
         if not edge_ranges:
-            edge_ranges = [40, 50]
+            edge_ranges = [10]
         if not algorithms:
-            algorithms = ["greedy", "convex optimization"]
+            algorithms = ["greedy"]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():
@@ -262,7 +269,6 @@ class ExperimentRunner:
             return
         
         total_experiments = len(user_ranges) * len(edge_ranges) * len(algorithms)
-        experiment_count = 0
         
         print(f"Starting comprehensive experiments...")
         print(f"User ranges: {user_ranges}")
@@ -277,15 +283,12 @@ class ExperimentRunner:
                 continue
             for num_users in user_ranges:
                 for algorithm in algorithms:
-                    experiment_count += 1
-                    
                     try:
                         result = self.run_single_experiment(
                             num_users, num_edges, algorithm, experiment_duration
                         )
-                        # self.results.append(result)
-                        # if experiment_count % 5 == 0:  # Save every 5 experiments
-                        #     self.save_results_to_csv()
+                        self.results.append(result)
+                        
                         
                     except Exception as e:
                         print(f"Experiment failed: {e}")
@@ -299,6 +302,7 @@ class ExperimentRunner:
                         })
                     
                     time.sleep(5)
+            self.save_results_to_csv()
             res = requests.post(f"{self.api_base}/reset_simulation")
         
             if res.status_code != 200:
@@ -309,7 +313,6 @@ class ExperimentRunner:
         
         total_time = time.time() - start_time
         print(f"\nAll experiments completed in {total_time:.2f} seconds")
-        # self.save_results_to_csv()
         successful = sum(1 for r in self.results if r.get('success', False))
         print(f"Experiment Summary: {successful}/{total_experiments} successful")
 

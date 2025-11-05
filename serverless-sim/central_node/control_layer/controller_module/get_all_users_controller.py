@@ -54,19 +54,15 @@ class GetAllUsersController:
                 )
             else:
                 location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
-                nearest_node_id, nearest_distance = self.assignment_matrix.get(user_id, (None, None))
-                # data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
-                # bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
                 bandwidth = Config.DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND
-                propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
                 transmission_delay = data_size / bandwidth
-                total_turnaround_time = propagation_delay + transmission_delay
+                total_turnaround_time = 0 + transmission_delay
                 latency = Latency(
-                    distance=nearest_distance,
+                    distance=0,
                     data_size=data_size,
                     bandwidth=bandwidth,
-                    propagation_delay=propagation_delay,
+                    propagation_delay=0,
                     transmission_delay=transmission_delay,
                     computation_delay=0.0,
                     container_status="unknown",
@@ -74,7 +70,7 @@ class GetAllUsersController:
                 )
                 user_node = UserNodeInfo(
                     user_id=user_id,
-                    assigned_node_id=nearest_node_id,
+                    assigned_node_id=None,
                     location=location,
                     last_executed=0,
                     size=item.get("size", 10),
@@ -106,11 +102,10 @@ class GetAllUsersController:
             sample_data = self.data_manager.get_random_generated_data(self.current_step_id)
             if not sample_data:
                 return False
-        
-        for item in sample_data:
+
+        for item in sample_data.get("items", []):
             user_id = f"user_{item.get('id', 0)}"
             location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
-            
             if user_id in self.scheduler.user_nodes:
                 # Update existing user via scheduler helper (updates last_updated & history)
                 self.scheduler.update_user_node(user_id, location)
@@ -124,19 +119,16 @@ class GetAllUsersController:
                     + getattr(user_node.latency, 'computation_delay', 0)
                 )
             else:
-                # Create new user node
-                nearest_node_id, nearest_distance = self.assignment_matrix.get(user_id, (None, None))
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
                 bandwidth = Config.DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND
-                propagation_delay = nearest_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000  # Convert to ms
                 transmission_delay = data_size / bandwidth
-                total_turnaround_time = propagation_delay + transmission_delay
+                total_turnaround_time = transmission_delay
                 
                 latency = Latency(
-                    distance=nearest_distance,
+                    distance=0,
                     data_size=data_size,
                     bandwidth=bandwidth,
-                    propagation_delay=propagation_delay,
+                    propagation_delay=0,
                     transmission_delay=transmission_delay,
                     computation_delay=0.0,
                     container_status="unknown",
@@ -145,7 +137,7 @@ class GetAllUsersController:
                 
                 user_node = UserNodeInfo(
                     user_id=user_id,
-                    assigned_node_id=nearest_node_id,
+                    assigned_node_id=None,
                     location=location,
                     last_executed=0,
                     size=random.randint(5, 15),  # Random size between 5-15
@@ -171,6 +163,7 @@ class GetAllUsersController:
         self.response = []
         if self.current_dataset == "dact":
             self._update_dact_sample()
+            self.scheduler.node_assignment()
         elif self.current_dataset == "random_generated":
             self._update_random_generated_sample()
             self.scheduler.node_assignment()
