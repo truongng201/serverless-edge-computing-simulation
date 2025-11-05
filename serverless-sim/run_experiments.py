@@ -89,7 +89,7 @@ class ExperimentRunner:
                 self.edge_processes.append(process)
             
             print("Waiting for edge nodes to register...")
-            time.sleep(5)
+            time.sleep(num_edges * 2 // 10)  # Wait time proportional to number of edges
             
             response = requests.get(f"{self.api_base}/cluster/status")
             if response.status_code == 200:
@@ -130,6 +130,21 @@ class ExperimentRunner:
         except Exception as e:
             print(f"Failed to set assignment algorithm: {e}")
             return False
+
+    def set_dataset(self, num_users: int) -> bool:
+        dataset_name = 'random_generated'
+        try:
+            print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
+            payload = {"dataset_name": dataset_name, "sample_size": int(num_users)}
+            response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=10)
+            if response.status_code == 200:
+                return True
+            else:
+                print(f"Failed to set dataset: {response.status_code} {response.text}")
+                return False
+        except Exception as e:
+            print(f"Failed to set dataset: {e}")
+            return False
     
     def run_simulation_workload(self, duration: int = 60) -> Dict[str, Any]:
         """Run simulation workload for specified duration"""
@@ -165,15 +180,20 @@ class ExperimentRunner:
         print(f"EXPERIMENT: {num_users} users, {num_edges} edges, {algorithm} algorithm")
         print(f"{'='*60}")
         
-        requests.post(f"{self.api_base}/reset_simulation")
+        res = requests.post(f"{self.api_base}/reset_simulation")
+        
+        if res.status_code != 200:
+            return {"error": "Failed to reset simulation"}
+        else:
+            print("Simulation reset successfully")
         time.sleep(2)
         
         # Set algorithm
         if not self.set_assignment_algorithm(algorithm):
             return {"error": f"Failed to set algorithm to {algorithm}"}
         
-        # # Run workload and collect metrics
-        # metrics = self.run_simulation_workload(experiment_duration)
+        if not self.set_dataset(num_users):
+            return {"error": f"Failed to set dataset random_generated for {num_users} users"}
         
         experiment_time = time.time() - experiment_start
         
@@ -230,9 +250,9 @@ class ExperimentRunner:
     
     def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 600):
         if not user_ranges:
-            user_ranges = [100]
+            user_ranges = [100, 200, 300, 400, 500]
         if not edge_ranges:
-            edge_ranges = [10, 20]
+            edge_ranges = [40, 50]
         if not algorithms:
             algorithms = ["greedy", "convex optimization"]
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -279,6 +299,12 @@ class ExperimentRunner:
                         })
                     
                     time.sleep(5)
+            res = requests.post(f"{self.api_base}/reset_simulation")
+        
+            if res.status_code != 200:
+                return {"error": "Failed to reset simulation"}
+            else:
+                print("Simulation reset successfully")
             self.cleanup_processes()
         
         total_time = time.time() - start_time

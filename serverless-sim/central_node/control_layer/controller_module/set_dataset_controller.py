@@ -15,7 +15,7 @@ class SetDatasetController:
         self._validate()
 
     def _validate(self):
-        if self.dataset_name not in ["none", "dact", "random_generated"]:
+        if self.dataset_name and self.dataset_name not in ["none", "dact", "random_generated"]:
             raise ValueError(f"Dataset {self.dataset_name} is not available.")
 
         if self.sample_size is not None and (not isinstance(self.sample_size, int) or self.sample_size <= 0 or self.sample_size > 1000):
@@ -28,7 +28,6 @@ class SetDatasetController:
             sample_data = self.data_manager.get_dact_data_by_step(self.scheduler.current_step_id)
         elif self.dataset_name == "random_generated":
             self.scheduler.current_step_id = 1
-            print(self.sample_size)
             self.scheduler.set_random_sample_size(self.sample_size)
             sample_data = self.data_manager.get_random_generated_data(self.scheduler.current_step_id, self.sample_size)
 
