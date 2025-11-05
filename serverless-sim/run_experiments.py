@@ -63,7 +63,7 @@ class ExperimentRunner:
         print("Central node failed to start within timeout")
         return False
     
-    def deploy_edge_nodes(self, num_edges: int, start_port: int = 5001) -> bool:
+    def deploy_edge_nodes(self, num_edges: int, start_port: int = 5701) -> bool:
         print(f"\n{'-'*40}")
         print(f"Deploying {num_edges} edge nodes starting from port {start_port}")
         print(f"{'-'*40}")
@@ -504,11 +504,11 @@ class ExperimentRunner:
             print(f"Saved duration plot to {duration_path}")
         
     
-    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 10):
+    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 30):
         if not user_ranges:
-            user_ranges = [100, 200]
+            user_ranges = [800]
         if not edge_ranges:
-            edge_ranges = [10, 20]
+            edge_ranges = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
         if not algorithms:
             algorithms = ["greedy", "convex optimization"]
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -562,14 +562,14 @@ class ExperimentRunner:
         csv_filename = self.save_results_to_csv()
         if csv_filename:
             print("Generating plots...")
-            self.plot_comparison(csv_filename, save_path="experiment_comparison.png")
+            self.plot_comparison(csv_filename, save_path=f"experiment_comparison_{user_ranges[0]}.png")
         print(f"\nAll experiments completed in {total_time:.2f} seconds")
         successful = sum(1 for r in self.results if r.get('success', False))
         print(f"Experiment Summary: {successful}/{total_experiments} successful")
 
 
 def main():
-    central_url = "http://localhost:8000"
+    central_url = "http://localhost:8008"
     runner = ExperimentRunner(central_url=central_url)
     
     runner.run_comprehensive_experiments()

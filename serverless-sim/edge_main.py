@@ -31,7 +31,7 @@ def create_edge_node_app(node_id: str, central_node_url: str, node_port: int, ed
 
     return app
 
-def setup_logging(log_level: str = "INFO", node_id: str = "edge"):
+def setup_logging(port, log_level: str = "INFO", node_id: str = "edge"):
     """Setup logging configuration"""
     # Create logger
     logger = logging.getLogger()
@@ -44,7 +44,7 @@ def setup_logging(log_level: str = "INFO", node_id: str = "edge"):
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
     # File handler
-    file_handler = logging.FileHandler(f'logs/edge_node_{node_id}.log')
+    file_handler = logging.FileHandler(f'logs/edge_node_{node_id}_{port}.log')
     file_handler.setLevel(getattr(logging, log_level.upper()))
     file_handler.setFormatter(formatter)
     
@@ -123,7 +123,7 @@ def main():
     args = parser.parse_args()
     
     # Setup logging
-    setup_logging(args.log_level, args.node_id)
+    setup_logging(args.port, args.log_level, args.node_id)
     logger = logging.getLogger(__name__)
     
     logger.info("=" * 60)
