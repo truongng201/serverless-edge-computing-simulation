@@ -12,10 +12,10 @@ class GetAllUsersController:
         self.scheduler = scheduler
         self.data_manager = data_manager
         self.current_step_id = self.scheduler.current_step_id
-        self.current_dataset = self.scheduler.current_dataset
+        self.current_dataset = self.scheduler.get_current_dataset()
+        self.random_sample_size = self.scheduler.get_random_sample_size()
         self.simulation = self.scheduler.simulation
         self.response = []
-        self.assignment_matrix = {}
        
     def _update_scheduler(self):
         self.scheduler.current_dataset = self.current_dataset
@@ -85,21 +85,19 @@ class GetAllUsersController:
                     cold_start_penalty=0.0
                 )
                 self.scheduler.create_user_node(user_node)
-        # Advance multiple steps per tick to increase apparent speed
-        step_mul = max(1, int(getattr(Config, 'DATASET_STEP_MULTIPLIER', 1)))
-        self.current_step_id += step_mul
+        self.current_step_id += 1
         return True
     
     def _update_random_generated_sample(self):
         if not self.simulation or not self.current_step_id:
             return False
         
-        sample_data = self.data_manager.get_random_generated_data(self.current_step_id)
+        sample_data = self.data_manager.get_random_generated_data(self.current_step_id, self.random_sample_size)
 
         if not sample_data:
             # If no data, wrap back to the beginning for continuous playback
             self.current_step_id = 1
-            sample_data = self.data_manager.get_random_generated_data(self.current_step_id)
+            sample_data = self.data_manager.get_random_generated_data(self.current_step_id, self.random_sample_size)
             if not sample_data:
                 return False
 
@@ -152,10 +150,7 @@ class GetAllUsersController:
                     cold_start_penalty=0.0
                 )
                 self.scheduler.create_user_node(user_node)
-        
-        # Advance to next step for continuous simulation
-        step_mul = max(1, int(getattr(Config, 'DATASET_STEP_MULTIPLIER', 1)))
-        self.current_step_id += step_mul
+        self.current_step_id += 1
         return True
        
         
@@ -190,7 +185,6 @@ class GetAllUsersController:
 
 
     def execute(self):
-        self.assignment_matrix = self.scheduler.node_assignment()
         self._get_all_users()
         self._update_scheduler()
         return self.response

@@ -67,6 +67,7 @@ class SetDatasetController:
                 
     def execute(self):
         self.scheduler.set_current_dataset(self.dataset_name)
+        self.scheduler.set_random_sample_size(self.sample_size)
         if self.dataset_name == "none":
             self.scheduler.clear_all_users()
             return "Dataset cleared successfully"

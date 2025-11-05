@@ -7,6 +7,9 @@ import signal
 import sys
 from datetime import datetime
 from typing import Dict, Any
+from collections import OrderedDict, defaultdict
+import matplotlib.pyplot as plt
+import math
 
 
 
@@ -146,7 +149,7 @@ class ExperimentRunner:
             print(f"Failed to set dataset: {e}")
             return False
     
-    def run_simulation_workload(self, duration: int = 300, delay_time: int = 5) -> Dict[str, Any]:
+    def run_simulation_workload(self, duration: int = 50, delay_time: int = 1) -> Dict[str, Any]:
         print(f"Running simulation workload for {duration} seconds...")
         
         # Start simulation
@@ -219,49 +222,295 @@ class ExperimentRunner:
         return result
     
     def save_results_to_csv(self, filename: str = None):
-        """Save experiment results to CSV file"""
+        """Save experiment results to CSV with one row per metric timestep.
+
+        Output columns:
+          timestamp, num_users, num_edges, algorithm, experiment_duration,
+          total_experiment_time, timestep, metric, success
+        """
+        import json
+
         if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"experiment_results_{timestamp}.csv"
-        
+
         print(f"Saving results to {filename}")
-        
-        with open(filename, 'w', newline='') as csvfile:
-            if not self.results:
-                print("No results to save")
-                return
-            
-            # Get all possible field names
-            fieldnames = set()
-            for result in self.results:
-                fieldnames.update(result.keys())
-                if 'metrics' in result and isinstance(result['metrics'], dict):
-                    for metric_key in result['metrics'].keys():
-                        fieldnames.add(f"metric_{metric_key}")
-            
-            fieldnames = sorted(list(fieldnames))
-            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
-            writer.writeheader()
-            
-            for result in self.results:
-                # Flatten metrics
-                row = result.copy()
-                if 'metrics' in row and isinstance(row['metrics'], dict):
-                    for metric_key, metric_value in row['metrics'].items():
-                        row[f"metric_{metric_key}"] = metric_value
-                    del row['metrics']
-                
-                writer.writerow(row)
-        
-        print(f"Results saved to {filename}")
+        if not self.results:
+            print("No results to save")
+            return
+
+        fieldnames = [
+            "num_users",
+            "num_edges",
+            "algorithm",
+            "experiment_duration",
+            "total_experiment_time",
+            "timestep",
+            "total_turnaround_time",
+        ]
+
+        try:
+            with open(filename, "w", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+
+                for result in self.results:
+                    base_row = {
+                        "num_users": result.get("num_users", ""),
+                        "num_edges": result.get("num_edges", ""),
+                        "algorithm": result.get("algorithm", ""),
+                        "experiment_duration": result.get("experiment_duration", ""),
+                        "total_experiment_time": result.get("total_experiment_time", ""),
+                    }
+
+                    metrics = result.get("metrics")
+                    # If metrics is a dict with per-timestep values, write one row per timestep
+                    if isinstance(metrics, dict) and metrics:
+                        # Sort keys numerically when possible
+                        def key_to_int(k):
+                            try:
+                                return int(k)
+                            except Exception:
+                                return k
+                        for k, v in sorted(metrics.items(), key=lambda kv: key_to_int(kv[0])):
+                            try:
+                                timestep = int(k)
+                            except Exception:
+                                timestep = k
+                            row = dict(base_row)
+                            row["timestep"] = timestep
+                            row["total_turnaround_time"] = v
+                            writer.writerow(row)
+                    else:
+                        row = dict(base_row)
+                        row["timestep"] = ""
+                        try:
+                            row["total_turnaround_time"] = json.dumps(metrics) if metrics is not None else ""
+                        except Exception:
+                            row["total_turnaround_time"] = str(metrics)
+                        writer.writerow(row)
+
+            print(f"Results saved to {filename}")
+        except Exception as e:
+            print(f"Failed to save results to CSV: {e}")
+        return filename
     
-    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 300):
+    def load_results_from_csv(self, filename: str):
+        """Load the CSV produced by save_results_to_csv into structured dict:
+        data[(num_users,num_edges)][algorithm] = OrderedDict[timestep] = value
+        """
+        data = defaultdict(lambda: defaultdict(OrderedDict))
+        try:
+            with open(filename, newline='') as f:
+                reader = csv.DictReader(f)
+                for r in reader:
+                    try:
+                        num_users = int(r.get("num_users") or 0)
+                        num_edges = int(r.get("num_edges") or 0)
+                        alg = r.get("algorithm", "").strip()
+                        t = r.get("timestep", "")
+                        if t == "":
+                            continue
+                        timestep = int(t)
+                        val = r.get("total_turnaround_time", "")
+                        if val == "":
+                            continue
+                        value = float(val)
+                    except Exception:
+                        continue
+                    combo = (num_users, num_edges)
+                    data[combo][alg][timestep] = value
+        except Exception as e:
+            print(f"Failed to load CSV {filename}: {e}")
+            return {}
+        # ensure ordered timesteps
+        for combo in list(data.keys()):
+            for alg in list(data[combo].keys()):
+                data[combo][alg] = OrderedDict(sorted(data[combo][alg].items(), key=lambda kv: kv[0]))
+        return data
+    
+    def plot_comparison(self, csv_filename: str = None, save_path: str = None, show: bool = True):
+        """Plot algorithm comparison in two separate figures with better zoom"""
+        if csv_filename is None:
+            import glob
+            csv_files = glob.glob("experiment_results_*.csv")
+            if not csv_files:
+                print("No CSV files found to plot")
+                return
+            csv_filename = max(csv_files, key=os.path.getctime)
+            print(f"Using most recent CSV: {csv_filename}")
+
+        data = self.load_results_from_csv(csv_filename)
+        if not data:
+            print("No data to plot")
+            return
+
+        # Load experiment times from CSV
+        exp_times = {}  # (users, edges, algorithm) -> total_experiment_time
+        try:
+            with open(csv_filename, newline='') as f:
+                reader = csv.DictReader(f)
+                for r in reader:
+                    try:
+                        users = int(r.get("num_users", 0))
+                        edges = int(r.get("num_edges", 0))
+                        alg = r.get("algorithm", "").strip()
+                        exp_time = float(r.get("total_experiment_time", 0))
+                        exp_times[(users, edges, alg)] = exp_time
+                    except:
+                        continue
+        except:
+            pass
+
+        combos = sorted(data.keys())
+        n = len(combos)
+        cols = min(4, n)  # More columns for better layout
+        rows = math.ceil(n / cols)
+
+        # ===== FIGURE 1: TURNAROUND TIMES =====
+        plt.style.use("seaborn-v0_8-darkgrid")
+        fig1, axes1 = plt.subplots(rows, cols, figsize=(5*cols, 4*rows), squeeze=False)
+
+        for idx, combo in enumerate(combos):
+            r = idx // cols
+            c = idx % cols
+            ax = axes1[r][c]
+            
+            algs = data[combo]
+            if not algs:
+                ax.set_visible(False)
+                continue
+                
+            all_timesteps = set()
+            for alg in algs:
+                all_timesteps.update(algs[alg].keys())
+            if not all_timesteps:
+                ax.set_visible(False)
+                continue
+            all_timesteps = sorted(all_timesteps)
+            
+            # Get all values to determine proper zoom range
+            all_values = []
+            for alg, od in algs.items():
+                all_values.extend(od.values())
+            if not all_values:
+                continue
+                
+            min_val = min(all_values)
+            max_val = max(all_values)
+            
+            # Plot with thicker lines and larger markers
+            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+            for i, (alg, od) in enumerate(algs.items()):
+                xs = list(od.keys())
+                ys = list(od.values())
+                if not xs:
+                    continue
+                ax.plot(xs, ys, marker='o', linewidth=3, markersize=8, 
+                       label=alg, color=colors[i % len(colors)])
+
+            ax.set_title(f"Users={combo[0]}, Edges={combo[1]}", fontsize=14, fontweight='bold')
+            ax.set_xlabel("Timestep", fontsize=12)
+            ax.set_ylabel("Total Turnaround Time", fontsize=12)
+            ax.set_xticks(all_timesteps)
+            
+            # Better zoom: focus on the actual data range
+            if max_val > min_val:
+                range_val = max_val - min_val
+                margin = max(range_val * 0.05, abs(min_val) * 0.0001)  # At least 0.01% margin
+                ax.set_ylim(min_val - margin, max_val + margin)
+            
+            # Format y-axis with more precision
+            if min_val > 100:
+                from matplotlib.ticker import FuncFormatter
+                def format_func(x, p):
+                    return f'{x:.3f}'
+                ax.yaxis.set_major_formatter(FuncFormatter(format_func))
+            
+            ax.grid(True, alpha=0.4)
+            ax.legend(fontsize=11, loc='best')
+            ax.tick_params(axis='both', which='major', labelsize=10)
+
+        # Hide unused subplots
+        for idx in range(len(combos), rows * cols):
+            r = idx // cols
+            c = idx % cols
+            axes1[r][c].set_visible(False)
+
+        fig1.suptitle("Algorithm Performance: Total Turnaround Time Comparison", 
+                     fontsize=18, fontweight='bold')
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+        # ===== FIGURE 2: EXPERIMENT DURATION =====
+        fig2, axes2 = plt.subplots(rows, cols, figsize=(5*cols, 4*rows), squeeze=False)
+
+        for idx, combo in enumerate(combos):
+            r = idx // cols
+            c = idx % cols  
+            ax = axes2[r][c]
+            
+            # Get experiment times for this combo
+            exp_data = []
+            exp_labels = []
+            exp_colors = []
+            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
+            
+            for i, alg in enumerate(sorted(data[combo].keys()) if combo in data else []):
+                key = (combo[0], combo[1], alg)
+                if key in exp_times:
+                    exp_data.append(exp_times[key])
+                    exp_labels.append(alg)
+                    exp_colors.append(colors[i % len(colors)])
+            
+            if exp_data:
+                bars = ax.bar(exp_labels, exp_data, alpha=0.8, color=exp_colors, width=0.6)
+                ax.set_title(f"Users={combo[0]}, Edges={combo[1]}", fontsize=14, fontweight='bold')
+                ax.set_ylabel("Experiment Time (seconds)", fontsize=12)
+                ax.tick_params(axis='x', rotation=0, labelsize=11)
+                ax.tick_params(axis='y', labelsize=10)
+                
+                # Add value labels on bars with better formatting
+                for bar, val in zip(bars, exp_data):
+                    height = bar.get_height()
+                    ax.text(bar.get_x() + bar.get_width()/2., height + height*0.02,
+                          f'{val:.1f}s', ha='center', va='bottom', fontsize=11, fontweight='bold')
+                
+                # Set y-limit with some margin
+                max_time = max(exp_data)
+                ax.set_ylim(0, max_time * 1.15)
+                ax.grid(True, alpha=0.3, axis='y')
+            else:
+                ax.set_visible(False)
+
+        # Hide unused subplots  
+        for idx in range(len(combos), rows * cols):
+            r = idx // cols
+            c = idx % cols
+            axes2[r][c].set_visible(False)
+
+        fig2.suptitle("Algorithm Performance: Experiment Duration Comparison", 
+                     fontsize=18, fontweight='bold')
+        plt.tight_layout(rect=[0, 0, 1, 0.95])
+
+        # Save both figures
+        if save_path:
+            base_name = save_path.replace('.png', '')
+            turnaround_path = f"{base_name}_turnaround.png"
+            duration_path = f"{base_name}_duration.png"
+            
+            fig1.savefig(turnaround_path, dpi=300, bbox_inches='tight')
+            fig2.savefig(duration_path, dpi=300, bbox_inches='tight')
+            print(f"Saved turnaround plot to {turnaround_path}")
+            print(f"Saved duration plot to {duration_path}")
+        
+    
+    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 10):
         if not user_ranges:
-            user_ranges = [100]
+            user_ranges = [100, 200]
         if not edge_ranges:
-            edge_ranges = [10]
+            edge_ranges = [10, 20]
         if not algorithms:
-            algorithms = ["greedy"]
+            algorithms = ["greedy", "convex optimization"]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():
@@ -302,7 +551,6 @@ class ExperimentRunner:
                         })
                     
                     time.sleep(5)
-            self.save_results_to_csv()
             res = requests.post(f"{self.api_base}/reset_simulation")
         
             if res.status_code != 200:
@@ -310,8 +558,11 @@ class ExperimentRunner:
             else:
                 print("Simulation reset successfully")
             self.cleanup_processes()
-        
         total_time = time.time() - start_time
+        csv_filename = self.save_results_to_csv()
+        if csv_filename:
+            print("Generating plots...")
+            self.plot_comparison(csv_filename, save_path="experiment_comparison.png")
         print(f"\nAll experiments completed in {total_time:.2f} seconds")
         successful = sum(1 for r in self.results if r.get('success', False))
         print(f"Experiment Summary: {successful}/{total_experiments} successful")
