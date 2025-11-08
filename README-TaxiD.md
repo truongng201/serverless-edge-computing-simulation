@@ -144,3 +144,16 @@ sequenceDiagram
   BE-->>UI: roads + bounds + center
   UI->>UI: fit view + draw roads/nodes/users
 ```
+Tuyệt, bạn đã preprocess xong. Làm tiếp như sau:
+
+Trỏ backend dùng file đã tạo
+PowerShell (trong repo):
+$env:TAXID_GRAPHML_PATH = (Resolve-Path 'predict-model-with-taxi/osm/beijing_taxid.graphml').Path
+$env:TAXID_ROADS_JSON_GZ_PATH = (Resolve-Path 'predict-model-with-taxi/osm/beijing_taxid_roads.json.gz').Path
+Khởi động backend
+python serverless-sim\central_main.py --port 8000 --log-level INFO
+Kiểm tra nhanh API
+Invoke-RestMethod -Method Get http://127.0.0.1:8000/api/v1/central/taxid/roads_preprocessed
+Invoke-RestMethod -Method Post http://127.0.0.1:8000/api/v1/central/start_taxid_sample
+Invoke-RestMethod -Method Get http://127.0.0.1:8000/api/v1/central/get_all_users
+
