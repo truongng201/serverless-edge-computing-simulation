@@ -1,0 +1,19 @@
+# Core numerical stack
+numpy==1.26.4
+pandas==2.2.2
+tqdm==4.66.5
+
+# Geospatial / OSM
+pyproj==3.6.1
+shapely==2.0.4
+networkx==3.2.1
+osmnx==1.9.3
+
+# NOTE: Install PyTorch with the CUDA wheel matching your GPU/driver.
+# Do NOT install the default CPU-only torch from PyPI if you need GPU.
+# Examples:
+#   CUDA 12.1:
+#     pip install --index-url https://download.pytorch.org/whl/cu121 torch torchvision torchaudio
+#   CUDA 11.8:
+#     pip install --index-url https://download.pytorch.org/whl/cu118 torch torchvision torchaudio
+
