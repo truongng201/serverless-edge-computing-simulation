@@ -14,6 +14,7 @@ from typing import List, Tuple, Optional, Any, Dict
 import math
 import pandas as pd
 from functools import lru_cache
+import numpy as np
 
 try:
     import networkx as nx
@@ -60,8 +61,13 @@ class CandidateGenerator:
         if not geoms:
             raise ValueError("Graph has no edges with usable geometry.")
         self._tree = STRtree(geoms)
-        # mapping: geom -> index
-        self._geom_to_idx = {id(g): i for i, g in enumerate(geoms)}
+        # Robust mappings to resolve items returned by STRtree.query across Shapely versions
+        try:
+            self._wkb_to_idx = {g.wkb: i for i, g in enumerate(geoms)}
+        except Exception:
+            self._wkb_to_idx = {}
+        # Also keep id-based map as a fallback
+        self._geom_id_to_idx = {id(g): i for i, g in enumerate(geoms)}
         self._edges = edge_keys
         self._edge_len = edge_len
         self._geoms = geoms
@@ -77,11 +83,67 @@ class CandidateGenerator:
         env = p.buffer(rad).envelope
         rough = self._tree.query(env)
         cands: List[Tuple[float, int]] = []  # (distance, idx)
-        for geom in rough:
-            idx = self._geom_to_idx.get(id(geom))
-            if idx is None:
+        # Normalize rough hits into (geom, idx)
+        items: List[Tuple[LineString, int]] = []
+        # Case 1: array of indices
+        try:
+            if isinstance(rough, np.ndarray) and np.issubdtype(rough.dtype, np.integer):
+                for j in rough.tolist():
+                    jj = int(j)
+                    if 0 <= jj < len(self._geoms):
+                        items.append((self._geoms[jj], jj))
+            else:
+                raise TypeError
+        except Exception:
+            # Case 2: list of geometries or mixed
+            try:
+                iter_rough = list(rough)
+            except Exception:
+                iter_rough = []
+            for it in iter_rough:
+                if isinstance(it, (int, np.integer)):
+                    jj = int(it)
+                    if 0 <= jj < len(self._geoms):
+                        items.append((self._geoms[jj], jj))
+                    continue
+                geom = it
+                idx = None
+                # Try WKB map first
+                try:
+                    if self._wkb_to_idx:
+                        idx = self._wkb_to_idx.get(geom.wkb)
+                except Exception:
+                    idx = None
+                # Fallback to id map
+                if idx is None:
+                    idx = self._geom_id_to_idx.get(id(geom))
+                # Slowest fallback: bounds filter + equals
+                if idx is None:
+                    try:
+                        gb = geom.bounds
+                        candidates_idx = []
+                        for j, gj in enumerate(self._geoms):
+                            b = gj.bounds
+                            if not (b[2] < gb[0] or b[0] > gb[2] or b[3] < gb[1] or b[1] > gb[3]):
+                                candidates_idx.append(j)
+                        for j in candidates_idx:
+                            gj = self._geoms[j]
+                            try:
+                                if gj.equals(geom):
+                                    idx = j
+                                    break
+                            except Exception:
+                                continue
+                    except Exception:
+                        idx = None
+                if idx is not None:
+                    items.append((geom, idx))
+        # Score candidates within radius
+        for geom, idx in items:
+            try:
+                d = geom.distance(p)
+            except Exception:
                 continue
-            d = geom.distance(p)
             if d <= rad:
                 cands.append((d, idx))
         if not cands:
@@ -341,14 +403,25 @@ class HMMMapMatcher:
             if not cands:
                 t -= 1
                 continue
+            # ensure k_star is valid for current time step
+            if k_star >= len(cands) or k_star < 0:
+                # try to realign using dp[t] if available
+                if t < len(dp) and len(dp[t]) == len(cands) and len(cands) > 0:
+                    k_star = max(range(len(cands)), key=lambda k: dp[t][k])
+                else:
+                    k_star = 0
+            # guard indexing into back[t]
             matched[t] = cands[k_star]
-            prev = back[t][k_star]
+            prev = back[t][k_star] if (t < len(back) and k_star < len(back[t])) else None
             if prev is None:
                 # stop backtracking at this gap
                 t -= 1
                 # choose next best at previous t if exists
                 if t >= 0 and len(cand_list[t]) > 0:
-                    k_star = max(range(len(dp[t])), key=lambda k: dp[t][k])
+                    if t < len(dp) and len(dp[t]) == len(cand_list[t]) and len(dp[t]) > 0:
+                        k_star = max(range(len(dp[t])), key=lambda k: dp[t][k])
+                    else:
+                        k_star = 0
                 continue
             k_star = prev
             t -= 1

@@ -64,6 +64,14 @@ class SequenceHorizonDataset(Dataset):
                 if max_needed >= base + n:
                     break  # not enough future rows for the 10-minute target
                 start = end - (self.lookback - 1)
+                # quick sanity check to avoid NaN windows
+                win = self.df.iloc[start : end + 1]
+                # require finite features and positions in window and at targets
+                if not np.isfinite(win[self.feature_cols].to_numpy(dtype=np.float32)).all():
+                    continue
+                fut = self.df.iloc[[end + s for s in steps]][['x','y']].to_numpy(dtype=np.float32)
+                if not np.isfinite(fut).all():
+                    continue
                 self.examples.append((start, end))
 
     def __len__(self) -> int:
@@ -95,3 +103,109 @@ class SequenceHorizonDataset(Dataset):
         # Also return base position (x0,y0) to reconstruct absolute coords later
         base_pos = torch.tensor([x0, y0], dtype=torch.float32)
         return x_seq, y_target, base_pos
+
+
+class SequenceHorizonCurvDataset(Dataset):
+    """Curvilinear Δs targets using cumulative along-path length s_glob.
+
+    Expects df to contain per-minute columns: ['trip_id','ts','x','y','s_glob'].
+    Targets are Δs_glob for horizons [1,3,5,10] minutes ahead.
+    """
+
+    def __init__(self, df: pd.DataFrame, feature_cols: List[str], lookback: int = 20):
+        super().__init__()
+        self.df = df.sort_values(['trip_id', 'ts']).reset_index(drop=True)
+        self.feature_cols = feature_cols
+        self.lookback = int(lookback)
+        if 's_glob' not in self.df.columns:
+            raise ValueError("DataFrame missing 's_glob' for curv dataset")
+        self.examples: List[Tuple[int, int]] = []
+        for trip_id, g in self.df.groupby('trip_id'):
+            n = len(g)
+            if n < self.lookback + 10:
+                continue
+            base = g.index.min()
+            for end in range(base + self.lookback - 1, base + n):
+                steps = [1, 3, 5, 10]
+                max_needed = end + steps[-1]
+                if max_needed >= base + n:
+                    break
+                start = end - (self.lookback - 1)
+                win = self.df.iloc[start : end + 1]
+                if not np.isfinite(win[self.feature_cols].to_numpy(dtype=np.float32)).all():
+                    continue
+                self.examples.append((start, end))
+
+    def __len__(self) -> int:
+        return len(self.examples)
+
+    def __getitem__(self, idx: int):
+        start, end = self.examples[idx]
+        rows = self.df.iloc[start : end + 1]
+        x_seq = torch.tensor(rows[self.feature_cols].to_numpy(dtype=np.float32))
+        base = self.df.iloc[end]
+        x0 = float(base['x']); y0 = float(base['y'])
+        s0 = float(base['s_glob'])
+        steps = [1, 3, 5, 10]
+        targs = []  # Δs for horizons
+        for s in steps:
+            row = self.df.iloc[end + s]
+            ds = float(row['s_glob'] - s0)
+            targs.append(ds)
+        y_target = torch.tensor(np.array(targs, dtype=np.float32))  # [4]
+        base_pos = torch.tensor([x0, y0], dtype=torch.float32)
+        return x_seq, y_target, base_pos
+
+
+class SequenceStepCurvDataset(Dataset):
+    """Stepwise Δs targets for 1' decoder (10 steps).
+
+    Expects df with per-minute rows and columns: ['trip_id','ts','x','y','s_glob'].
+    Returns:
+      - x_seq [L,F]
+      - y_steps [10]: Δs for each minute from t+1..t+10
+      - base_pos [2]: (x_t, y_t)
+    """
+
+    def __init__(self, df: pd.DataFrame, feature_cols: List[str], lookback: int = 20, max_steps: int = 10):
+        super().__init__()
+        self.df = df.sort_values(['trip_id', 'ts']).reset_index(drop=True)
+        if 's_glob' not in self.df.columns:
+            raise ValueError("DataFrame missing 's_glob' for stepwise curv dataset")
+        self.feature_cols = feature_cols
+        self.lookback = int(lookback)
+        self.max_steps = int(max_steps)
+        self.examples: List[Tuple[int, int]] = []
+        for trip_id, g in self.df.groupby('trip_id'):
+            n = len(g)
+            if n < self.lookback + self.max_steps:
+                continue
+            base = g.index.min()
+            for end in range(base + self.lookback - 1, base + n):
+                max_needed = end + self.max_steps
+                if max_needed >= base + n:
+                    break
+                # window sanity: features finite; s_glob monotonic-ish
+                win = self.df.iloc[end - (self.lookback - 1): end + 1]
+                if not np.isfinite(win[self.feature_cols].to_numpy(dtype=np.float32)).all():
+                    continue
+                # step deltas finite
+                sseq = self.df.iloc[end: end + self.max_steps + 1]['s_glob'].to_numpy(dtype=np.float64)
+                ds = np.diff(sseq)
+                if not np.isfinite(ds).all():
+                    continue
+                self.examples.append((end - (self.lookback - 1), end))
+
+    def __len__(self) -> int:
+        return len(self.examples)
+
+    def __getitem__(self, idx: int):
+        start, end = self.examples[idx]
+        rows = self.df.iloc[start : end + 1]
+        x_seq = torch.tensor(rows[self.feature_cols].to_numpy(dtype=np.float32))
+        x0 = float(rows['x'].iloc[-1]); y0 = float(rows['y'].iloc[-1])
+        sseq = self.df.iloc[end: end + self.max_steps + 1]['s_glob'].to_numpy(dtype=np.float64)
+        ds = np.diff(sseq).astype(np.float32)  # length max_steps
+        y_steps = torch.tensor(ds, dtype=torch.float32)
+        base_pos = torch.tensor([x0, y0], dtype=torch.float32)
+        return x_seq, y_steps, base_pos

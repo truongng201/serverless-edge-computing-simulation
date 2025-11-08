@@ -35,3 +35,27 @@ def hit_at_r(
             hits = (dist <= radius_m).astype(np.float32).mean(axis=1)
         return float(hits.mean())
 
+
+def per_horizon_errors_m(
+    pred: torch.Tensor,  # [B, 8]
+    target: torch.Tensor,  # [B, 8]
+) -> List[float]:
+    """Return mean L2 error (meters) per horizon [1,3,5,10]."""
+    with torch.no_grad():
+        p = pred.detach().cpu().numpy().reshape(-1, 4, 2)
+        t = target.detach().cpu().numpy().reshape(-1, 4, 2)
+        dist = np.linalg.norm(p - t, axis=2)  # [B, 4]
+        return [float(dist[:, i].mean()) for i in range(4)]
+
+
+def per_horizon_hit_at_r(
+    pred: torch.Tensor,
+    target: torch.Tensor,
+    radius_m: float = 200.0,
+) -> List[float]:
+    """Return hit@R per horizon [1,3,5,10]."""
+    with torch.no_grad():
+        p = pred.detach().cpu().numpy().reshape(-1, 4, 2)
+        t = target.detach().cpu().numpy().reshape(-1, 4, 2)
+        dist = np.linalg.norm(p - t, axis=2)  # [B, 4]
+        return [float((dist[:, i] <= radius_m).mean()) for i in range(4)]

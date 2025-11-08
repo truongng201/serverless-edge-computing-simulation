@@ -59,6 +59,7 @@ out_dir/
 import os
 import re
 import math
+import time
 from typing import List, Tuple, Dict, Optional
 
 import numpy as np
@@ -97,7 +98,13 @@ def load_raw_tdrive(root: str, num_taxis: int) -> pd.DataFrame:
     """
     files = _list_taxi_files(root)[:num_taxis]
     rows = []
-    for fp in files:
+    # progress over files if tqdm available
+    try:
+        from tqdm import tqdm  # type: ignore
+        file_iter = tqdm(files, desc='[Prepare] Reading files', unit='file')
+    except Exception:
+        file_iter = files
+    for fp in file_iter:
         with open(fp, 'r', encoding='utf-8') as f:
             for line in f:
                 parts = line.strip().split(',')
@@ -327,22 +334,43 @@ def prepare_phase_a(
     """
     os.makedirs(out_dir, exist_ok=True)
     # 1) load raw
+    print(f"[Phase A] Prepare | root={tdrive_root} | num_taxis={num_taxis} | out={out_dir}", flush=True)
+    t0 = time.time()
     raw = load_raw_tdrive(tdrive_root, num_taxis=num_taxis)
+    print(f"[Phase A] Loaded rows={len(raw)} | taxis={raw['taxi_id'].nunique()}", flush=True)
     # 2) compute UTM x,y
     raw = _compute_xy(raw)
     # 3) segment trips by idle gap (configurable)
     raw = _segment_trips(raw, max_idle_gap_sec=int(max_idle_gap_min * 60))
+    print(f"[Phase A] Segmented trips={raw['trip_id'].nunique()} | max_idle_gap_min={max_idle_gap_min}", flush=True)
     # 4) filter speed outliers
     raw = _filter_speed_outliers(raw, max_speed_kmh=160.0)
     # 5) resample per trip to 60s
     resampled_parts = []
-    for trip_id, trip in raw.groupby('trip_id'):
+    # progress over trips if tqdm available
+    try:
+        from tqdm import tqdm  # type: ignore
+        n_trips = int(raw['trip_id'].nunique())
+        trip_iter = raw.groupby('trip_id')
+        pbar = tqdm(total=n_trips, desc='[Phase A] Resampling trips', unit='trip')
+        for trip_id, trip in trip_iter:
+            sub = _resample_trip_minutely(trip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
+            if not sub.empty:
+                resampled_parts.append(sub)
+            pbar.update(1)
+        pbar.close()
+    except Exception:
+        for trip_id, trip in raw.groupby('trip_id'):
+            sub = _resample_trip_minutely(trip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
+            if not sub.empty:
+                resampled_parts.append(sub)
         sub = _resample_trip_minutely(trip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
         if not sub.empty:
             resampled_parts.append(sub)
     if not resampled_parts:
         raise RuntimeError("No trips after resampling. Check filters and input size.")
     resampled = pd.concat(resampled_parts, ignore_index=True)
+    print(f"[Phase A] Resampled rows={len(resampled)}", flush=True)
     # final safety fill against any residual NaNs
     for col in ['x', 'y']:
         resampled[col] = resampled.groupby('trip_id')[col].transform(
@@ -351,8 +379,10 @@ def prepare_phase_a(
     resampled = resampled.dropna(subset=['x', 'y'])
     # 6) features
     feats = _compute_features(resampled)
+    print(f"[Phase A] Features computed | columns={len(feats.columns)}", flush=True)
     # 7) split by day
     train_df, val_df, test_df = train_val_test_split_by_day(feats)
+    print(f"[Phase A] Split sizes | train={len(train_df)} val={len(val_df)} test={len(test_df)}", flush=True)
     # 8) fit scaler on train
     feature_cols = [
         'v', 'a', 'delta_v', 'delta_heading', 'tod_sin', 'tod_cos',
@@ -387,6 +417,7 @@ def prepare_phase_a(
         'created': pd.Timestamp.utcnow().isoformat(),
     }
     pd.Series(meta).to_json(os.path.join(out_dir, 'meta.json'))
+    print(f"[Phase A] Saved artifacts to {out_dir} | elapsed={time.time()-t0:.1f}s", flush=True)
 
 
 def prepare_phase_b(
@@ -418,12 +449,15 @@ def prepare_phase_b(
     before computing features and splits.
     """
     os.makedirs(out_dir, exist_ok=True)
+    t0 = time.time()
     # 1) Load raw and project to UTM XY
     raw = load_raw_tdrive(tdrive_root, num_taxis=num_taxis)
     raw = _compute_xy(raw)
     raw = _segment_trips(raw, max_idle_gap_sec=int(max_idle_gap_min * 60))
+    print(f"[Phase B] Segmented trips={raw['trip_id'].nunique()} | max_idle_gap_min={max_idle_gap_min}", flush=True)
     raw = _filter_speed_outliers(raw, max_speed_kmh=max_speed_kmh)
     # 2) Load OSM graph (projected)
+    tG0 = time.time()
     G = load_graph(
         graphml_path=graphml,
         place=place,
@@ -433,6 +467,32 @@ def prepare_phase_b(
         overpass_timeout=overpass_timeout,
         xml_path=xml,
     )
+    gsrc = 'graphml' if graphml else ('xml' if xml else ('place/bbox' if (place or bbox) else 'unknown'))
+    print(f"[Phase B] Graph loaded | source={gsrc} | elapsed={time.time()-tG0:.1f}s", flush=True)
+    # Save graph meta
+    try:
+        import json
+        nodes = getattr(G, 'number_of_nodes', lambda: None)()
+        edges = getattr(G, 'number_of_edges', lambda: None)()
+        xs = [d.get('x') for _, d in G.nodes(data=True) if 'x' in d]
+        ys = [d.get('y') for _, d in G.nodes(data=True) if 'y' in d]
+        bbox_m = None
+        if xs and ys:
+            bbox_m = [float(min(xs)), float(min(ys)), float(max(xs)), float(max(ys))]
+        graph_meta = {
+            'crs': 'EPSG:32650',
+            'source': gsrc,
+            'place': place,
+            'bbox_param': list(bbox) if bbox is not None else None,
+            'nodes': int(nodes) if nodes is not None else None,
+            'edges': int(edges) if edges is not None else None,
+            'bbox_m': bbox_m,
+            'created': pd.Timestamp.utcnow().isoformat(),
+        }
+        with open(os.path.join(out_dir, 'graph.meta.json'), 'w', encoding='utf-8') as f:
+            json.dump(graph_meta, f)
+    except Exception:
+        pass
     # 3) Build candidate generator + matcher
     cand_gen = CandidateGenerator(G, radius_m=candidate_radius_m, k=k_candidates)
     matcher = HMMMapMatcher(
@@ -446,13 +506,23 @@ def prepare_phase_b(
         speed_scale_mps=speed_scale_mps,
         adaptive_radius=adaptive_radius,
     )
+    print(f"[Phase B] HMM params | sigma={sigma_gps_m} | radius={candidate_radius_m} | K={k_candidates} | beam={beam_size} | turn_penalty={turn_penalty} | sp={use_shortest_path} | road_resample={use_road_resample}", flush=True)
     # 4) Map-match per trip, then resample to 60s
     #    - If use_road_resample: resample along road footpoints segment-by-segment
     #    - Else: reuse _resample_trip_minutely by feeding matched x,y at original ts
     matched_resampled = []
     total_obs = 0
     total_nomatch = 0
-    for trip_id, trip in raw.groupby('trip_id'):
+    try:
+        from tqdm import tqdm  # type: ignore
+        trip_iter = tqdm(list(raw.groupby('trip_id')), desc='[Phase B] Map-matching trips', unit='trip')
+    except Exception:
+        trip_iter = raw.groupby('trip_id')
+    for item in trip_iter:
+        if isinstance(item, tuple) and len(item) == 2:
+            trip_id, trip = item
+        else:
+            trip_id, trip = item
         trip = trip.sort_values('ts')
         xs = trip['x'].tolist()
         ys = trip['y'].tolist()
@@ -463,11 +533,16 @@ def prepare_phase_b(
         if use_road_resample:
             try:
                 from .resample.road_resample import resample_on_road
-                rdf = resample_on_road(matched, ts, dt_sec=60)
+                rdf = resample_on_road(matched, ts, graph=G, dt_sec=60)
                 if not rdf.empty:
                     rdf['taxi_id'] = trip['taxi_id'].iloc[0]
                     rdf['trip_id'] = trip_id
-                    sub = rdf.rename(columns={'ts': 'ts', 'x': 'x', 'y': 'y'})[['taxi_id', 'trip_id', 'ts', 'x', 'y']]
+                    # keep edge/s/edge_len if available for downstream (Phase B)
+                    cols = ['taxi_id', 'trip_id', 'ts', 'x', 'y']
+                    for c in ['edge', 's', 'edge_len']:
+                        if c in rdf.columns:
+                            cols.append(c)
+                    sub = rdf.rename(columns={'ts': 'ts', 'x': 'x', 'y': 'y'})[cols]
                 else:
                     sub = pd.DataFrame()
             except Exception:
@@ -494,15 +569,24 @@ def prepare_phase_b(
     if not matched_resampled:
         raise RuntimeError("No trips matched/resampled. Check OSM loader and parameters.")
     resampled = pd.concat(matched_resampled, ignore_index=True)
-    # final safety fill
+    # final safety fill + enforce numeric dtype for x,y
     for col in ['x', 'y']:
+        # ensure numeric then interpolate per trip
+        resampled[col] = pd.to_numeric(resampled[col], errors='coerce')
         resampled[col] = resampled.groupby('trip_id')[col].transform(
-            lambda s: s.interpolate().ffill().bfill()
+            lambda s: pd.to_numeric(s, errors='coerce').interpolate().ffill().bfill()
         )
     resampled = resampled.dropna(subset=['x', 'y'])
+    # compute cumulative along-path length per trip (s_glob, meters)
+    resampled = resampled.sort_values(['trip_id', 'ts']).reset_index(drop=True)
+    dx = resampled.groupby('trip_id')['x'].diff().astype('float64').fillna(0.0)
+    dy = resampled.groupby('trip_id')['y'].diff().astype('float64').fillna(0.0)
+    step_len = (dx**2 + dy**2).pow(0.5)
+    resampled['s_glob'] = step_len.groupby(resampled['trip_id']).cumsum().astype('float64')
     # 5) Features, splits, scaler as Phase A
     feats = _compute_features(resampled)
     train_df, val_df, test_df = train_val_test_split_by_day(feats)
+    print(f"[Phase B] Split sizes | train={len(train_df)} val={len(val_df)} test={len(test_df)}", flush=True)
     feature_cols = [
         'v', 'a', 'delta_v', 'delta_heading', 'tod_sin', 'tod_cos',
         'dow_sin', 'dow_cos', 'rush_hour', 'stop_flag', 'dw_time'
@@ -522,6 +606,8 @@ def prepare_phase_b(
         'test_trip_ids': sorted(list(set(test_df['trip_id'].astype(str).unique()))),
     }
     pd.Series(split).to_json(os.path.join(out_dir, 'split.json'))
+    # map-matching fallback ratio (no candidate -> fallback to original xy)
+    match_fallback_ratio = float(total_nomatch) / float(total_obs) if total_obs > 0 else None
     meta = {
         'num_taxis': int(num_taxis),
         'phase': 'B',
@@ -540,6 +626,8 @@ def prepare_phase_b(
         'turn_penalty': float(turn_penalty),
         'speed_scale_mps': float(speed_scale_mps),
         'adaptive_radius': list(adaptive_radius) if adaptive_radius is not None else None,
+        'match_fallback_ratio': match_fallback_ratio,
         'created': pd.Timestamp.utcnow().isoformat(),
     }
     pd.Series(meta).to_json(os.path.join(out_dir, 'meta.json'))
+    print(f"[Phase B] Saved artifacts to {out_dir} | fallback_ratio={match_fallback_ratio if match_fallback_ratio is not None else 'n/a'} | elapsed={time.time()-t0:.1f}s", flush=True)

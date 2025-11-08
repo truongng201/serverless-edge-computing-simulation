@@ -51,11 +51,24 @@ def main():
     p_train.add_argument('--dropout', type=float, default=0.1)
     p_train.add_argument('--lr', type=float, default=1e-3)
     p_train.add_argument('--epochs', type=int, default=10)
+    p_train.add_argument('--target-scale', type=float, default=100.0, help='Scale factor for targets in loss (speeds convergence)')
+    p_train.add_argument('--mode', type=str, choices=['xy','curv','curv_step'], default='xy', help='Training target mode: Δx,Δy (xy) or Δs (curv)')
+    p_train.add_argument('--early-stop-patience', type=int, default=0,
+                         help='Early stopping patience (epochs). 0 disables early stop.')
+    p_train.add_argument('--early-stop-min-delta', type=float, default=0.0,
+                         help='Minimum improvement in val_loss to reset patience.')
+    p_train.add_argument('--device', type=str, choices=['auto','cpu','cuda'], default='auto', help='Compute device to use')
+    p_train.add_argument('--num-workers', type=int, default=0, help='DataLoader workers (use >0 to prefetch)')
+    p_train.add_argument('--no-progress', action='store_true', help='Disable tqdm progress bars for train/val')
 
     p_eval = sub.add_parser('eval', help='Evaluate GRU on test set')
     p_eval.add_argument('--data-dir', type=str, default='tdrive_predictor_artifacts/phase_a')
     p_eval.add_argument('--ckpt', type=str, default=None)
     p_eval.add_argument('--lookback', type=int, default=None)
+    p_eval.add_argument('--mode', type=str, choices=['xy','curv','curv_step'], default=None, help='Eval mode; if omitted, inferred from ckpt')
+    p_eval.add_argument('--graphml', type=str, default=None)
+    p_eval.add_argument('--place', type=str, default=None)
+    p_eval.add_argument('--bbox', type=float, nargs=4, default=None, metavar=('NORTH','SOUTH','EAST','WEST'))
 
     p_ctrv = sub.add_parser('eval-ctrv', help='Evaluate CTRV EKF baseline on test set')
     p_ctrv.add_argument('--data-dir', type=str, default='tdrive_predictor_artifacts/phase_a')
@@ -115,6 +128,8 @@ def main():
             )
     elif args.cmd == 'train':
         ckpt = train_gru(
+            early_stop_patience=args.early_stop_patience,
+            early_stop_min_delta=args.early_stop_min_delta,
             data_dir=args.data_dir,
             lookback=args.lookback,
             batch_size=args.batch_size,
@@ -123,10 +138,23 @@ def main():
             dropout=args.dropout,
             lr=args.lr,
             epochs=args.epochs,
+            device=(None if args.device == 'auto' else args.device),
+            num_workers=args.num_workers,
+            progress=(not args.no_progress),
+            target_scale=args.target_scale,
+            mode=args.mode,
         )
         print(f"Saved checkpoint: {ckpt}")
     elif args.cmd == 'eval':
-        stats = evaluate_gru(data_dir=args.data_dir, ckpt_path=args.ckpt, lookback=args.lookback)
+        stats = evaluate_gru(
+            data_dir=args.data_dir,
+            ckpt_path=args.ckpt,
+            lookback=args.lookback,
+            mode=args.mode,
+            graphml=args.graphml,
+            place=args.place,
+            bbox=tuple(args.bbox) if args.bbox is not None else None,
+        )
         print("Metrics:", stats)
     elif args.cmd == 'eval-ctrv':
         import os, pandas as pd, numpy as np

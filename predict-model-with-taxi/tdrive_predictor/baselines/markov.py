@@ -44,7 +44,7 @@ def _assign_edges(df: pd.DataFrame, cand_gen: CandidateGenerator) -> List[EdgeKe
     return edges
 
 
-def build_transitions(train_df: pd.DataFrame, cand_gen: CandidateGenerator) -> List[Dict[EdgeKey, Counter]]:
+def build_transitions(train_df: pd.DataFrame, cand_gen: CandidateGenerator, laplace: float = 0.1, enable_stay: bool = True) -> List[Dict[EdgeKey, Counter]]:
     """Build hour-conditioned transitions from per-minute train data.
 
     Returns a list of 24 dicts: trans[hour][edge_a] -> Counter(edge_b->count)
@@ -53,13 +53,18 @@ def build_transitions(train_df: pd.DataFrame, cand_gen: CandidateGenerator) -> L
     for trip_id, g in train_df.sort_values(['trip_id', 'ts']).groupby('trip_id'):
         g = g.reset_index(drop=True)
         edges = _assign_edges(g[['x', 'y']], cand_gen)
+        stop = g['stop_flag'].values if 'stop_flag' in g.columns else None
         for i in range(len(g) - 1):
             a = edges[i]
             b = edges[i + 1]
             if a[0] == -1 or b[0] == -1:
                 continue
             hour = int(g['ts'].iloc[i].hour)
-            trans[hour][a][b] += 1
+            # stay (self-loop) when stopped
+            if enable_stay and stop is not None and stop[i] == 1:
+                trans[hour][a][a] += 1
+            else:
+                trans[hour][a][b] += 1
     return trans
 
 
@@ -131,4 +136,3 @@ def eval_markov_on_split(
     if not preds:
         return np.zeros((0, 8), dtype=np.float32), np.zeros((0, 8), dtype=np.float32)
     return np.array(preds, dtype=np.float32), np.array(truths, dtype=np.float32)
-
