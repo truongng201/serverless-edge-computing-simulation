@@ -78,3 +78,5 @@ Test metrics (UTM meters): ADE ≈ 768.7; FDE ≈ 1526.9; Hit@100/200/400 ≈ 0.
 Reading: many near hits (≤100 m), but long-tail errors inflate FDE (no road constraints).
 Limitations: free-space prediction; no map-matching/snap or road semantics yet.
 Next: add CTRV baseline; Phase B HMM map-matching + per-step snap; road-aware GRU and ablations.
+
+
