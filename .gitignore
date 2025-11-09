@@ -34,9 +34,7 @@ next-env.d.ts
 
 highD-dataset-v1.0/
 random_generated.txt
-.venv/
-venv/
-__pycache__/
+
 *.pyc
 predict-model-with-taxi/tdrive_predictor_artifacts/
 .venv/

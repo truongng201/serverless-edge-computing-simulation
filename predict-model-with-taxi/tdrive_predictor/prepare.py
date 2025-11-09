@@ -60,6 +60,7 @@ import os
 import re
 import math
 import time
+import sys
 from typing import List, Tuple, Dict, Optional
 
 import numpy as np
@@ -352,7 +353,16 @@ def prepare_phase_a(
         from tqdm import tqdm  # type: ignore
         n_trips = int(raw['trip_id'].nunique())
         trip_iter = raw.groupby('trip_id')
-        pbar = tqdm(total=n_trips, desc='[Phase A] Resampling trips', unit='trip')
+        is_tty = bool(getattr(sys.stderr, 'isatty', lambda: False)())
+        pbar = tqdm(
+            total=n_trips,
+            desc='[Phase A] Resampling trips',
+            unit='trip',
+            leave=False,
+            dynamic_ncols=True,
+            mininterval=0.5,
+            disable=(not is_tty),
+        )
         for trip_id, trip in trip_iter:
             sub = _resample_trip_minutely(trip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
             if not sub.empty:
@@ -507,22 +517,53 @@ def prepare_phase_b(
         adaptive_radius=adaptive_radius,
     )
     print(f"[Phase B] HMM params | sigma={sigma_gps_m} | radius={candidate_radius_m} | K={k_candidates} | beam={beam_size} | turn_penalty={turn_penalty} | sp={use_shortest_path} | road_resample={use_road_resample}", flush=True)
-    # 4) Map-match per trip, then resample to 60s
-    #    - If use_road_resample: resample along road footpoints segment-by-segment
-    #    - Else: reuse _resample_trip_minutely by feeding matched x,y at original ts
-    matched_resampled = []
+    # 4) Map-match per trip, then resample to 60s (streaming + chunked flush)
     total_obs = 0
     total_nomatch = 0
+    tmp_dir = os.path.join(out_dir, '_tmp_chunks')
+    os.makedirs(tmp_dir, exist_ok=True)
+    chunk_size = 200
+    chunk_parts: List[pd.DataFrame] = []
+    chunk_files: List[str] = []
+
+    def _flush_chunk(parts: List[pd.DataFrame], idx: int) -> str:
+        if not parts:
+            return ''
+        dfc = pd.concat(parts, ignore_index=True)
+        for c in ['x', 'y']:
+            dfc[c] = pd.to_numeric(dfc[c], errors='coerce')
+            dfc[c] = dfc.groupby('trip_id')[c].transform(lambda s: pd.to_numeric(s, errors='coerce').interpolate().ffill().bfill())
+        dfc = dfc.dropna(subset=['x', 'y'])
+        dfc = dfc.sort_values(['trip_id', 'ts']).reset_index(drop=True)
+        dx_ = dfc.groupby('trip_id')['x'].diff().astype('float64').fillna(0.0)
+        dy_ = dfc.groupby('trip_id')['y'].diff().astype('float64').fillna(0.0)
+        step_len_ = (dx_**2 + dy_**2).pow(0.5)
+        dfc['s_glob'] = step_len_.groupby(dfc['trip_id']).cumsum().astype('float64')
+        feats_c = _compute_features(dfc)
+        fp = os.path.join(tmp_dir, f'feats_chunk_{idx:05d}.pkl')
+        feats_c.to_pickle(fp)
+        return fp
+
     try:
         from tqdm import tqdm  # type: ignore
-        trip_iter = tqdm(list(raw.groupby('trip_id')), desc='[Phase B] Map-matching trips', unit='trip')
+        n_trips = int(raw['trip_id'].nunique())
+        is_tty = bool(getattr(sys.stderr, 'isatty', lambda: False)())
+        pbar = tqdm(
+            total=n_trips,
+            desc='[Phase B] Map-matching trips',
+            unit='trip',
+            leave=False,
+            dynamic_ncols=True,
+            mininterval=0.5,
+            disable=(not is_tty),
+        )
+        iterator = raw.groupby('trip_id')
     except Exception:
-        trip_iter = raw.groupby('trip_id')
-    for item in trip_iter:
-        if isinstance(item, tuple) and len(item) == 2:
-            trip_id, trip = item
-        else:
-            trip_id, trip = item
+        pbar = None
+        iterator = raw.groupby('trip_id')
+
+    chunk_idx = 0
+    for trip_id, trip in iterator:
         trip = trip.sort_values('ts')
         xs = trip['x'].tolist()
         ys = trip['y'].tolist()
@@ -537,7 +578,6 @@ def prepare_phase_b(
                 if not rdf.empty:
                     rdf['taxi_id'] = trip['taxi_id'].iloc[0]
                     rdf['trip_id'] = trip_id
-                    # keep edge/s/edge_len if available for downstream (Phase B)
                     cols = ['taxi_id', 'trip_id', 'ts', 'x', 'y']
                     for c in ['edge', 's', 'edge_len']:
                         if c in rdf.columns:
@@ -548,7 +588,6 @@ def prepare_phase_b(
             except Exception:
                 sub = pd.DataFrame()
         else:
-            # build DataFrame with matched xy (fallback to original if None)
             mx = []
             my = []
             for i, m in enumerate(matched):
@@ -565,27 +604,52 @@ def prepare_phase_b(
             })
             sub = _resample_trip_minutely(mtrip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
         if not sub.empty:
-            matched_resampled.append(sub)
-    if not matched_resampled:
+            chunk_parts.append(sub)
+        if pbar is not None:
+            pbar.update(1)
+        if len(chunk_parts) >= chunk_size:
+            fp = _flush_chunk(chunk_parts, chunk_idx)
+            if fp:
+                chunk_files.append(fp)
+            chunk_parts.clear()
+            chunk_idx += 1
+    if chunk_parts:
+        fp = _flush_chunk(chunk_parts, chunk_idx)
+        if fp:
+            chunk_files.append(fp)
+        chunk_parts.clear()
+    if pbar is not None:
+        pbar.close()
+    if not chunk_files:
         raise RuntimeError("No trips matched/resampled. Check OSM loader and parameters.")
-    resampled = pd.concat(matched_resampled, ignore_index=True)
-    # final safety fill + enforce numeric dtype for x,y
-    for col in ['x', 'y']:
-        # ensure numeric then interpolate per trip
-        resampled[col] = pd.to_numeric(resampled[col], errors='coerce')
-        resampled[col] = resampled.groupby('trip_id')[col].transform(
-            lambda s: pd.to_numeric(s, errors='coerce').interpolate().ffill().bfill()
-        )
-    resampled = resampled.dropna(subset=['x', 'y'])
-    # compute cumulative along-path length per trip (s_glob, meters)
-    resampled = resampled.sort_values(['trip_id', 'ts']).reset_index(drop=True)
-    dx = resampled.groupby('trip_id')['x'].diff().astype('float64').fillna(0.0)
-    dy = resampled.groupby('trip_id')['y'].diff().astype('float64').fillna(0.0)
-    step_len = (dx**2 + dy**2).pow(0.5)
-    resampled['s_glob'] = step_len.groupby(resampled['trip_id']).cumsum().astype('float64')
-    # 5) Features, splits, scaler as Phase A
-    feats = _compute_features(resampled)
-    train_df, val_df, test_df = train_val_test_split_by_day(feats)
+
+    # Load feature chunks and split
+    train_parts: List[pd.DataFrame] = []
+    val_parts: List[pd.DataFrame] = []
+    test_parts: List[pd.DataFrame] = []
+    for fp in chunk_files:
+        feats_c = pd.read_pickle(fp)
+        tr_c, va_c, te_c = train_val_test_split_by_day(feats_c)
+        if not tr_c.empty: train_parts.append(tr_c)
+        if not va_c.empty: val_parts.append(va_c)
+        if not te_c.empty: test_parts.append(te_c)
+    train_df = pd.concat(train_parts, ignore_index=True) if train_parts else pd.DataFrame()
+    val_df = pd.concat(val_parts, ignore_index=True) if val_parts else pd.DataFrame()
+    test_df = pd.concat(test_parts, ignore_index=True) if test_parts else pd.DataFrame()
+    # cleanup chunks
+    try:
+        for fp in chunk_files:
+            try:
+                os.remove(fp)
+            except Exception:
+                pass
+        try:
+            os.rmdir(tmp_dir)
+        except Exception:
+            pass
+    except Exception:
+        pass
+    # 5) Features already computed per-chunk; proceed to scaler/saves
     print(f"[Phase B] Split sizes | train={len(train_df)} val={len(val_df)} test={len(test_df)}", flush=True)
     feature_cols = [
         'v', 'a', 'delta_v', 'delta_heading', 'tod_sin', 'tod_cos',
