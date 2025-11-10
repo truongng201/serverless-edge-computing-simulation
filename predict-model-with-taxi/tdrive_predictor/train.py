@@ -162,7 +162,7 @@ def train_gru(
         cur_lr = opt.param_groups[0]['lr']
         if val_loss < (best_val - float(early_stop_min_delta)):
             best_val = val_loss
-            torch.save({'model_state': model.state_dict(), 'meta': meta, 'feature_cols': feature_cols, 'lookback': lookback, 'mode': mode}, ckpt_path)
+            torch.save({'model_state': model.state_dict(), 'meta': meta, 'feature_cols': feature_cols, 'lookback': lookback, 'mode': mode, 'hidden_size': hidden_size}, ckpt_path)
             no_improve = 0
         else:
             no_improve += 1
@@ -172,5 +172,5 @@ def train_gru(
             break
     # Always save final weights to ensure ckpt exists
     if not os.path.exists(ckpt_path):
-        torch.save({'model_state': model.state_dict(), 'meta': meta, 'feature_cols': feature_cols, 'lookback': lookback, 'mode': mode}, ckpt_path)
+        torch.save({'model_state': model.state_dict(), 'meta': meta, 'feature_cols': feature_cols, 'lookback': lookback, 'mode': mode, 'hidden_size': hidden_size}, ckpt_path)
     return ckpt_path
