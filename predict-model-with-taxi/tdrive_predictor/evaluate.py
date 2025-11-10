@@ -334,7 +334,20 @@ def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, 
     from .mapmatch.hmm import CandidateGenerator
     import numpy as np
     import torch
-    model = GRUStepDecoderRoad(input_size=len(feature_cols))
+    # Infer hidden_size from checkpoint to match trained model
+    hs = None
+    try:
+        sd = ckpt['model_state']
+        w = sd.get('encoder.weight_ih_l0', None)
+        if w is not None:
+            hs = int(w.shape[0] // 3)
+        else:
+            w2 = sd.get('dec_cell.weight_ih', None)
+            if w2 is not None:
+                hs = int(w2.shape[0] // 3)
+    except Exception:
+        hs = None
+    model = GRUStepDecoderRoad(input_size=len(feature_cols), hidden_size=(hs or 256))
     model.load_state_dict(ckpt['model_state'])
     model.to(device)
     model.eval()
