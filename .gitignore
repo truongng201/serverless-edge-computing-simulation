@@ -40,3 +40,8 @@ random_generated.txt
 venv/
 __pycache__/
 *.pyc
+predict-model-with-taxi/tdrive_predictor_artifacts/
+*.pkl
+*.pt
+*.pth
+*.tar.gz
