@@ -122,7 +122,9 @@ class Scheduler:
     def update_user_node(self, user_id: str, new_location: Dict[str, float]) -> bool:
         if user_id not in self.user_nodes:
             return False
-        self.user_nodes[user_id].location = new_location
+        user = self.user_nodes[user_id]
+        user.location = new_location
+        self._append_history_point(user, new_location)
         return True
 
     def create_user_node(self, user_node: UserNodeInfo):

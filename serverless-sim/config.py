@@ -74,7 +74,8 @@ class Config:
     ASSIGNMENT_SCAN_INTERVAL = 0.5  # seconds between reassignment scans
     LOAD_AWARE_ALPHA = 1.0  # weight for CPU load in load-aware score
 
-    # Predictive scheduling parameters    TDRIVE_ARTIFACT_DIR = os.getenv(
+    # Predictive scheduling parameters
+    TDRIVE_ARTIFACT_DIR = os.getenv(
         "TDRIVE_ARTIFACT_DIR",
         os.path.join(
             os.path.dirname(os.path.dirname(__file__)),

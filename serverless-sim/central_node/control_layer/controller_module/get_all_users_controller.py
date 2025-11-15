@@ -234,16 +234,67 @@ class GetAllUsersController:
         step_mul = max(1, int(getattr(Config, 'DATASET_STEP_MULTIPLIER', 1)))
         self.current_step_id += step_mul
         return True
-       
-        
+
+    def _update_taxid_replay_sample(self):
+        """
+        Advance all TaxiD replay users by one step along their preloaded trajectories.
+
+        Trajectories are stored on scheduler.current_dataset as:
+          {
+            "name": "taxid_replay",
+            "trajectories_px": {user_id: [{"ts": ..., "x": float, "y": float}, ...]},
+            "step": int,
+          }
+        """
+        if not self.simulation:
+            return False
+        dataset = self.current_dataset
+        if not isinstance(dataset, dict) or dataset.get("name") != "taxid_replay":
+            return False
+        trajectories_px = dataset.get("trajectories_px") or {}
+        step = int(dataset.get("step", 0))
+        if not trajectories_px:
+            return False
+        max_len = 0
+        for user_id, seq in trajectories_px.items():
+            if not seq:
+                continue
+            max_len = max(max_len, len(seq))
+            idx = min(step, len(seq) - 1)
+            pt = seq[idx]
+            location = {"x": pt.get("x", 0.0), "y": pt.get("y", 0.0)}
+            if user_id in self.scheduler.user_nodes:
+                self.scheduler.update_user_node(user_id, location)
+                user_node = self.scheduler.user_nodes[user_id]
+                dist_m = getattr(user_node.latency, "distance", 0.0)
+                user_node.latency.propagation_delay = (
+                    dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                )
+                user_node.latency.total_turnaround_time = (
+                    user_node.latency.propagation_delay
+                    + getattr(user_node.latency, "transmission_delay", 0.0)
+                    + getattr(user_node.latency, "computation_delay", 0.0)
+                )
+        if max_len == 0:
+            return False
+        dataset["step"] = min(step + 1, max_len - 1)
+        self.current_dataset = dataset
+        return True
+
     def _get_all_users(self):
         self.response = []
-        if self.current_dataset == "dact":
+        dataset = self.current_dataset
+        dataset_name = dataset.get("name") if isinstance(dataset, dict) else dataset
+
+        if dataset_name == "dact":
             self._update_dact_sample()
-        elif self.current_dataset == "vehicles":
+        elif dataset_name == "vehicles":
             self._update_vehicles_sample()
-        elif self.current_dataset == "random_generated":
+        elif dataset_name == "random_generated":
             self._update_random_generated_sample()
+            self.scheduler.node_assignment()
+        elif dataset_name == "taxid_replay":
+            self._update_taxid_replay_sample()
             self.scheduler.node_assignment()
         for user_id, user_node in self.scheduler.user_nodes.items():
             assigned_edge = None

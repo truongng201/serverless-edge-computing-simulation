@@ -121,6 +121,11 @@ class CentralCoreController:
         controller.execute()
         return "Start TaxiD (Beijing OSM) sample"
 
+    def start_taxid_replay_sample(self):
+        controller = StartTaxiDReplaySampleController(self.scheduler)
+        controller.execute()
+        return "Start TaxiD replay (last1k) sample"
+
     def get_taxid_roads(self):
         controller = GetTaxiDRoadsController(self.scheduler)
         return controller.execute()

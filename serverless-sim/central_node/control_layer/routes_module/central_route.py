@@ -148,6 +148,12 @@ def start_taxid_sample():
     result = central_core_controller.start_taxid_sample()
     return result
 
+@central_route.route('/start_taxid_replay_sample', methods=['POST'])
+@standard_response
+def start_taxid_replay_sample():
+    result = central_core_controller.start_taxid_replay_sample()
+    return result
+
 @central_route.route('/taxid/roads', methods=['GET'])
 @standard_response
 def get_taxid_roads():

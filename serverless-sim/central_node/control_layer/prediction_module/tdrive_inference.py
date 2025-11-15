@@ -3,8 +3,15 @@ from __future__ import annotations
 
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
+import sys
 
 import numpy as np
+
+# Ensure the T-Drive package directory is importable when running from serverless-sim
+ROOT_DIR = Path(__file__).resolve().parents[3]
+TDRIVE_PKG_DIR = ROOT_DIR / "predict-model-with-taxi"
+if TDRIVE_PKG_DIR.exists() and str(TDRIVE_PKG_DIR) not in sys.path:  # pragma: no cover
+    sys.path.append(str(TDRIVE_PKG_DIR))
 
 try:
     from tdrive_predictor.inference_service import (
