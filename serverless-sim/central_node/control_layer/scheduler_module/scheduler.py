@@ -1,10 +1,22 @@
-import logging
+﻿import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
 import time
 from enum import Enum
 import cvxpy as cp
 import numpy as np
+import math
+from datetime import datetime
+
+try:
+    from central_node.control_layer.prediction_module.tdrive_inference import (
+        TDrivePredictorAdapter,
+        get_mobility_prediction,
+    )
+except ImportError:
+    TDrivePredictorAdapter = None  # type: ignore
+    get_mobility_prediction = None
+
 
 from config import Config
 
@@ -15,6 +27,7 @@ LARGE_CAP = 1e12
 class AssignmentAlgorithm(Enum):
     GREEDY = "greedy"
     CVX = "convex optimization"
+    PREDICTIVE = "predictive"
 
 class Scheduler:
     def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
@@ -33,6 +46,21 @@ class Scheduler:
         self.assignment_matrix = {}
         self.current_dataset = None
         self.current_step_id = None
+
+        self.history_max_points = getattr(Config, "TDRIVE_HISTORY_LENGTH", 20)
+        self.predictor_adapter = None
+        if TDrivePredictorAdapter and getattr(Config, "TDRIVE_ARTIFACT_DIR", None):
+            try:
+                self.predictor_adapter = TDrivePredictorAdapter(
+                    Config.TDRIVE_ARTIFACT_DIR,
+                    getattr(Config, "TDRIVE_CKPT_NAME", None),
+                    getattr(Config, "TDRIVE_DEVICE", "cpu"),
+                )
+            except Exception as exc:
+                self.logger.warning("Failed to initialize T-Drive predictor: %s", exc)
+        elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
+            self.logger.warning("Predictive scheduling requested but predictor is unavailable")
+
 
     def start_simulation(self):
         self.simulation = True
@@ -98,6 +126,58 @@ class Scheduler:
         return True
 
     def create_user_node(self, user_node: UserNodeInfo):
+        self.user_nodes[user_node.user_id] = user_node
+        self._append_history_point(user_node, user_node.location)
+
+    def _append_history_point(self, user_node: UserNodeInfo, location: Dict[str, float]) -> None:
+        ts = time.time()
+        record = {
+            "ts": ts,
+            "x": float(location.get("x", 0.0)),
+            "y": float(location.get("y", 0.0)),
+        }
+        prev = user_node.history[-1] if user_node.history else None
+        if prev:
+            dt = max(ts - prev.get("ts", ts), 1e-3)
+            dx = (record["x"] - prev.get("x", record["x"])) * Config.DEFAULT_PIXEL_TO_METERS
+            dy = (record["y"] - prev.get("y", record["y"])) * Config.DEFAULT_PIXEL_TO_METERS
+            dist = math.hypot(dx, dy)
+            v = dist / dt
+            prev_v = prev.get("v", 0.0)
+            record["v"] = v
+            record["delta_v"] = v - prev_v
+            record["a"] = record["delta_v"] / dt
+            heading = math.atan2(dy, dx) if dist > 1e-6 else prev.get("heading", 0.0)
+            record["heading"] = heading
+            prev_heading = prev.get("heading", heading)
+            delta_heading = ((heading - prev_heading) + math.pi) % (2 * math.pi) - math.pi
+            record["delta_heading"] = delta_heading
+            stop_flag = 1.0 if v < Config.PREDICTIVE_STOP_SPEED else 0.0
+            record["stop_flag"] = stop_flag
+            prev_dw = prev.get("dw_time", 0.0)
+            record["dw_time"] = prev_dw + dt if stop_flag else 0.0
+        else:
+            record.update({
+                "v": 0.0,
+                "delta_v": 0.0,
+                "a": 0.0,
+                "heading": 0.0,
+                "delta_heading": 0.0,
+                "stop_flag": 0.0,
+                "dw_time": 0.0,
+            })
+        dt_obj = datetime.fromtimestamp(ts)
+        sec_day = dt_obj.hour * 3600 + dt_obj.minute * 60 + dt_obj.second
+        record["tod_sin"] = math.sin(2 * math.pi * sec_day / 86400)
+        record["tod_cos"] = math.cos(2 * math.pi * sec_day / 86400)
+        dow = dt_obj.weekday()
+        record["dow_sin"] = math.sin(2 * math.pi * dow / 7)
+        record["dow_cos"] = math.cos(2 * math.pi * dow / 7)
+        record["rush_hour"] = 1.0 if dt_obj.hour in range(7, 11) or dt_obj.hour in range(17, 21) else 0.0
+        user_node.history.append(record)
+        if len(user_node.history) > self.history_max_points:
+            user_node.history = user_node.history[-self.history_max_points:]
+
         self.user_nodes[user_node.user_id] = user_node
 
     def _classify_nodes(self):
@@ -169,23 +249,90 @@ class Scheduler:
     
     def node_assignment(self) -> dict:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
-            for user_id, user_node in self.user_nodes.items():
-                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
-                user_node.assigned_node_id = assigned_node_id
-                user_node.latency.distance = assigned_node_distance
-                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-                total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
-                user_node.latency.total_turnaround_time = total_turnaround_time
-                self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
-            return self.assignment_matrix
+            return self._assign_users_greedy()
         elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
             self._convex_optimization_assignment_all_users()
-            # print("Assignment matrix after CVX:", self.assignment_matrix)
             return self.assignment_matrix
+        elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
+            return self._predictive_assignment()
         else:
             self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
             return self.assignment_matrix
-
+    def _assign_users_greedy(self) -> dict:
+        self.assignment_matrix = {}
+        for user_id, user_node in self.user_nodes.items():
+            assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+            user_node.assigned_node_id = assigned_node_id
+            user_node.latency.distance = assigned_node_distance
+            user_node.latency.propagation_delay = (
+                assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+            )
+            total_turnaround_time = (
+                user_node.latency.propagation_delay
+                + user_node.latency.transmission_delay
+                + user_node.latency.computation_delay
+            )
+            user_node.latency.total_turnaround_time = total_turnaround_time
+            self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+        return self.assignment_matrix
+    def _predictive_assignment(self) -> dict:
+        if not self.predictor_adapter or not get_mobility_prediction:
+            self.logger.warning("Predictor not available, falling back to greedy assignment")
+            return self._assign_users_greedy()
+        if not self.edge_nodes:
+            self.logger.warning("No edge nodes registered; using greedy assignment")
+            return self._assign_users_greedy()
+        user_states = []
+        for user in self.user_nodes.values():
+            if not user.history:
+                continue
+            history = user.history[-self.history_max_points :]
+            user_states.append({"user_id": user.user_id, "history": history})
+        if not user_states:
+            return self._assign_users_greedy()
+        cloudlet_records = [
+            {"id": node_id, "x": info.location["x"], "y": info.location["y"]}
+            for node_id, info in self.edge_nodes.items()
+        ]
+        try:
+            prob_map = get_mobility_prediction(user_states, cloudlet_records, self.predictor_adapter)
+        except Exception as exc:
+            self.logger.warning("Predictive inference failed: %s", exc)
+            return self._assign_users_greedy()
+        self.assignment_matrix = {}
+        for user_id, user_node in self.user_nodes.items():
+            probs = prob_map.get(user_id)
+            if probs is None:
+                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+            else:
+                horizon_idx = probs.shape[1] - 1 if probs.ndim == 2 else -1
+                order = np.argsort(probs[:, horizon_idx])[::-1]
+                assigned_node_id = None
+                for idx in order:
+                    node_id = cloudlet_records[idx]["id"]
+                    if self._check_resource_constraints(user_node, node_id):
+                        assigned_node_id = node_id
+                        break
+                if assigned_node_id is None:
+                    assigned_node_id = "central_node"
+                if assigned_node_id == "central_node":
+                    location = self.central_node["location"]
+                else:
+                    location = self.edge_nodes[assigned_node_id].location
+                assigned_node_distance = self._calculate_distance(user_node.location, location)
+            user_node.assigned_node_id = assigned_node_id
+            user_node.latency.distance = assigned_node_distance
+            user_node.latency.propagation_delay = (
+                assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+            )
+            total_turnaround_time = (
+                user_node.latency.propagation_delay
+                + user_node.latency.transmission_delay
+                + user_node.latency.computation_delay
+            )
+            user_node.latency.total_turnaround_time = total_turnaround_time
+            self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+        return self.assignment_matrix
     def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:
         if cloudlet_id == "central_node":
             return True  # Assume central node has unlimited capacity
@@ -408,3 +555,8 @@ class Scheduler:
                 )
                 user_node.latency.total_turnaround_time = total_turnaround_time
                 self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+
+
+
+
+

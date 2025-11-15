@@ -103,7 +103,7 @@ def load_raw_tdrive(root: str, num_taxis: int) -> pd.DataFrame:
     try:
         from tqdm import tqdm  # type: ignore
         file_iter = tqdm(files, desc='[Prepare] Reading files', unit='file')
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         file_iter = files
     for fp in file_iter:
         with open(fp, 'r', encoding='utf-8') as f:
@@ -369,14 +369,11 @@ def prepare_phase_a(
                 resampled_parts.append(sub)
             pbar.update(1)
         pbar.close()
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         for trip_id, trip in raw.groupby('trip_id'):
             sub = _resample_trip_minutely(trip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
             if not sub.empty:
                 resampled_parts.append(sub)
-        sub = _resample_trip_minutely(trip[['taxi_id', 'trip_id', 'ts', 'x', 'y']])
-        if not sub.empty:
-            resampled_parts.append(sub)
     if not resampled_parts:
         raise RuntimeError("No trips after resampling. Check filters and input size.")
     resampled = pd.concat(resampled_parts, ignore_index=True)
@@ -558,7 +555,7 @@ def prepare_phase_b(
             disable=(not is_tty),
         )
         iterator = raw.groupby('trip_id')
-    except Exception:
+    except (ImportError, ModuleNotFoundError):
         pbar = None
         iterator = raw.groupby('trip_id')
 

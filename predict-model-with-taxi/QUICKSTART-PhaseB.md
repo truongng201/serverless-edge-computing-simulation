@@ -300,4 +300,52 @@ Saved checkpoint: tdrive_predictor_artifacts\phase_b_sp\gru_phase_curv_step.pt
 (.venv) (base) PS C:\Users\Surface1\Documents\Serverless-edge-computing-simulation\predict-model-with-taxi> python -m tdrive_predictor.cli eval --data-dir tdrive_predictor_artifacts\phase_b_sp --mode curv_step --graphml .\osm\beijing_taxid.graphml
 >>
 Metrics: {'ADE': 978.8319091796875, 'FDE': 1827.216552734375, 'Hit@100': 0.2931815981864929, 'Hit@200': 0.3398591876029968, 'Hit@400': 0.3639695346355438, 'PerHorizonError': {'h1': 384.5330810546875, 'h3': 679.6910400390625, 'h5': 1023.8865966796875, 'h10': 1827.216552734375}, 'PerHorizonHit@200': {'h1': 0.5282090847719163, 'h3': 0.4107435625421931, 'h5': 0.37342077345935, 'h10': 0.33985919567942907}}
-(.venv) (base) PS C:\Users\Surface1\Documents\Serverless-edge-computing-simulation\predict-model-with-taxi> 
+(.venv) (base) PS C:\Users\Surface1\Documents\Serverless-edge-computing-simulation\predict-model-with-tax 
+
+
+
+
+
+ python -m tdrive_predictor.cli train --data-dir tdrive_predictor_artifacts/phase_b_5k_fast --mode curv_step --lookback 20 --epochs 80 --batch-size 256 --hidden-size 512 --target-scale 1.0 --early-stop-patience 6 --early-stop-min-delta 0.1 --device cuda --num-workers 16
+                                                                                                                 [Epoch 1/80] train_loss=15.2992 val_loss=94.7642 best_val=94.7642 lr=1.00e-03                                        
+[Epoch 2/80] train_loss=24.7745 val_loss=93.2517 best_val=93.2517 lr=1.00e-03                                        
+[Epoch 3/80] train_loss=34.8725 val_loss=92.3581 best_val=92.3581 lr=1.00e-03                                        
+[Epoch 4/80] train_loss=45.0557 val_loss=91.7738 best_val=91.7738 lr=1.00e-03                                        
+[Epoch 5/80] train_loss=55.2087 val_loss=91.8344 best_val=91.7738 lr=1.00e-03                                        
+[Epoch 6/80] train_loss=55.2345 val_loss=92.7590 best_val=91.7738 lr=1.00e-03                                        
+[Epoch 7/80] train_loss=55.1191 val_loss=91.4695 best_val=91.4695 lr=1.00e-03                                        
+[Epoch 8/80] train_loss=55.1275 val_loss=91.6237 best_val=91.4695 lr=1.00e-03                                        
+[Epoch 9/80] train_loss=55.0239 val_loss=91.7865 best_val=91.4695 lr=1.00e-03                                        
+[Epoch 10/80] train_loss=55.0588 val_loss=91.3739 best_val=91.4695 lr=1.00e-03                                       
+[Epoch 11/80] train_loss=54.9233 val_loss=91.2300 best_val=91.2300 lr=1.00e-03                                       
+[Epoch 12/80] train_loss=55.0283 val_loss=91.1347 best_val=91.2300 lr=1.00e-03                                       
+[Epoch 13/80] train_loss=54.8924 val_loss=91.3860 best_val=91.2300 lr=1.00e-03                                       
+[Epoch 14/80] train_loss=54.9122 val_loss=91.3593 best_val=91.2300 lr=1.00e-03                                       
+[Epoch 15/80] train_loss=54.9123 val_loss=91.0357 best_val=91.0357 lr=1.00e-03                                       
+[Epoch 16/80] train_loss=54.8186 val_loss=91.4407 best_val=91.0357 lr=1.00e-03                                       
+[Epoch 17/80] train_loss=54.8242 val_loss=91.1976 best_val=91.0357 lr=1.00e-03                                       
+[Epoch 18/80] train_loss=54.8162 val_loss=91.3877 best_val=91.0357 lr=5.00e-04                                       
+[Epoch 19/80] train_loss=54.3635 val_loss=90.7461 best_val=90.7461 lr=5.00e-04                                       
+[Epoch 20/80] train_loss=54.3398 val_loss=90.5823 best_val=90.5823 lr=5.00e-04                                       
+[Epoch 21/80] train_loss=54.2366 val_loss=90.5993 best_val=90.5823 lr=5.00e-04                                       
+[Epoch 22/80] train_loss=54.2966 val_loss=90.6142 best_val=90.5823 lr=5.00e-04                                       
+[Epoch 23/80] train_loss=54.3520 val_loss=90.6904 best_val=90.5823 lr=2.50e-04                                       
+[Epoch 24/80] train_loss=54.0613 val_loss=90.3837 best_val=90.3837 lr=2.50e-04                                       
+[Epoch 25/80] train_loss=54.0165 val_loss=90.2525 best_val=90.2525 lr=2.50e-04                                       
+[Epoch 26/80] train_loss=54.0092 val_loss=90.2190 best_val=90.2525 lr=2.50e-04                                       
+[Epoch 27/80] train_loss=53.9797 val_loss=90.2356 best_val=90.2525 lr=2.50e-04                                       
+[Epoch 28/80] train_loss=53.9791 val_loss=90.2923 best_val=90.2525 lr=2.50e-04                                       
+[Epoch 29/80] train_loss=53.9527 val_loss=90.1597 best_val=90.2525 lr=2.50e-04                                       
+[Epoch 30/80] train_loss=53.9270 val_loss=90.1519 best_val=90.1519 lr=2.50e-04                                       
+[Epoch 31/80] train_loss=53.9554 val_loss=90.1435 best_val=90.1519 lr=2.50e-04                                       
+[Epoch 32/80] train_loss=53.9323 val_loss=90.2107 best_val=90.1519 lr=2.50e-04                                       
+[Epoch 33/80] train_loss=53.9196 val_loss=90.1094 best_val=90.1519 lr=2.50e-04                                       
+[Epoch 34/80] train_loss=53.8850 val_loss=90.3561 best_val=90.1519 lr=2.50e-04                                       
+[Epoch 35/80] train_loss=53.8694 val_loss=90.1179 best_val=90.1519 lr=2.50e-04                                       
+[Epoch 36/80] train_loss=53.8680 val_loss=90.1692 best_val=90.1519 lr=1.25e-04           
+(.venv) truongnx@jackson:~/toanlncode/Serverless-edge-computing-simulation/predict-model-with-taxi$ python -m tdrive_predictor.cli eval --data-dir tdrive_predictor_artifacts/phase_b_5k_fast --mode curv_step --graphml ./osm/beijing_tax
+id.graphml
+/home/truongnx/toanlncode/Serverless-edge-computing-simulation/predict-model-with-taxi/tdrive_predictor/evaluate.py:53: FutureWarning: You are using `torch.load` with `weights_only=False` (the current default value), which uses the default pickle module implicitly. It is possible to construct malicious pickle data which will execute arbitrary code during unpickling (See https://github.com/pytorch/pytorch/blob/main/SECURITY.md#untrusted-models for more details). In a future release, the default value for `weights_only` will be flipped to `True`. This limits the functions that could be executed during unpickling. Arbitrary objects will no longer be allowed to be loaded via this mode unless they are explicitly allowlisted by the user via `torch.serialization.add_safe_globals`. We recommend you start setting `weights_only=True` for any use case where you don't have full control of the loaded file. Please open an issue on GitHub for any issues related to this experimental feature.
+  ckpt = torch.load(ckpt_path, map_location=device)
+Metrics: {'ADE': 704.5794067382812, 'FDE': 1326.8875732421875, 'Hit@100': 0.44184792041778564, 'Hit@200': 0.5092555284500122, 'Hit@400': 0.5633185505867004, 'PerHorizonError': {'h1': 244.22714233398438, 'h3': 496.4449462890625, 'h5': 750.757080078125, 'h10': 1326.8875732421875}, 'PerHorizonHit@200': {'h1': 0.6894228988389862, 'h3': 0.566739198938261, 'h5': 0.5362888112753595, 'h10': 0.5092555450321831}}
+

@@ -41,3 +41,5 @@ predict-model-with-taxi/tdrive_predictor_artifacts/
 venv/
 __pycache__/
 *.pyc
+predict-model-with-taxi/tdrive_predictor_artifacts/
+*.pkl

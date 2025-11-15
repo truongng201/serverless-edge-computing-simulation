@@ -1,4 +1,4 @@
-from enum import Enum
+﻿from enum import Enum
 import os
 import platform
 
@@ -74,7 +74,21 @@ class Config:
     ASSIGNMENT_SCAN_INTERVAL = 0.5  # seconds between reassignment scans
     LOAD_AWARE_ALPHA = 1.0  # weight for CPU load in load-aware score
 
-    # Predictive scheduling parameters
+    # Predictive scheduling parameters    TDRIVE_ARTIFACT_DIR = os.getenv(
+        "TDRIVE_ARTIFACT_DIR",
+        os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "predict-model-with-taxi",
+            "tdrive_predictor_artifacts",
+            "phase_b_5k_fast",
+        ),
+    )
+    TDRIVE_CKPT_NAME = os.getenv("TDRIVE_CKPT_NAME", "gru_phase_curv_step.pt")
+    TDRIVE_DEVICE = os.getenv("TDRIVE_DEVICE", "cpu")
+    TDRIVE_HISTORY_LENGTH = int(os.getenv("TDRIVE_HISTORY_LENGTH", "20"))
+    TDRIVE_MAX_RADIUS_M = float(os.getenv("TDRIVE_MAX_RADIUS_M", "1000"))
+    TDRIVE_SOFTMAX_TEMPERATURE = float(os.getenv("TDRIVE_SOFTMAX_TEMPERATURE", "50"))
+    PREDICTIVE_STOP_SPEED = float(os.getenv("PREDICTIVE_STOP_SPEED", "0.5"))
     PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB = 256  # default per-user memory footprint
     PREDICTIVE_DEFAULT_DATA_SIZE_BYTES = 512 * 1024  # 512 KB when historical data missing
     PREDICTIVE_COLD_START_MS = 300  # expected cold start penalty
@@ -131,3 +145,4 @@ class Config:
             "beijing_taxid_roads.json.gz",
         ),
     )
+

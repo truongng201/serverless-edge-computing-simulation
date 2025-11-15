@@ -1,4 +1,4 @@
-import time
+﻿import time
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 
@@ -52,10 +52,11 @@ class UserNodeInfo:
     speed: int
     last_executed: float
     latency: Latency
+    history: List[Dict[str, float]] = field(default_factory=list)
     # Optimization parameters
-    bandwidth_demand: float = 10.0    # ω_i^t (Mbps)
+    bandwidth_demand: float = 10.0    # Ï‰_i^t (Mbps)
     memory_demand: float = Config.DEFAULT_USER_MEMORY_DEMAND
-    cpu_demand: float = 1.0           # π_i^t (cores)
+    cpu_demand: float = 1.0           # Ï€_i^t (cores)
     data_size_demand: float = 1024.0  # s_i^t (bytes) - also migration data
     previous_node_id: Optional[str] = None  # For migration tracking
     migration_cost: float = 0.0       # Current migration cost
