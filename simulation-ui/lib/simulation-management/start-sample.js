@@ -60,3 +60,18 @@ export const startTaxiDSample = async () => {
     setLoadingData(false);
   }
 };
+
+export const startTaxiDReplaySample = async () => {
+  const { setLoadingData, setDataError } = useGlobalState.getState();
+
+  try {
+    setLoadingData(true);
+    await axios.post(
+      `${process.env.NEXT_PUBLIC_API_URL}/api/v1/central/start_taxid_replay_sample`
+    );
+  } catch (error) {
+    setDataError(`Failed to start TaxiD replay sample: ${error.message}`);
+  } finally {
+    setLoadingData(false);
+  }
+};

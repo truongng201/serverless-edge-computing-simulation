@@ -10,3 +10,5 @@ python serverless-sim/scripts/export_taxid_replay_last1k.py `
 [2025-11-16] Fixed Config predictive block syntax and wired StartTaxiDReplaySampleController into controller __init__, central_core, and central_route.
 [2025-11-16] Implemented taxid_replay dataset playback in GetAllUsersController and ensured scheduler.update_user_node appends history for predictive inference.
 [2025-11-16] Updated T-Drive inference bridge to add predict-model-with-taxi to sys.path so tdrive_predictor can be imported from serverless-sim.
+[2025-11-16] Updated simulation-ui DatasetSelectionCard and start-sample helpers to add a new 'TaxiD Replay (last 1000 trips)' dataset that calls /start_taxid_replay_sample and reuses TaxiD road overlays.
+[2025-11-16] Tweaked SimulationCanvas user connection drawing to use thinner lines and smaller markers for central/edge assignments.

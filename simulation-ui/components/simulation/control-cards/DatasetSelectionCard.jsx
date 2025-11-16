@@ -9,7 +9,15 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import { startDactSample, startVehiclesSample, startRandomGeneratedSample, startTaxiDSample, loadTaxiDRoads, loadTaxiDRoadsPreprocessed } from "@/lib/simulation-management";
+import {
+  startDactSample,
+  startVehiclesSample,
+  startRandomGeneratedSample,
+  startTaxiDSample,
+  startTaxiDReplaySample,
+  loadTaxiDRoads,
+  loadTaxiDRoadsPreprocessed,
+} from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
 
 export default function DatasetSelectionCard() {
@@ -27,6 +35,16 @@ export default function DatasetSelectionCard() {
     } else if (value === "TaxiD") {
       await startTaxiDSample();
       // Prefer preprocessed fast path; fallback to dynamic
+      try {
+        const ok = await loadTaxiDRoadsPreprocessed();
+        if (!ok) {
+          await loadTaxiDRoads();
+        }
+      } catch (_e) {
+        try { await loadTaxiDRoads(); } catch (_e2) {}
+      }
+    } else if (value === "TaxiDReplay") {
+      await startTaxiDReplaySample();
       try {
         const ok = await loadTaxiDRoadsPreprocessed();
         if (!ok) {
@@ -64,7 +82,10 @@ export default function DatasetSelectionCard() {
               <SelectItem value="Dataset4">
                 Dataset 4: Random Generated Data
               </SelectItem>
-              <SelectItem value="TaxiD">Dataset 5: TaxiD (Beijing OSM)</SelectItem>
+              <SelectItem value="TaxiD">Dataset 5: TaxiD (Beijing OSM, random spawn)</SelectItem>
+              <SelectItem value="TaxiDReplay">
+                Dataset 6: TaxiD Replay (last 1000 trips)
+              </SelectItem>
             </SelectContent>
           </Select>
         </div>
