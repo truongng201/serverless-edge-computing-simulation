@@ -85,21 +85,6 @@ class CentralCoreController:
         response = controller.execute()
         return response
 
-    def start_dact_sample(self):
-        controller = StartDactSampleController(self.data_manager, self.scheduler)
-        controller.execute()
-        return "Start using dact sample"
-    
-    def start_vehicles_sample(self):
-        controller = StartVehiclesSampleController(self.data_manager, self.scheduler)
-        controller.execute()
-        return "Start using vehicles sample"
-
-    def start_random_generated_sample(self):
-        controller = StartRandomGeneratedSampleController(self.data_manager, self.scheduler)
-        controller.execute()
-        return "Start using random generated sample"
-
     def set_assignment_algorithm(self, request_data):
         controller = SetAssignmentAlgorithmController(self.scheduler, request_data)
         return controller.execute()
@@ -116,15 +101,6 @@ class CentralCoreController:
         controller = GetPerformanceMetricsController(self.scheduler)
         return controller.execute()
 
-    def start_taxid_sample(self):
-        controller = StartTaxiDSampleController(self.scheduler)
-        controller.execute()
-        return "Start TaxiD (Beijing OSM) sample"
-
-    def start_taxid_replay_sample(self):
-        controller = StartTaxiDReplaySampleController(self.scheduler)
-        controller.execute()
-        return "Start TaxiD replay (last1k) sample"
 
     def get_taxid_roads(self):
         controller = GetTaxiDRoadsController(self.scheduler)
@@ -132,4 +108,12 @@ class CentralCoreController:
 
     def get_taxid_roads_preprocessed(self):
         controller = GetTaxiDRoadsPreprocessedController(self.scheduler)
+        return controller.execute()
+    
+    def get_dataset_info(self):
+        controller = GetDatasetListController(self.scheduler, self.data_manager)
+        return controller.execute()
+    
+    def set_dataset(self, request_data):
+        controller = SetDatasetController(self.scheduler, self.data_manager, request_data)
         return controller.execute()

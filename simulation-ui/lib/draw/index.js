@@ -3,5 +3,9 @@ export { drawCentralNodes } from "./draw-central-nodes";
 export { drawConnections } from "./draw-connections";
 export { drawUserConnections } from "./draw-user-connections";
 export { drawUsers } from "./draw-users";
+<<<<<<< HEAD
 export { drawEdgeNodes } from "./draw-edge-nodes";
 export { drawRoads } from "./draw-roads";
+=======
+export { drawEdgeNodes } from "./draw-edge-nodes";
+>>>>>>> main

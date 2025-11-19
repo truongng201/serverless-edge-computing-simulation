@@ -9,31 +9,26 @@ import {
 } from "@/components/ui/select";
 import { Navigation } from "lucide-react";
 import useGlobalState from "@/hooks/use-global-state";
-import {
-  startDactSample,
-  startVehiclesSample,
-  startRandomGeneratedSample,
-  startTaxiDSample,
-  startTaxiDReplaySample,
+import { 
+  setDataset, 
+  getDatasetInfo, 
   loadTaxiDRoads,
-  loadTaxiDRoadsPreprocessed,
+  loadTaxiDRoadsPreprocessed 
 } from "@/lib/simulation-management";
 import { clearAllUsers } from "@/lib/user-management";
+import { useEffect, useState } from "react";
 
 export default function DatasetSelectionCard() {
-  const { selectedDataset, setSelectedDataset } = useGlobalState();
+  const { selectedDataset, setSelectedDataset, datasetInfo, setDatasetInfo } = useGlobalState();
+  const [sampleSize, setSampleSize] = useState(100);
 
-  const handleDatasetChange = async (value) => {
+  const handleDatasetChange = async (value, sampleSizeOverride = null) => {
     setSelectedDataset(value);
-
-    if (value === "Dataset2") {
-      await startDactSample();
-    } else if (value === "Dataset3") {
-      await startVehiclesSample();
-    } else if (value === "Dataset4") {
-      await startRandomGeneratedSample();
+    const effectiveSampleSize = sampleSizeOverride !== null ? sampleSizeOverride : sampleSize;
+    await setDataset(value, value === "random_generated" ? effectiveSampleSize : null);
+    if (value === "none") {
+      await clearAllUsers();
     } else if (value === "TaxiD") {
-      await startTaxiDSample();
       // Prefer preprocessed fast path; fallback to dynamic
       try {
         const ok = await loadTaxiDRoadsPreprocessed();
@@ -44,7 +39,6 @@ export default function DatasetSelectionCard() {
         try { await loadTaxiDRoads(); } catch (_e2) {}
       }
     } else if (value === "TaxiDReplay") {
-      await startTaxiDReplaySample();
       try {
         const ok = await loadTaxiDRoadsPreprocessed();
         if (!ok) {
@@ -53,10 +47,16 @@ export default function DatasetSelectionCard() {
       } catch (_e) {
         try { await loadTaxiDRoads(); } catch (_e2) {}
       }
-    } else if (value === "none") {
-      await clearAllUsers();
     }
   };
+
+  useEffect(() => {
+    const fetchDatasetInfo = async () => {
+      const response = await getDatasetInfo();
+      setDatasetInfo(response);
+    };
+    fetchDatasetInfo();
+  }, []);
 
   return (
     <Card className="mb-4">
@@ -71,24 +71,47 @@ export default function DatasetSelectionCard() {
           <Label className="text-xs">Dataset</Label>
           <Select value={selectedDataset} onValueChange={handleDatasetChange}>
             <SelectTrigger className="h-8">
-              <SelectValue />
+              <SelectValue placeholder="Select a dataset" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">Dataset 1: None (Self adding user)</SelectItem>
-              <SelectItem value="Dataset2">Dataset 2: DACT Sample</SelectItem>
-              <SelectItem value="Dataset3">
-                Dataset 3: Vehicle Sample
-              </SelectItem>
-              <SelectItem value="Dataset4">
-                Dataset 4: Random Generated Data
-              </SelectItem>
-              <SelectItem value="TaxiD">Dataset 5: TaxiD (Beijing OSM, random spawn)</SelectItem>
-              <SelectItem value="TaxiDReplay">
-                Dataset 6: TaxiD Replay (last 1000 trips)
-              </SelectItem>
+              {datasetInfo?.dataset_list?.length > 0 ? (
+                datasetInfo.dataset_list.map((dataset) => (
+                  <SelectItem key={dataset.name} value={dataset.name}>
+                    {dataset.ui_name}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="none">No datasets available</SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
+
+        {selectedDataset === "random_generated" && (
+          <div className="space-y-2">
+            <Label className="text-xs">Sample Size</Label>
+            <Select
+              value={sampleSize.toString()}
+              onValueChange={(value) => {
+                const newSampleSize = Number(value);
+                setSampleSize(newSampleSize);
+                handleDatasetChange("random_generated", newSampleSize);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Select a sample size" />
+              </SelectTrigger>
+              <SelectContent>
+                {[100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map((size) => (
+                  <SelectItem key={size} value={size.toString()}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        )}
+
         <div className="text-xs text-gray-600">
           Select a predefined Dataset to load sample data, or choose "None" to
           manually add users.

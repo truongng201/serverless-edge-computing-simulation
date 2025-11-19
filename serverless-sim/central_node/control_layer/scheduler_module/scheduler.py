@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
 import time
@@ -44,7 +44,8 @@ class Scheduler:
         
         self.simulation = False
         self.assignment_matrix = {}
-        self.current_dataset = None
+        self.current_dataset = "none"
+        self.random_sample_size = 0
         self.current_step_id = None
 
         self.history_max_points = getattr(Config, "TDRIVE_HISTORY_LENGTH", 20)
@@ -90,6 +91,18 @@ class Scheduler:
             self.assignment_algorithm = AssignmentAlgorithm(assignment_algorithm)
         except ValueError:
             raise Exception(f"Invalid assignment algorithm: {assignment_algorithm}")
+    
+    def get_random_sample_size(self):
+        return self.random_sample_size
+    
+    def set_random_sample_size(self, sample_size=100):
+        self.random_sample_size = sample_size
+        
+    def get_current_dataset(self):
+        return self.current_dataset
+    
+    def set_current_dataset(self, dataset_name):
+        self.current_dataset = dataset_name
         
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:
@@ -181,6 +194,9 @@ class Scheduler:
             user_node.history = user_node.history[-self.history_max_points:]
 
         self.user_nodes[user_node.user_id] = user_node
+    
+    def clear_all_users(self):
+        self.user_nodes = {}
 
     def _classify_nodes(self):
         classified_nodes = {
@@ -260,6 +276,7 @@ class Scheduler:
         else:
             self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
             return self.assignment_matrix
+            
     def _assign_users_greedy(self) -> dict:
         self.assignment_matrix = {}
         for user_id, user_node in self.user_nodes.items():
@@ -277,6 +294,7 @@ class Scheduler:
             user_node.latency.total_turnaround_time = total_turnaround_time
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         return self.assignment_matrix
+
     def _predictive_assignment(self) -> dict:
         if not self.predictor_adapter or not get_mobility_prediction:
             self.logger.warning("Predictor not available, falling back to greedy assignment")
@@ -335,6 +353,7 @@ class Scheduler:
             user_node.latency.total_turnaround_time = total_turnaround_time
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         return self.assignment_matrix
+
     def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:
         if cloudlet_id == "central_node":
             return True  # Assume central node has unlimited capacity
@@ -557,8 +576,3 @@ class Scheduler:
                 )
                 user_node.latency.total_turnaround_time = total_turnaround_time
                 self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
-
-
-
-
-

@@ -33,7 +33,6 @@ next-env.d.ts
 *.log
 
 highD-dataset-v1.0/
-random_generated.txt
 
 *.pyc
 .venv/
@@ -45,3 +44,4 @@ predict-model-with-taxi/tdrive_predictor_artifacts/
 *.pt
 *.pth
 *.tar.gz
+random_generated*.txt

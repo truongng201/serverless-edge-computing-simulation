@@ -17,6 +17,7 @@ export const drawUserConnections = (ctx, users, centralNodes, edgeNodes, zoomLev
       // Set line style based on connection type
       if (user.assignedCentral) {
         // Connection to central node - blue color
+<<<<<<< HEAD
         ctx.strokeStyle = "rgba(99, 102, 241, 0.9)";
         ctx.lineWidth = 1.5 / zoomLevel; // thinner
         ctx.setLineDash([8 / zoomLevel, 4 / zoomLevel]);
@@ -25,6 +26,16 @@ export const drawUserConnections = (ctx, users, centralNodes, edgeNodes, zoomLev
         ctx.strokeStyle = "rgba(16, 185, 129, 0.9)";
         ctx.lineWidth = 1.5 / zoomLevel; // thinner
         ctx.setLineDash([6 / zoomLevel, 3 / zoomLevel]);
+=======
+        ctx.strokeStyle = "rgba(99, 102, 241, 1.0)"; // Made more opaque
+        ctx.lineWidth = 3 / zoomLevel; // Made thicker
+        ctx.setLineDash([10 / zoomLevel, 5 / zoomLevel]);
+      } else {
+        // Connection to edge node - green color
+        ctx.strokeStyle = "rgba(16, 185, 129, 1.0)"; // Made more opaque
+        ctx.lineWidth = 3 / zoomLevel; // Made thicker
+        ctx.setLineDash([8 / zoomLevel, 4 / zoomLevel]);
+>>>>>>> main
       }
       
       // Draw the connection line
@@ -35,9 +46,15 @@ export const drawUserConnections = (ctx, users, centralNodes, edgeNodes, zoomLev
       ctx.setLineDash([]);
       
       // Draw a small indicator at the user end
+<<<<<<< HEAD
       ctx.fillStyle = user.assignedCentral ? "rgba(99, 102, 241, 0.9)" : "rgba(16, 185, 129, 0.9)";
       ctx.beginPath();
       ctx.arc(user.x, user.y, 3.5 / zoomLevel, 0, 2 * Math.PI);
+=======
+      ctx.fillStyle = user.assignedCentral ? "rgba(99, 102, 241, 1.0)" : "rgba(16, 185, 129, 1.0)";
+      ctx.beginPath();
+      ctx.arc(user.x, user.y, 5 / zoomLevel, 0, 2 * Math.PI); // Made bigger
+>>>>>>> main
       ctx.fill();
     }
   });
