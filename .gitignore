@@ -39,7 +39,7 @@ highD-dataset-v1.0/
 venv/
 __pycache__/
 *.pyc
-predict-model-with-taxi/tdrive_predictor_artifacts/
+predict-model-with-taxi/tdrive_predictor_artifacts*/
 *.pkl
 *.pt
 *.pth
