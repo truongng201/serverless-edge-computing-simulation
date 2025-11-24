@@ -2,6 +2,7 @@ from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.helper_module.data_manager import DataManager
 from central_node.control_layer.models import Latency, UserNodeInfo
 
+from shared.custom_exception import InvalidDataException
 from config import Config
 
 class SetDatasetController:
@@ -15,11 +16,11 @@ class SetDatasetController:
         self._validate()
 
     def _validate(self):
-        if self.dataset_name and self.dataset_name not in ["none", "dact", "random_generated"]:
-            raise ValueError(f"Dataset {self.dataset_name} is not available.")
+        if self.dataset_name and self.dataset_name not in ["none", "dact", "random_generated", "taxiD", "taxiD_Replay"]:
+            raise InvalidDataException(f"Dataset {self.dataset_name} is not available.")
 
         if self.sample_size is not None and (not isinstance(self.sample_size, int) or self.sample_size <= 0 or self.sample_size > 1000):
-            raise ValueError("Sample size must be a positive integer not exceeding 1000.")
+            raise InvalidDataException("Sample size must be a positive integer not exceeding 1000.")
         
     def start_sample_data(self):
         sample_data = {}

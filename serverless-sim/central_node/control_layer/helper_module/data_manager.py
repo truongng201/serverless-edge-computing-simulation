@@ -24,11 +24,11 @@ class DataManager:
                "ui_name": "Random Generated Data"
             },
             {
-                "name": "TaxiD",
+                "name": "taxiD",
                 "ui_name": "TaxiD"
             },
             {
-                "name": "TaxiD",
+                "name": "taxiD_Replay",
                 "ui_name": "TaxiD Replay"
             },
         ]

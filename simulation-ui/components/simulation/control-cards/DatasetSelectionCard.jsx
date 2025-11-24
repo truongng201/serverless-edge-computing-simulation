@@ -19,7 +19,7 @@ import { clearAllUsers } from "@/lib/user-management";
 import { useEffect, useState } from "react";
 
 export default function DatasetSelectionCard() {
-  const { selectedDataset, setSelectedDataset, datasetInfo, setDatasetInfo } = useGlobalState();
+  const { selectedDataset, setSelectedDataset, datasetInfo, setDatasetInfo, setRoads, setShowRoads } = useGlobalState();
   const [sampleSize, setSampleSize] = useState(100);
 
   const handleDatasetChange = async (value, sampleSizeOverride = null) => {
@@ -28,25 +28,16 @@ export default function DatasetSelectionCard() {
     await setDataset(value, value === "random_generated" ? effectiveSampleSize : null);
     if (value === "none") {
       await clearAllUsers();
-    } else if (value === "TaxiD") {
-      // Prefer preprocessed fast path; fallback to dynamic
-      try {
-        const ok = await loadTaxiDRoadsPreprocessed();
-        if (!ok) {
-          await loadTaxiDRoads();
-        }
-      } catch (_e) {
-        try { await loadTaxiDRoads(); } catch (_e2) {}
+      setRoads([])
+      setShowRoads(false)
+    } else if (value === "taxiD" || value === "taxiD_Replay") {
+      const ok = await loadTaxiDRoadsPreprocessed();
+      if (!ok) {
+        await loadTaxiDRoads();
       }
-    } else if (value === "TaxiDReplay") {
-      try {
-        const ok = await loadTaxiDRoadsPreprocessed();
-        if (!ok) {
-          await loadTaxiDRoads();
-        }
-      } catch (_e) {
-        try { await loadTaxiDRoads(); } catch (_e2) {}
-      }
+    } else{
+      setRoads([])
+      setShowRoads(false)
     }
   };
 
