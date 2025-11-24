@@ -11,6 +11,7 @@ from .model import GRUDisplacement, GRUDisplacementRoad, GRUStepDecoderRoad
 from .osm.loader import load_graph
 from .mapmatch.hmm import CandidateGenerator
 from .metrics import compute_errors_m, hit_at_r, per_horizon_errors_m, per_horizon_hit_at_r
+from .road_rollout import rollout_curv_step_on_graph
 
 
 def _advance_along_polyline(poly_xy, delta_s: float):
@@ -334,37 +335,42 @@ def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, 
     from .mapmatch.hmm import CandidateGenerator
     import numpy as np
     import torch
+
     # Infer hidden_size from checkpoint to match trained model
     hs = None
     try:
-        sd = ckpt['model_state']
-        w = sd.get('encoder.weight_ih_l0', None)
+        sd = ckpt["model_state"]
+        w = sd.get("encoder.weight_ih_l0", None)
         if w is not None:
             hs = int(w.shape[0] // 3)
         else:
-            w2 = sd.get('dec_cell.weight_ih', None)
+            w2 = sd.get("dec_cell.weight_ih", None)
             if w2 is not None:
                 hs = int(w2.shape[0] // 3)
     except Exception:
         hs = None
     model = GRUStepDecoderRoad(input_size=len(feature_cols), hidden_size=(hs or 256))
-    model.load_state_dict(ckpt['model_state'])
+    model.load_state_dict(ckpt["model_state"])
     model.to(device)
     model.eval()
+
     steps_all = list(range(1, 11))
     steps_eval = [1, 3, 5, 10]
     preds_xy = []
     trues_xy = []
-    df_sorted = test_df.sort_values(['trip_id','ts']).reset_index(drop=True)
+    df_sorted = test_df.sort_values(["trip_id", "ts"]).reset_index(drop=True)
+
     use_graph = (graphml is not None) or (place is not None) or (bbox is not None)
-    G = None; cand = None
+    G = None
+    cand = None
     if use_graph:
         try:
             G = load_graph(graphml_path=graphml, place=place, bbox=bbox)
             cand = CandidateGenerator(G)
         except Exception:
             use_graph = False
-    for trip_id, g in df_sorted.groupby('trip_id'):
+
+    for trip_id, g in df_sorted.groupby("trip_id"):
         n = len(g)
         if n < (lookback or 20) + max(steps_all):
             continue
@@ -372,149 +378,133 @@ def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, 
         for end in range(base_idx + (lookback or 20) - 1, base_idx + n):
             if end + max(steps_all) >= base_idx + n:
                 break
-            x_seq = torch.tensor(df_sorted.loc[end-(lookback or 20)+1:end, feature_cols].to_numpy(dtype=np.float32)).unsqueeze(0).to(device)
+            x_seq = (
+                torch.tensor(
+                    df_sorted.loc[end - (lookback or 20) + 1 : end, feature_cols].to_numpy(
+                        dtype=np.float32
+                    )
+                )
+                .unsqueeze(0)
+                .to(device)
+            )
             with torch.no_grad():
                 pred_steps = model(x_seq).squeeze(0).detach().cpu().numpy()
-            x0 = float(df_sorted.loc[end, 'x']); y0 = float(df_sorted.loc[end, 'y'])
+            x0 = float(df_sorted.loc[end, "x"])
+            y0 = float(df_sorted.loc[end, "y"])
             true_xy = []
             for h in steps_eval:
-                tx = float(df_sorted.loc[end+h, 'x'] - x0); ty = float(df_sorted.loc[end+h, 'y'] - y0)
+                tx = float(df_sorted.loc[end + h, "x"] - x0)
+                ty = float(df_sorted.loc[end + h, "y"] - y0)
                 true_xy.extend([tx, ty])
             trues_xy.append(np.array(true_xy, dtype=np.float32))
-            if use_graph and ('edge' in df_sorted.columns):
-                cur_edge = df_sorted.loc[end, 'edge'] if 'edge' in df_sorted.columns else None
-                cur_s = df_sorted.loc[end, 's'] if 's' in df_sorted.columns else None
+
+            # Graph-constrained rollout when edges are available; otherwise fallback
+            # to polyline-based interpolation.
+            used_graph_rollout = False
+            if use_graph and ("edge" in df_sorted.columns):
+                cur_edge = df_sorted.loc[end, "edge"] if "edge" in df_sorted.columns else None
+                cur_s = df_sorted.loc[end, "s"] if "s" in df_sorted.columns else None
                 if (cur_edge is None) or (cur_s is None) or (not np.isfinite(cur_s)):
                     cands0 = cand.query(x0, y0)
                     if cands0:
-                        cur_edge = cands0[0]['edge']
-                        cur_s = cands0[0]['s']
+                        cur_edge = cands0[0]["edge"]
+                        cur_s = cands0[0]["s"]
                     else:
                         cur_edge = None
-                pred_xy_list = []
-                px, py = x0, y0
-                e = cur_edge
-                s0 = float(cur_s) if cur_s is not None else 0.0
-                import math
-                for si in range(len(steps_all)):
-                    rem = float(max(0.0, pred_steps[si]))
-                    steps_guard = 0
-                    while rem > 1e-6 and e is not None and steps_guard < 16:
-                        steps_guard += 1
-                        try:
-                            data = G.get_edge_data(*e)
-                            geom = data.get('geometry', None)
-                        except Exception:
-                            geom = None
-                        if geom is None:
-                            u,v,k = e
-                            x1 = G.nodes[u]['x']; y1=G.nodes[u]['y']
-                            x2 = G.nodes[v]['x']; y2=G.nodes[v]['y']
-                            L = math.hypot(x2-x1, y2-y1)
-                            Lrem = max(0.0, L - s0)
-                            step = min(rem, Lrem)
-                            t = 0.0 if L<=1e-6 else (s0 + step) / L
-                            px = x1 + t*(x2-x1); py = y1 + t*(y2-y1)
-                            rem -= step
-                            if rem <= 1e-6:
-                                break
-                            at = v
+                if cur_edge is not None and cur_s is not None and np.isfinite(cur_s):
+                    xy_steps = rollout_curv_step_on_graph(
+                        G,
+                        cand,
+                        cur_edge,
+                        float(cur_s),
+                        pred_steps,
+                        x0,
+                        y0,
+                    )
+                    agg = []
+                    for h in steps_eval:
+                        idx = h - 1
+                        if 0 <= idx < len(xy_steps):
+                            px_h, py_h = xy_steps[idx]
                         else:
-                            L = float(geom.length)
-                            Lrem = max(0.0, L - s0)
-                            step = min(rem, Lrem)
-                            sg = s0 + step
-                            p = geom.interpolate(sg)
-                            px, py = float(p.x), float(p.y)
-                            rem -= step
-                            if rem <= 1e-6:
-                                break
-                            u,v,k = e
-                            at = v
-                        neigh = cand.neighbor_edges(e)
-                        best = None; best_sc = -1e18
-                        h1 = cand.tangent_heading(e, s0 if geom is None else float(L)) or 0.0
-                        for en in neigh:
-                            if en == e:
-                                continue
-                            u2,v2,k2 = en
-                            if u2 == at:
-                                h2 = cand.tangent_heading(en, 0.0) or 0.0
-                            elif v2 == at:
-                                data2 = G.get_edge_data(u2,v2,k2)
-                                geom2 = data2.get('geometry', None)
-                                h2 = cand.tangent_heading(en, float(geom2.length) if geom2 is not None else 0.0) or 0.0
-                            else:
-                                continue
-                            align = abs(math.cos(((h2 - h1 + math.pi) % (2*math.pi)) - math.pi))
-                            if align > best_sc:
-                                best_sc = align; best = en
-                        e = best
-                        if e is None:
-                            break
-                        u3,v3,k3 = e
-                        if u3 == at:
-                            s0 = 0.0
-                        else:
-                            data3 = G.get_edge_data(u3,v3,k3)
-                            geom3 = data3.get('geometry', None)
-                            s0 = float(geom3.length) if geom3 is not None else 0.0
-                    pred_xy_list.append((px - x0, py - y0))
-                agg = []
-                for h in steps_eval:
-                    dx, dy = pred_xy_list[h-1]
-                    agg.extend([dx, dy])
-                preds_xy.append(np.array(agg, dtype=np.float32))
-            else:
-                path_xy = df_sorted.loc[end:end+max(steps_all), ['x','y']].to_numpy(dtype=np.float64)
-                import math
-                pred_xy_list = []
-                cur_idx = 0
-                cur_off = 0.0
-                for si in range(len(steps_all)):
-                    rem = float(max(0.0, pred_steps[si]))
-                    xA,yA = path_xy[cur_idx]
-                    if cur_idx+1 < len(path_xy):
-                        xB,yB = path_xy[cur_idx+1]
+                            px_h, py_h = xy_steps[-1]
+                        agg.extend([px_h - x0, py_h - y0])
+                    preds_xy.append(np.array(agg, dtype=np.float32))
+                    used_graph_rollout = True
+            if used_graph_rollout:
+                continue
+
+            # Fallback: use ground-truth polyline clip method
+            path_xy = df_sorted.loc[end : end + max(steps_all), ["x", "y"]].to_numpy(
+                dtype=np.float64
+            )
+            import math
+
+            pred_xy_list = []
+            cur_idx = 0
+            cur_off = 0.0
+            for si in range(len(steps_all)):
+                rem = float(max(0.0, pred_steps[si]))
+                xA, yA = path_xy[cur_idx]
+                if cur_idx + 1 < len(path_xy):
+                    xB, yB = path_xy[cur_idx + 1]
+                else:
+                    xB, yB = xA, yA
+                seg_len = math.hypot(xB - xA, yB - yA)
+                posx, posy = xA, yA
+                while rem > 1e-6 and cur_idx + 1 < len(path_xy):
+                    avail = max(0.0, seg_len - cur_off)
+                    step = min(rem, avail)
+                    t = 0.0 if seg_len <= 1e-6 else (cur_off + step) / seg_len
+                    posx = xA + t * (xB - xA)
+                    posy = yA + t * (yB - yA)
+                    rem -= step
+                    if rem <= 1e-6:
+                        cur_off += step
+                        break
+                    cur_idx += 1
+                    cur_off = 0.0
+                    xA, yA = path_xy[cur_idx]
+                    if cur_idx + 1 < len(path_xy):
+                        xB, yB = path_xy[cur_idx + 1]
                     else:
-                        xB,yB = xA,yA
-                    seg_len = math.hypot(xB-xA, yB-yA)
-                    posx, posy = xA, yA
-                    while rem > 1e-6 and cur_idx+1 < len(path_xy):
-                        avail = max(0.0, seg_len - cur_off)
-                        step = min(rem, avail)
-                        t = 0.0 if seg_len<=1e-6 else (cur_off + step)/seg_len
-                        posx = xA + t*(xB-xA); posy = yA + t*(yB-yA)
-                        rem -= step
-                        if rem <= 1e-6:
-                            cur_off += step
-                            break
-                        cur_idx += 1
-                        cur_off = 0.0
-                        xA,yA = path_xy[cur_idx]
-                        if cur_idx+1 < len(path_xy):
-                            xB,yB = path_xy[cur_idx+1]
-                        else:
-                            xB,yB = xA,yA
-                        seg_len = math.hypot(xB-xA, yB-yA)
-                    pred_xy_list.append((posx - x0, posy - y0))
-                agg = []
-                for h in steps_eval:
-                    dx, dy = pred_xy_list[h-1]
-                    agg.extend([dx, dy])
-                preds_xy.append(np.array(agg, dtype=np.float32))
+                        xB, yB = xA, yA
+                    seg_len = math.hypot(xB - xA, yB - yA)
+                pred_xy_list.append((posx - x0, posy - y0))
+            agg = []
+            for h in steps_eval:
+                dx, dy = pred_xy_list[h - 1]
+                agg.extend([dx, dy])
+            preds_xy.append(np.array(agg, dtype=np.float32))
+
     if not preds_xy:
-        return {"ADE": float('nan'), "FDE": float('nan'), "Hit@100": float('nan'), "Hit@200": float('nan'), "Hit@400": float('nan')}
+        return {
+            "ADE": float("nan"),
+            "FDE": float("nan"),
+            "Hit@100": float("nan"),
+            "Hit@200": float("nan"),
+            "Hit@400": float("nan"),
+        }
     preds_t = torch.tensor(np.vstack(preds_xy))
     targets_t = torch.tensor(np.vstack(trues_xy))
     res = compute_errors_m(preds_t, targets_t)
-    res['Hit@100'] = hit_at_r(preds_t, targets_t, radius_m=100.0, final_only=True)
-    res['Hit@200'] = hit_at_r(preds_t, targets_t, radius_m=200.0, final_only=True)
-    res['Hit@400'] = hit_at_r(preds_t, targets_t, radius_m=400.0, final_only=True)
+    res["Hit@100"] = hit_at_r(preds_t, targets_t, radius_m=100.0, final_only=True)
+    res["Hit@200"] = hit_at_r(preds_t, targets_t, radius_m=200.0, final_only=True)
+    res["Hit@400"] = hit_at_r(preds_t, targets_t, radius_m=400.0, final_only=True)
     ph_err = per_horizon_errors_m(preds_t, targets_t)
     ph_hit200 = per_horizon_hit_at_r(preds_t, targets_t, radius_m=200.0)
-    res['PerHorizonError'] = {'h1': ph_err[0], 'h3': ph_err[1], 'h5': ph_err[2], 'h10': ph_err[3]}
-    res['PerHorizonHit@200'] = {'h1': ph_hit200[0], 'h3': ph_hit200[1], 'h5': ph_hit200[2], 'h10': ph_hit200[3]}
+    res["PerHorizonError"] = {
+        "h1": ph_err[0],
+        "h3": ph_err[1],
+        "h5": ph_err[2],
+        "h10": ph_err[3],
+    }
+    res["PerHorizonHit@200"] = {
+        "h1": ph_hit200[0],
+        "h3": ph_hit200[1],
+        "h5": ph_hit200[2],
+        "h10": ph_hit200[3],
+    }
     return res
 
 

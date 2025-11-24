@@ -46,6 +46,15 @@ def train_gru(
     # features list saved in meta
     meta = pd.read_json(os.path.join(data_dir, 'meta.json'), typ='series').to_dict()
     feature_cols: List[str] = meta['feature_cols']
+    # Experiment toggles for curv_step mode (controlled via environment variables)
+    # - TDRIVE_CURVSTEP_WEIGHTED_LOSS=1 -> use non-uniform step weights
+    # - TDRIVE_CURVSTEP_HIGH_SS=1       -> increase scheduled sampling cap to 0.8
+    def _env_flag(name: str) -> bool:
+        v = os.environ.get(name, "").strip().lower()
+        return v in ("1", "true", "yes", "y")
+
+    use_weighted_curv_step_loss = _env_flag("TDRIVE_CURVSTEP_WEIGHTED_LOSS")
+    use_high_ss_prob = _env_flag("TDRIVE_CURVSTEP_HIGH_SS")
     # build datasets
     if mode == 'curv':
         ds_train = SequenceHorizonCurvDataset(train_df, feature_cols, lookback=lookback)
@@ -74,11 +83,18 @@ def train_gru(
     opt = torch.optim.Adam(model.parameters(), lr=lr)
     # Older torch versions may not accept 'verbose' kwarg
     scheduler = torch.optim.lr_scheduler.ReduceLROnPlateau(opt, mode='min', factor=0.5, patience=2)
-    # weighted SmoothL1 per horizon
+    # weighted SmoothL1 per horizon / step
     if mode == 'curv':
         horizon_weights = torch.tensor([1.0, 0.5, 0.5, 1.0], dtype=torch.float32, device=device)
     elif mode == 'curv_step':
-        horizon_weights = torch.ones(10, dtype=torch.float32, device=device)
+        if use_weighted_curv_step_loss:
+            horizon_weights = torch.tensor(
+                [1.0, 1.0, 1.0, 1.0, 0.8, 0.8, 0.8, 0.8, 0.7, 0.7],
+                dtype=torch.float32,
+                device=device,
+            )
+        else:
+            horizon_weights = torch.ones(10, dtype=torch.float32, device=device)
     else:
         horizon_weights = torch.tensor([1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0], dtype=torch.float32, device=device)
     loss_fn = nn.SmoothL1Loss(reduction='none')
@@ -104,7 +120,8 @@ def train_gru(
             y_target = y_target.to(device, non_blocking=pin)
             opt.zero_grad()
             if mode == 'curv_step':
-                ss_p = min(0.5, 0.1 * epoch)
+                max_ss = 0.8 if use_high_ss_prob else 0.5
+                ss_p = min(max_ss, 0.1 * epoch)
                 y_pred = model(x_seq, teacher=y_target, ss_prob=ss_p)
             else:
                 y_pred = model(x_seq)

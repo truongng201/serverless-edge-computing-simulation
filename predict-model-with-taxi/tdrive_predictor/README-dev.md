@@ -82,6 +82,26 @@ Key HMM params:
 - Inference (serverless-sim) for `curv_step` projects Δs along last heading; no step-wise snap-to-road in inference_service.
 - Road-aware GRU with snap-after-each-step is not implemented.
 - Per-horizon metrics exist in code but not rendered as tables/reports automatically.
+
+## Experiment toggles (env flags)
+
+These are optional and backward-compatible; unset = old behavior.
+
+- `TDRIVE_CURVSTEP_WEIGHTED_LOSS=1`  
+  curv_step loss uses step weights `[1,1,1,1,0.8,0.8,0.8,0.8,0.7,0.7]` (FDE less dominant).
+- `TDRIVE_CURVSTEP_HIGH_SS=1`  
+  scheduled sampling cap for curv_step increases to 0.8 (`ss_prob = min(0.8, 0.1*epoch)`).
+- `TDRIVE_USE_GRAPH_CONTEXT_FEATURES=1` (prepare Phase B)  
+  add `node_degree`, `is_junction` features (degree ≥3 → junction) to feature_cols/meta. If off, Phase B feature set stays the same.
+- `TDRIVE_GRAPHML_PATH=/abs/path/to/beijing_taxid.graphml` (inference)  
+  if Phase B + curv_step, inference_service rolls out Δs snapped per-step on the road graph; otherwise falls back to heading-based rollout.
+
+### Preset combos (curv_step)
+
+1) Baseline: no flags.  
+2) Weighted: `TDRIVE_CURVSTEP_WEIGHTED_LOSS=1`.  
+3) Weighted + high SS: `TDRIVE_CURVSTEP_WEIGHTED_LOSS=1`, `TDRIVE_CURVSTEP_HIGH_SS=1`.  
+4) Weighted + node_degree: prepare with `TDRIVE_USE_GRAPH_CONTEXT_FEATURES=1`, train with (2) or (3).
 # tdrive_predictor Developer Notes
 
 This doc explains how the current code prepares data, trains, evaluates models, supported model modes, and what each file in `tdrive_predictor/` does.

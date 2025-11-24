@@ -24,6 +24,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
+import os
 import numpy as np
 import pandas as pd
 import torch
@@ -33,6 +34,9 @@ from .model import (
     GRUDisplacementRoad,
     GRUStepDecoderRoad,
 )
+from .road_rollout import rollout_curv_step_on_graph
+from .osm.loader import load_graph
+from .mapmatch.hmm import CandidateGenerator
 
 HistoryRecord = Dict[str, float]
 CloudletRecord = Dict[str, float]
@@ -48,6 +52,8 @@ class PredictorBundle:
     lookback: int
     mode: str
     scaler: Dict[str, Tuple[float, float]]
+    graph: Optional[object] = None
+    cand: Optional[CandidateGenerator] = None
 
     def to(self, device: torch.device) -> "PredictorBundle":
         self.model.to(device)
@@ -105,6 +111,20 @@ def load_predictor_bundle(
     model.load_state_dict(ckpt["model_state"])
     model.eval()
     scaler = pd.read_pickle(artifact_path / "scaler.pkl")
+    # Optional: load road graph for Phase B curv_step inference if configured.
+    graph = None
+    cand = None
+    if mode == "curv_step" and meta.get("phase", "A") == "B":
+        graphml_path = os.environ.get("TDRIVE_GRAPHML_PATH")
+        if graphml_path:
+            try:
+                graph = load_graph(graphml_path=graphml_path, place=None, bbox=None, project=True)
+                cand = CandidateGenerator(graph)
+                print(f"[Inference] Loaded road graph from {graphml_path} for curv_step rollout.", flush=True)
+            except Exception as exc:
+                print(f"[Inference] Failed to load graph from {graphml_path}: {exc}", flush=True)
+                graph = None
+                cand = None
     bundle = PredictorBundle(
         model=model,
         device=torch.device(device),
@@ -112,6 +132,8 @@ def load_predictor_bundle(
         lookback=lookback,
         mode=mode,
         scaler=scaler,
+        graph=graph,
+        cand=cand,
     )
     return bundle.to(bundle.device)
 
@@ -170,15 +192,53 @@ def predict_future_positions(
     with torch.no_grad():
         pred = bundle.model(x_seq, teacher=None, ss_prob=1.0)
     ds_seq = pred.squeeze(0).cpu().numpy().astype(np.float32)
+    # Prefer graph-constrained rollout when a road graph is available; otherwise
+    # fall back to simple heading-based propagation.
+    graph = getattr(bundle, "graph", None)
+    cand = getattr(bundle, "cand", None)
+    x0, y0 = base_pos
+    if graph is not None and cand is not None:
+        cur_edge = None
+        cur_s = None
+        # If caller provided edge/s in the last history record, reuse them
+        last = history[-1]
+        if "edge" in last:
+            cur_edge = last["edge"]
+            cur_s = last.get("s", None)
+        # Otherwise, project base position to nearest edge
+        if (cur_edge is None) or (cur_s is None):
+            try:
+                cands0 = cand.query(float(x0), float(y0))
+            except Exception:
+                cands0 = []
+            if cands0:
+                cur_edge = cands0[0]["edge"]
+                cur_s = cands0[0]["s"]
+        if cur_edge is not None and cur_s is not None and np.isfinite(cur_s):
+            xy_steps = rollout_curv_step_on_graph(
+                graph,
+                cand,
+                cur_edge,
+                float(cur_s),
+                ds_seq,
+                x0,
+                y0,
+            )
+            coords: List[Tuple[int, float, float]] = []
+            for step_idx, (px, py) in enumerate(xy_steps, start=1):
+                if step_idx in horizons:
+                    coords.append((step_idx, px, py))
+            return coords
+    # Fallback: free-space rollout using last heading
     dir_vec = _heading_vector(history)
-    coords: List[Tuple[int, float, float]] = []
-    px, py = base_pos
+    coords_fallback: List[Tuple[int, float, float]] = []
+    px, py = x0, y0
     for step, ds in enumerate(ds_seq, start=1):
         px += dir_vec[0] * float(ds)
         py += dir_vec[1] * float(ds)
         if step in horizons:
-            coords.append((step, px, py))
-    return coords
+            coords_fallback.append((step, px, py))
+    return coords_fallback
 
 
 def cloudlet_probabilities(
