@@ -12,20 +12,18 @@ class RandomGeneratedDataLoader:
         
         self.num_items = num_items
         self.central_node_location = central_node_location
-        self.current_step = 0  # Add current_step tracking
+        self.current_step = 1
         
-        # Define the path to the data file
         self.data_file_path = os.path.join(
             os.path.dirname(__file__), 
             '..', '..', '..', 
             'mock_data', 
-            'random_generated.txt'
+            f'random_generated_{self.num_items}.txt'
         )
         
-        # Load or generate initial data and simulation history
         self.simulation_data = self._load_or_generate_simulation_data()
-        self.users = self.simulation_data['initial_users']  # For current state tracking
-        self.step_history = self.simulation_data['step_history']  # All computed steps
+        self.users = self.simulation_data['initial_users']
+        self.step_history = self.simulation_data['step_history']
     
     def _random_location_around_central(self, central_node_location, min_distance=None, max_distance=None):
         if min_distance is None:
@@ -52,7 +50,7 @@ class RandomGeneratedDataLoader:
         if max_speed is None:
             max_speed = Config.USER_MAX_SPEED
             
-        speed = random.uniform(min_speed, max_speed)  # m/s, slow pedestrian/vehicle speed
+        speed = random.uniform(min_speed, max_speed)
         direction = random.uniform(0, 2 * math.pi)
         
         vx = speed * math.cos(direction)
@@ -65,10 +63,10 @@ class RandomGeneratedDataLoader:
         vx, vy, speed, direction = self.random_velocity()
 
         return {
-            "user_id": i,
+            "id": i,
             "current_step": 0,
-            "location_x": x,
-            "location_y": y,
+            "x": x,
+            "y": y,
             "velocity_x": vx,
             "velocity_y": vy,
             "speed": speed,
@@ -76,9 +74,6 @@ class RandomGeneratedDataLoader:
         }
     
     def _load_or_generate_simulation_data(self):
-        """
-        Load complete simulation data from file if it exists, otherwise generate new data
-        """
         if os.path.exists(self.data_file_path):
             # Load existing data
             try:
@@ -99,7 +94,6 @@ class RandomGeneratedDataLoader:
             except (json.JSONDecodeError, FileNotFoundError) as e:
                 print(f"Error loading data file: {e}, regenerating...")
         
-        # Generate new simulation data
         print(f"Generating new simulation data and saving to {self.data_file_path}")
         users = []
         for i in range(1, self.num_items + 1):  # user range from 1 -> num_items
@@ -118,9 +112,6 @@ class RandomGeneratedDataLoader:
         return simulation_data
     
     def _save_simulation_data(self, simulation_data):
-        """
-        Save complete simulation data to the file
-        """
         try:
             # Create directory if it doesn't exist
             os.makedirs(os.path.dirname(self.data_file_path), exist_ok=True)
@@ -132,9 +123,6 @@ class RandomGeneratedDataLoader:
             print(f"Error saving data to file: {e}")
     
     def _save_step_to_file(self, step: int, step_data):
-        """
-        Save a specific timestep data to the file
-        """
         try:
             self.simulation_data['step_history'][str(step)] = step_data
             self._save_simulation_data(self.simulation_data)
@@ -142,20 +130,12 @@ class RandomGeneratedDataLoader:
             print(f"Error saving step {step} to file: {e}")
     
     def get_data_by_step(self, step: int):
-        """
-        Get user data for a specific timestep, updating positions based on movement
-        
-        Args:
-            step: The current simulation timestep
-            
-        Returns:
-            List of user data with updated positions
-        """
-        # Check if we already have this step cached
         step_key = str(step)
         if step_key in self.step_history:
             print(f"Returning cached data for step {step}")
-            return self.step_history[step_key]
+            return {
+                "items": self.step_history[step_key]
+            }
         
         # Update positions if we've moved to a new step
         if step > self.current_step:
@@ -167,9 +147,9 @@ class RandomGeneratedDataLoader:
         for user in self.users:
             user_data = {
                 "timestep": step,
-                "user_id": user["user_id"],
-                "location_x": user["location_x"],
-                "location_y": user["location_y"]
+                "id": user["id"],
+                "x": user["x"],
+                "y": user["y"]
             }
             data.append(user_data)
         
@@ -180,20 +160,22 @@ class RandomGeneratedDataLoader:
         self._save_step_to_file(step, data)
         
         print(f"Generated and cached new data for step {step}")
-        return data
+        return {
+            "items": data
+        }
     
     def _update_user_positions(self, steps_elapsed: int = 1):
         for user in self.users:
             # Update current step
             user["current_step"] += steps_elapsed
             # Update position based on velocity
-            user["location_x"] += user["velocity_x"] * steps_elapsed
-            user["location_y"] += user["velocity_y"] * steps_elapsed
+            user["x"] += user["velocity_x"] * steps_elapsed
+            user["y"] += user["velocity_y"] * steps_elapsed
             
             # Check if user is getting too far from central node and apply boundary constraints
             central_x = self.central_node_location.get('x', 0)
             central_y = self.central_node_location.get('y', 0)
-            distance_from_center = math.sqrt((user["location_x"] - central_x)**2 + (user["location_y"] - central_y)**2)
+            distance_from_center = math.sqrt((user["x"] - central_x)**2 + (user["y"] - central_y)**2)
             max_allowed_distance = Config.USER_MAX_DISTANCE_FROM_CENTER
             
             # Add some randomness to movement (slight direction and speed variations)
@@ -201,7 +183,7 @@ class RandomGeneratedDataLoader:
                 # If user is too far, redirect them back towards center
                 if distance_from_center > max_allowed_distance:
                     # Calculate direction back to center
-                    angle_to_center = math.atan2(central_y - user["location_y"], central_x - user["location_x"])
+                    angle_to_center = math.atan2(central_y - user["y"], central_x - user["x"])
                     # Add some randomness to avoid straight-line movement
                     angle_variation = random.uniform(-0.5, 0.5)  # ±30 degrees variation
                     user["direction"] = angle_to_center + angle_variation
@@ -230,45 +212,10 @@ class RandomGeneratedDataLoader:
                 # Apply boundary constraint for users without direction
                 if distance_from_center > max_allowed_distance:
                     # Reduce velocity towards center
-                    direction_to_center_x = (central_x - user["location_x"]) / distance_from_center
-                    direction_to_center_y = (central_y - user["location_y"]) / distance_from_center
+                    direction_to_center_x = (central_x - user["x"]) / distance_from_center
+                    direction_to_center_y = (central_y - user["y"]) / distance_from_center
                     user["velocity_x"] = direction_to_center_x * abs(user["velocity_x"])
                     user["velocity_y"] = direction_to_center_y * abs(user["velocity_y"])
             
-            
-    def get_cached_steps(self):
-        """
-        Get list of all cached timesteps
-        
-        Returns:
-            List of integers representing cached timesteps
-        """
-        return sorted([int(step) for step in self.step_history.keys()])
-    
-    def get_max_cached_step(self):
-        """
-        Get the maximum cached timestep
-        
-        Returns:
-            Integer representing the maximum cached timestep, or -1 if no steps cached
-        """
-        cached_steps = self.get_cached_steps()
-        return max(cached_steps) if cached_steps else -1
-    
-    def clear_cache_after_step(self, step: int):
-        """
-        Clear cached data after a specific step (useful for restarting simulation from a point)
-        
-        Args:
-            step: The step after which to clear cache
-        """
-        steps_to_remove = [s for s in self.step_history.keys() if int(s) > step]
-        for step_key in steps_to_remove:
-            del self.step_history[step_key]
-        
-        # Save updated data
-        self._save_simulation_data(self.simulation_data)
-        print(f"Cleared cached data after step {step}")
-    
     def __len__(self):
         return self.num_items

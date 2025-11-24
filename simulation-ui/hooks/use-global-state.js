@@ -319,6 +319,13 @@ const useGlobalState = create((set) => ({
         : updater
     })),
 
+  datasetInfo: {},
+  setDatasetInfo: (updater) =>
+    set((state) => ({
+      datasetInfo: typeof updater === "function"
+        ? updater(state.datasetInfo)
+        : updater
+    })),
   
 
   // Loading and error request

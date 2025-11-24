@@ -29,7 +29,7 @@ def create_central_node_app():
     
     return app
 
-def setup_logging(log_level: str = "INFO"):
+def setup_logging(port, log_level: str = "INFO"):
     """Setup logging configuration"""
     # Create logger
     logger = logging.getLogger()
@@ -41,13 +41,8 @@ def setup_logging(log_level: str = "INFO"):
     # Create formatter
     formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     
-    # Ensure logs directory exists
-    try:
-        os.makedirs('logs', exist_ok=True)
-    except Exception:
-        pass
     # File handler
-    file_handler = logging.FileHandler('logs/central_node.log')
+    file_handler = logging.FileHandler(f'logs/central_node_{port}.log')
     file_handler.setLevel(getattr(logging, log_level.upper()))
     file_handler.setFormatter(formatter)
     
@@ -80,7 +75,7 @@ def main():
     args = parser.parse_args()
     
     # Setup logging
-    setup_logging(args.log_level)
+    setup_logging(args.port, args.log_level)
     logger = logging.getLogger(__name__)
     
     logger.info("=" * 60)

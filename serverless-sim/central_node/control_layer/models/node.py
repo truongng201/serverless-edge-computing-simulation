@@ -1,4 +1,4 @@
-﻿import time
+import time
 from typing import Dict, List, Any, Optional
 from dataclasses import dataclass, field
 

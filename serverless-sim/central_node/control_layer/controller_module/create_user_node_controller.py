@@ -20,8 +20,7 @@ class CreateUserNodeController:
 
     def _create_user_node(self):
         user_location = self.user_data.get("location", {"x": 0.0, "y": 0.0})
-        # Compute assignment for this single user location using greedy rule
-        assigned_node_id, assigned_node_distance = self.scheduler._greedy_assignment(user_location)
+        assigned_node_id, assigned_node_distance = self.scheduler.node_assignment(user_location)
         # data_size = random.randint(*Config.DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES)
         # bandwidth = random.randint(*Config.DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND)
         data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
@@ -58,11 +57,6 @@ class CreateUserNodeController:
             cold_start_penalty=0.0
         )
         self.scheduler.create_user_node(user_node)
-        # Update assignment matrix entry for this user (optional)
-        try:
-            self.scheduler.assignment_matrix[user_node.user_id] = (assigned_node_id, assigned_node_distance)
-        except Exception:
-            pass
 
     def execute(self):
         self._create_user_node()
