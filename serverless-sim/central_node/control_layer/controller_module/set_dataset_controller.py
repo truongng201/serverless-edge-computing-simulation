@@ -164,6 +164,7 @@ class SetDatasetController:
                         px, py = self._to_px(xmp, ymp, minx, maxy)
                         seq_px.append({"ts": pt["ts"], "x": px, "y": py})
                     trajectories_px[f"user_{user_id}"] = seq_px
+                sample_data["items"] = items
                 self.scheduler.set_trajectories_px(trajectories_px)
                 self.scheduler.set_current_step_id(0)
                 
@@ -207,6 +208,10 @@ class SetDatasetController:
         if self.dataset_name == "none":
             self.scheduler.clear_all_users()
             return "Dataset cleared successfully"
-
         self.start_sample_data()
+        if self.dataset_name == "taxiD_Replay":
+            self.logger.info(
+                f"TaxiD replay: created {len(self.scheduler.user_nodes)} users from "
+                f"{len(self.scheduler.get_trajectories_px())} trajectories"
+            )
         return f"Dataset set to {self.dataset_name} successfully"

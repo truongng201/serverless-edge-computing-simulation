@@ -50,9 +50,9 @@ class Scheduler:
             "current_step_id": None,
             "trajectories_px": {}
         }
-        self.current_dataset = "none"
-        self.random_sample_size = 0
-        self.current_step_id = None
+        # self.current_dataset = "none"
+        # self.random_sample_size = 0
+        # self.current_step_id = None
 
         self.history_max_points = getattr(Config, "TDRIVE_HISTORY_LENGTH", 20)
         self.predictor_adapter = None

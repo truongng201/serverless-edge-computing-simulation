@@ -11,15 +11,15 @@ class GetAllUsersController:
     def __init__(self, scheduler: Scheduler, data_manager: DataManager):
         self.scheduler = scheduler
         self.data_manager = data_manager
-        self.current_step_id = self.scheduler.current_step_id
+        self.current_step_id = self.scheduler.get_current_step_id()
         self.current_dataset = self.scheduler.get_current_dataset()
         self.random_sample_size = self.scheduler.get_sample_size()
         self.simulation = self.scheduler.simulation
         self.response = []
        
     def _update_scheduler(self):
-        self.scheduler.current_dataset = self.current_dataset
-        self.scheduler.current_step_id = self.current_step_id
+        self.scheduler.set_current_dataset(self.current_dataset)
+        self.scheduler.set_current_step_id(self.current_step_id)
         
     def _update_dact_sample(self):
         if not self.simulation or not self.current_step_id:
@@ -167,16 +167,16 @@ class GetAllUsersController:
         """
         if not self.simulation:
             return False
-        dataset = self.current_dataset
-        if not isinstance(dataset, dict) or dataset.get("name") != "taxid_replay":
-            return False
-        trajectories_px = dataset.get("trajectories_px") or {}
-        step = int(dataset.get("step", 0))
+       
+        trajectories_px = self.scheduler.get_trajectories_px()
+        step = self.scheduler.get_current_step_id()
         if not trajectories_px:
+            print("No trajectories found for TaxiD replay.")
             return False
         max_len = 0
         for user_id, seq in trajectories_px.items():
             if not seq:
+                print(f"No seq for {user_id}")
                 continue
             max_len = max(max_len, len(seq))
             idx = min(step, len(seq) - 1)
@@ -196,8 +196,7 @@ class GetAllUsersController:
                 )
         if max_len == 0:
             return False
-        dataset["step"] = min(step + 1, max_len - 1)
-        self.current_dataset = dataset
+        self.current_step_id = min(step + 1, max_len - 1) 
         return True
 
     def _get_all_users(self):
@@ -207,12 +206,10 @@ class GetAllUsersController:
 
         if dataset_name == "dact":
             self._update_dact_sample()
-        elif dataset_name == "vehicles":
-            self._update_vehicles_sample()
         elif dataset_name == "random_generated":
             self._update_random_generated_sample()
             self.scheduler.node_assignment()
-        elif dataset_name == "taxid_replay":
+        elif dataset_name == "taxiD_Replay":
             self._update_taxid_replay_sample()
             self.scheduler.node_assignment()
         for user_id, user_node in self.scheduler.user_nodes.items():
