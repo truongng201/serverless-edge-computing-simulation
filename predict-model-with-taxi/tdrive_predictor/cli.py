@@ -158,6 +158,7 @@ def main():
         print("Metrics:", stats)
     elif args.cmd == 'eval-ctrv':
         import os, pandas as pd, numpy as np
+        print(f"[CTRV] Evaluating CTRV baseline | data_dir={args.data_dir} | lookback={args.lookback} | snap={args.snap}")
         test_df = pd.read_pickle(os.path.join(args.data_dir, 'test.pkl'))
         params = CTRVParams(
             r_pos=args.r_pos,
@@ -273,6 +274,11 @@ def main():
         print("Metrics:", res)
     elif args.cmd == 'eval-markov':
         import os, pandas as pd, numpy as np
+        print(f"[Markov] Evaluating Markov baseline | data_dir={args.data_dir} | lookback={args.lookback}")
+        if args.graphml:
+            print(f"[Markov] Using graphml={args.graphml}")
+        elif args.place or args.bbox:
+            print(f"[Markov] Using place/bbox graph source | place={args.place} | bbox={args.bbox}")
         train_df = pd.read_pickle(os.path.join(args.data_dir, 'train.pkl'))
         test_df = pd.read_pickle(os.path.join(args.data_dir, 'test.pkl'))
         G = load_graph(graphml_path=args.graphml, place=args.place, bbox=tuple(args.bbox) if args.bbox else None)

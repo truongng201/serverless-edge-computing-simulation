@@ -50,6 +50,8 @@ def build_transitions(train_df: pd.DataFrame, cand_gen: CandidateGenerator, lapl
     Returns a list of 24 dicts: trans[hour][edge_a] -> Counter(edge_b->count)
     """
     trans: List[Dict[EdgeKey, Counter]] = [defaultdict(Counter) for _ in range(24)]
+    print(f"[Markov] Building transitions on train set | rows={len(train_df)}")
+    trip_count = 0
     for trip_id, g in train_df.sort_values(['trip_id', 'ts']).groupby('trip_id'):
         g = g.reset_index(drop=True)
         edges = _assign_edges(g[['x', 'y']], cand_gen)
@@ -65,6 +67,12 @@ def build_transitions(train_df: pd.DataFrame, cand_gen: CandidateGenerator, lapl
                 trans[hour][a][a] += 1
             else:
                 trans[hour][a][b] += 1
+        trip_count += 1
+        if trip_count % 1000 == 0:
+            print(f"[Markov]   processed {trip_count} train trips...")
+    total_states = sum(len(hour_dict) for hour_dict in trans)
+    total_transitions = sum(sum(counter.values()) for hour_dict in trans for counter in hour_dict.values())
+    print(f"[Markov] Finished transitions | states={total_states} | transitions={total_transitions}")
     return trans
 
 
@@ -97,10 +105,12 @@ def eval_markov_on_split(
     on train; at test time, rolls out per minute choosing argmax next edge per hour.
     Positions are taken as edge midpoints for simplicity.
     """
+    print(f"[Markov] Starting evaluation | train_rows={len(train_df)} | test_rows={len(test_df)} | lookback={lookback}")
     trans = build_transitions(train_df, cand_gen)
     steps = [1, 3, 5, 10]
     preds: List[List[float]] = []
     truths: List[List[float]] = []
+    trip_count = 0
     for trip_id, g in test_df.sort_values(['trip_id', 'ts']).groupby('trip_id'):
         g = g.reset_index(drop=True)
         n = len(g)
@@ -133,6 +143,11 @@ def eval_markov_on_split(
                 y_true_row.extend([float(row['x'] - x0), float(row['y'] - y0)])
             preds.append(y_pred_row)
             truths.append(y_true_row)
+        trip_count += 1
+        if trip_count % 500 == 0:
+            print(f"[Markov]   processed {trip_count} test trips...")
     if not preds:
+        print("[Markov] No valid windows found on test set (preds empty).")
         return np.zeros((0, 8), dtype=np.float32), np.zeros((0, 8), dtype=np.float32)
+    print(f"[Markov] Completed evaluation windows | count={len(preds)}")
     return np.array(preds, dtype=np.float32), np.array(truths, dtype=np.float32)
