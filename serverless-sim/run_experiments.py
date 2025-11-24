@@ -511,7 +511,7 @@ class ExperimentRunner:
             # edge_ranges = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
             edge_ranges = [10, 20, 30, 40, 50]
         if not algorithms:
-            algorithms = ["greedy", "convex optimization"]
+            algorithms = ["predictive", "greedy", "convex optimization"]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():
