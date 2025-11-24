@@ -135,10 +135,10 @@ class ExperimentRunner:
             return False
 
     def set_dataset(self, num_users: int) -> bool:
-        dataset_name = 'random_generated'
+        dataset_name = 'taxiD_Replay'
         try:
             print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
-            payload = {"dataset_name": dataset_name, "sample_size": int(num_users)}
+            payload = {"dataset_name": dataset_name}
             response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=10)
             if response.status_code == 200:
                 return True
@@ -181,7 +181,7 @@ class ExperimentRunner:
         return metrics
     
     def run_single_experiment(self, num_users: int, num_edges: int, algorithm: str, 
-                            experiment_duration: int = 300) -> Dict[str, Any]:
+                            experiment_duration: int = 600) -> Dict[str, Any]:
         """Run a single experiment configuration"""
         experiment_start = time.time()
         print(f"\n{'='*60}")
@@ -506,9 +506,10 @@ class ExperimentRunner:
     
     def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 30):
         if not user_ranges:
-            user_ranges = [800]
+            user_ranges = [1000]
         if not edge_ranges:
-            edge_ranges = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+            # edge_ranges = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
+            edge_ranges = [10, 20, 30, 40, 50]
         if not algorithms:
             algorithms = ["greedy", "convex optimization"]
         signal.signal(signal.SIGINT, self.signal_handler)
@@ -569,7 +570,7 @@ class ExperimentRunner:
 
 
 def main():
-    central_url = "http://localhost:8008"
+    central_url = "http://localhost:8000"
     runner = ExperimentRunner(central_url=central_url)
     
     runner.run_comprehensive_experiments()
