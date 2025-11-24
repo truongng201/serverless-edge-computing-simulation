@@ -5,7 +5,7 @@ class DeleteAllUsersController:
         self.scheduler = scheduler
         
     def _delete_all_users(self):
-        self.scheduler.user_nodes.clear()
+        self.scheduler.delete_all_user()
 
     def execute(self):
         self._delete_all_users()

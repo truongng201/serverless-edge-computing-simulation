@@ -11,11 +11,11 @@ class DeleteUserController:
     def _validate_user(self):
         if not self.user_id:
             raise InvalidDataException("User ID is required")
-        if self.user_id not in self.scheduler.user_nodes:
+        if not self.scheduler.get_user_by_id(self.user_id):
             raise NotFoundException(f"User {self.user_id} not found")
 
     def _delete_all_users(self):
-        del self.scheduler.user_nodes[self.user_id]
+        self.scheduler.delete_user_by_id(self.user_id)
 
     def execute(self):
         self._delete_all_users()

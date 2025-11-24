@@ -13,7 +13,7 @@ class GetAllUsersController:
         self.data_manager = data_manager
         self.current_step_id = self.scheduler.current_step_id
         self.current_dataset = self.scheduler.get_current_dataset()
-        self.random_sample_size = self.scheduler.get_random_sample_size()
+        self.random_sample_size = self.scheduler.get_sample_size()
         self.simulation = self.scheduler.simulation
         self.response = []
        

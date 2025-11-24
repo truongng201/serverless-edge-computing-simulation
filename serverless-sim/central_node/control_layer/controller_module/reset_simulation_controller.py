@@ -6,9 +6,9 @@ class ResetSimulationController:
 
     def _reset_simulation(self):
         self.scheduler.simulation = False
-        self.scheduler.current_dataset = None
-        self.scheduler.current_step_id = None
-        self.scheduler.user_nodes.clear()
+        self.scheduler.set_current_dataset(None)
+        self.scheduler.set_current_step_id(None)
+        self.scheduler.delete_all_user()
 
     def execute(self):
         self._reset_simulation()

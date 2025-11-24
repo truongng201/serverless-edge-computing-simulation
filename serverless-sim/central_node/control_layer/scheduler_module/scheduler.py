@@ -44,6 +44,12 @@ class Scheduler:
         
         self.simulation = False
         self.assignment_matrix = {}
+        self.dataset_metadata = {
+            "dataset_name": "none",
+            "sample_size": 0,
+            "current_step_id": None,
+            "trajectories_px": {}
+        }
         self.current_dataset = "none"
         self.random_sample_size = 0
         self.current_step_id = None
@@ -92,17 +98,42 @@ class Scheduler:
         except ValueError:
             raise Exception(f"Invalid assignment algorithm: {assignment_algorithm}")
     
-    def get_random_sample_size(self):
-        return self.random_sample_size
+    def get_sample_size(self):
+        return self.dataset_metadata.get("sample_size", 0)
     
-    def set_random_sample_size(self, sample_size=100):
-        self.random_sample_size = sample_size
+    def set_sample_size(self, sample_size=100):
+        self.dataset_metadata["sample_size"] = sample_size
         
     def get_current_dataset(self):
-        return self.current_dataset
+        return self.dataset_metadata.get("dataset_name", "none")
     
     def set_current_dataset(self, dataset_name):
-        self.current_dataset = dataset_name
+        self.dataset_metadata["dataset_name"] = dataset_name
+        
+    def get_current_step_id(self):
+        return self.dataset_metadata.get("current_step_id", None)
+    
+    def set_current_step_id(self, step_id=None):
+        self.dataset_metadata["current_step_id"] = step_id
+        
+    def delete_all_user(self):
+        self.user_nodes.clear()
+    
+    def delete_user_by_id(self, user_id):
+        if user_id not in self.user_nodes:
+            return
+        del self.user_nodes[user_id]
+        
+    def get_user_by_id(self, user_id):
+        if user_id not in self.user_nodes:
+            return None
+        return self.user_nodes[user_id]
+    
+    def get_trajectories_px(self):
+        return self.dataset_metadata["trajectories_px"]
+    
+    def set_trajectories_px(self, trajectories_px):
+        self.dataset_metadata["trajectories_px"] = trajectories_px
         
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:

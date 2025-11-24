@@ -14,7 +14,7 @@ class GetDatasetListController:
     def get_dataset_detail_information(self):
         self.response["dataset_list"] = self.data_manager.get_dataset_info()
         self.response["current_dataset"] = self.scheduler.get_current_dataset()
-        self.response["sample_size"] = self.scheduler.get_random_sample_size()
+        self.response["sample_size"] = self.scheduler.get_sample_size()
 
     def execute(self):
         self.get_dataset_detail_information()
