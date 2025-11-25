@@ -11,10 +11,16 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 # Ensure the T-Drive package directory is importable when running from serverless-sim
-ROOT_DIR = Path(__file__).resolve().parents[3]
+# Path: serverless-sim/central_node/control_layer/prediction_module/tdrive_inference.py
+# parents[0]=prediction_module, [1]=control_layer, [2]=central_node, [3]=serverless-sim, [4]=project_root
+ROOT_DIR = Path(__file__).resolve().parents[4]
 TDRIVE_PKG_DIR = ROOT_DIR / "predict-model-with-taxi"
-if TDRIVE_PKG_DIR.exists() and str(TDRIVE_PKG_DIR) not in sys.path:  # pragma: no cover
-    sys.path.append(str(TDRIVE_PKG_DIR))
+
+logger.info(f"TDrive package directory: {TDRIVE_PKG_DIR}")
+
+if TDRIVE_PKG_DIR.exists() and str(TDRIVE_PKG_DIR) not in sys.path:
+    sys.path.insert(0, str(TDRIVE_PKG_DIR))  # Insert at beginning for priority
+    logger.info(f"Added {TDRIVE_PKG_DIR} to sys.path")
 
 try:
     from tdrive_predictor.inference_service import (
@@ -23,11 +29,14 @@ try:
         load_predictor_bundle,
         predict_future_positions,
     )
+    load_error = None
+    logger.info("Successfully imported tdrive_predictor.inference_service")
 except ImportError as exc:  # pragma: no cover - optional dependency
     PredictorBundle = None  # type: ignore
     load_error = exc
-else:
-    load_error = None
+    logger.error(f"Failed to import tdrive_predictor: {exc}")
+    logger.error(f"TDRIVE_PKG_DIR exists: {TDRIVE_PKG_DIR.exists()}")
+    logger.error(f"sys.path includes: {[p for p in sys.path if 'predict' in p.lower()]}")
 
 
 class TDrivePredictorAdapter:
