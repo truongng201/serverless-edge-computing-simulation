@@ -97,6 +97,22 @@ else
     fi
 fi
 
+# Create a simple edge node image
+EDGE_IMAGE="edge-node:latest"
+if docker images | grep -q "edge-node"; then
+    echo "✅ Python edge-node image already exists"
+else
+    echo "Building python edge-node image..."
+
+    cd ..
+    if docker build -t "$EDGE_IMAGE" -f $PWD/Dockerfile; then
+        echo "✅ Python edge-node image built successfully"
+    else
+        echo "❌ Failed to build python edge-node image"
+        exit 1
+    fi
+fi
+
 # Test container creation and execution
 echo ""
 echo "🧪 Testing container operations..."

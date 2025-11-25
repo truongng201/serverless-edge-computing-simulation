@@ -1,0 +1,1 @@
+# This image is to start the edge node
