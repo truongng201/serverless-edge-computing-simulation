@@ -41,12 +41,16 @@ export const setServerAssignmentAlgorithm = async (selectedAlgorithm) => {
           algorithm: selectedAlgorithm,
         }
       );
-      if (!response.ok || response.data?.status !== "success") {
-        console.error("Failed to set assignment algorithm on backend");
+      // axios uses response.status, not response.ok
+      if (response.status !== 200 || response.data?.status !== "success") {
+        console.error("Failed to set assignment algorithm on backend:", response.data);
+        return { success: false, error: "Backend returned error" };
       }
+      return { success: true, algorithm: selectedAlgorithm };
     }
+    return { success: false, error: "API URL not configured" };
   } catch (error) {
     console.error("Error setting assignment algorithm:", error);
+    return { success: false, error: error.message };
   }
-  return null;
 };

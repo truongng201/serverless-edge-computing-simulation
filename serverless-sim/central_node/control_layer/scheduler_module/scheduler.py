@@ -1,7 +1,6 @@
 import logging
 import time
 from typing import Dict, List, Optional, Any, Tuple
-import time
 from enum import Enum
 import cvxpy as cp
 import numpy as np
@@ -62,7 +61,10 @@ class Scheduler:
                     Config.TDRIVE_ARTIFACT_DIR,
                     getattr(Config, "TDRIVE_CKPT_NAME", None),
                     getattr(Config, "TDRIVE_DEVICE", "cpu"),
+                    temperature=getattr(Config, "TDRIVE_SOFTMAX_TEMPERATURE", 50.0),
+                    max_radius=getattr(Config, "TDRIVE_MAX_RADIUS_M", None),
                 )
+                self.logger.info("T-Drive predictor adapter initialized successfully")
             except Exception as exc:
                 self.logger.warning("Failed to initialize T-Drive predictor: %s", exc)
         elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
@@ -225,6 +227,45 @@ class Scheduler:
             user_node.history = user_node.history[-self.history_max_points:]
 
         self.user_nodes[user_node.user_id] = user_node
+
+    def _pad_history_to_lookback(self, history: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        """Pad history to have at least `history_max_points` entries by replicating the last point.
+        
+        This allows prediction to work even when user has just been created.
+        The padded points represent a "stationary" user at the current position.
+        """
+        if len(history) >= self.history_max_points:
+            return history[-self.history_max_points:]
+        
+        if not history:
+            return []
+        
+        # Get the last known point as template
+        last_point = history[-1].copy()
+        padded = list(history)
+        
+        # Calculate how many points we need to add
+        points_needed = self.history_max_points - len(history)
+        
+        # Create padded points with slightly earlier timestamps (1 second apart)
+        base_ts = last_point.get("ts", time.time())
+        
+        for i in range(points_needed):
+            # Create a copy of the last point with modified timestamp
+            padded_point = last_point.copy()
+            # Set timestamp slightly before the earliest existing point
+            # Insert at the beginning to maintain chronological order
+            padded_point["ts"] = base_ts - (points_needed - i) * 60.0  # 1 minute apart
+            # For padded points, user is stationary
+            padded_point["v"] = 0.0
+            padded_point["delta_v"] = 0.0
+            padded_point["a"] = 0.0
+            padded_point["delta_heading"] = 0.0
+            padded_point["stop_flag"] = 1.0
+            padded_point["dw_time"] = float(points_needed - i) * 60.0  # dwell time accumulates
+            padded.insert(0, padded_point)
+        
+        return padded
     
     def clear_all_users(self):
         self.user_nodes = {}
@@ -333,14 +374,38 @@ class Scheduler:
         if not self.edge_nodes:
             self.logger.warning("No edge nodes registered; using greedy assignment")
             return self._assign_users_greedy()
+        
+        # Collect user states - pad history if insufficient
         user_states = []
+        users_no_history = 0
+        users_padded = 0
+        
         for user in self.user_nodes.values():
             if not user.history:
+                users_no_history += 1
                 continue
-            history = user.history[-self.history_max_points :]
+            
+            # Pad history to ensure we have enough points for prediction
+            history = self._pad_history_to_lookback(user.history)
+            
+            if len(user.history) < self.history_max_points:
+                users_padded += 1
+            
             user_states.append({"user_id": user.user_id, "history": history})
+        
+        # Log summary of user history status
+        total_users = len(self.user_nodes)
+        if users_no_history > 0 or users_padded > 0:
+            self.logger.info(
+                f"Predictive assignment: {total_users} users total, "
+                f"{users_no_history} with no history, "
+                f"{users_padded} padded to {self.history_max_points} points"
+            )
+        
         if not user_states:
+            self.logger.warning("No users with history data, falling back to greedy assignment")
             return self._assign_users_greedy()
+        
         cloudlet_records = [
             {"id": node_id, "x": info.location["x"], "y": info.location["y"]}
             for node_id, info in self.edge_nodes.items()
@@ -350,12 +415,26 @@ class Scheduler:
         except Exception as exc:
             self.logger.warning("Predictive inference failed: %s", exc)
             return self._assign_users_greedy()
+        
+        # Log prediction results summary
+        predicted_count = len(prob_map)
+        total_with_history = len(user_states)
+        if predicted_count < total_with_history:
+            self.logger.info(
+                f"Prediction results: {predicted_count}/{total_with_history} users predicted successfully"
+            )
+        
         self.assignment_matrix = {}
+        predictive_assignments = 0
+        greedy_fallback_assignments = 0
+        
         for user_id, user_node in self.user_nodes.items():
             probs = prob_map.get(user_id)
             if probs is None:
                 assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                greedy_fallback_assignments += 1
             else:
+                predictive_assignments += 1
                 horizon_idx = probs.shape[1] - 1 if probs.ndim == 2 else -1
                 order = np.argsort(probs[:, horizon_idx])[::-1]
                 assigned_node_id = None
@@ -383,6 +462,14 @@ class Scheduler:
             )
             user_node.latency.total_turnaround_time = total_turnaround_time
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+        
+        # Log final assignment summary
+        if predictive_assignments > 0 or greedy_fallback_assignments > 0:
+            self.logger.info(
+                f"Assignment complete: {predictive_assignments} predictive, "
+                f"{greedy_fallback_assignments} greedy fallback"
+            )
+        
         return self.assignment_matrix
 
     def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:

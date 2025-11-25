@@ -1,11 +1,14 @@
 ﻿"""Bridge between serverless-sim and the T-Drive predictor package."""
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence
 import sys
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 # Ensure the T-Drive package directory is importable when running from serverless-sim
 ROOT_DIR = Path(__file__).resolve().parents[3]
@@ -80,13 +83,35 @@ def get_mobility_prediction(
     if not user_states:
         return {}
     result = {}
+    failed_count = 0
+    insufficient_history_count = 0
+    
     for user in user_states:
         uid = user.get("user_id")
         if uid is None:
             continue
         try:
             probs = adapter.predict_user(user, cloudlets)
-        except Exception:
-            continue
-        result[uid] = probs
+            result[uid] = probs
+        except ValueError as e:
+            # Usually means insufficient history points
+            insufficient_history_count += 1
+            logger.debug(f"User {uid} prediction skipped: {e}")
+        except Exception as e:
+            failed_count += 1
+            logger.warning(f"User {uid} prediction failed: {e}")
+    
+    # Log summary if there were issues
+    total_users = len(user_states)
+    successful = len(result)
+    if insufficient_history_count > 0:
+        logger.info(
+            f"Predictive assignment: {successful}/{total_users} users predicted, "
+            f"{insufficient_history_count} users lack sufficient history (need 20+ points)"
+        )
+    if failed_count > 0:
+        logger.warning(
+            f"Predictive assignment: {failed_count} users failed due to errors"
+        )
+    
     return result
