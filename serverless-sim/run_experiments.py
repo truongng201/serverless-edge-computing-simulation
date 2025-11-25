@@ -507,7 +507,7 @@ class ExperimentRunner:
             print(f"Saved duration plot to {duration_path}")
         
     
-    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 30):
+    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 300):
         if not user_ranges:
             user_ranges = [1000]
         if not edge_ranges:

@@ -16,3 +16,5 @@ cvxpy==1.7.3
 osmnx==1.9.4
 shapely>=2.0.0
 networkx>=2.8
+# torch==2.0.1
+# torchvision==0.15.2
