@@ -162,26 +162,13 @@ class ContainerManager:
                 stdout=True,
                 stderr=True
             )
-
+            self.containers[container_id].state = ContainerState.WARM
             output = exec_result.output.decode("utf-8").strip()
             self.logger.debug(f"Exec output from {container_id[:12]}:\n{output}")
             return output
         except Exception as e:
             self.logger.error(f"Failed to exec in container {container_id}: {e}")
             return None
-
-    def warm_container(self, container_id: str) -> bool:
-        if not container_id or container_id not in self.containers:
-            return False
-
-        try:
-            self.containers[container_id].stopped_at = time.time()
-            self.containers[container_id].state = ContainerState.WARM
-            self.logger.info(f"Container warmed: {container_id[:12]}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to warm container {container_id}: {e}")
-            return False
 
     def remove_container(self, container_id: str, force: bool = False) -> bool:
         """Remove a container (WARM -> DEAD)"""

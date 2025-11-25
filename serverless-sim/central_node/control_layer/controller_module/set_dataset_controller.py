@@ -199,7 +199,6 @@ class SetDatasetController:
                 latency=latency
             )
             self.scheduler.create_user_node(user_node)
-
         self.scheduler.node_assignment()
                 
     def execute(self):

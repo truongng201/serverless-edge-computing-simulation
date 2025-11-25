@@ -33,7 +33,7 @@ for ((i=1; i<=NUM_EDGES; i++)); do
   PORT=$((START_PORT + i - 1))
   echo "➡️  Starting $NODE_ID on port $PORT"
   # Start each edge in a new process group
-  setsid ./deploy_edge.sh --node-id "$NODE_ID" --central-url "$CENTRAL_URL" --port "$PORT" &
+  setsid ./deploy_edge.sh --node-id "$NODE_ID" --central-url "$CENTRAL_URL" --cpus 2 --memory 1g --port "$PORT" &
   PIDS+=($!)
 done
 

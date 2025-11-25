@@ -19,7 +19,7 @@ class Config:
     DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
-    DEFAULT_MAX_WARM_TIME = 2  # seconds
+    DEFAULT_MAX_WARM_TIME = 8  # seconds: warm time larger than execution time to allow reuse
     
     
     # Cleanup
@@ -27,7 +27,7 @@ class Config:
     CLEANUP_DEAD_NODES_INTERVAL = 10  # seconds
 
     # Metrics Collection
-    METRICS_COLLECTION_INTERVAL = 5  # seconds
+    METRICS_COLLECTION_INTERVAL = 3  # seconds
     
     # Node Configuration
     CENTRAL_NODE_PORT = 8000
@@ -55,7 +55,7 @@ class Config:
     CONTAINER_NETWORK = "serverless-network"
     
     # User Configuration
-    DEFAULT_EXECUTION_TIME_INTERVAL = 15 # seconds: every 3 seconds all user in simulation call it assigned node
+    DEFAULT_EXECUTION_TIME_INTERVAL = 10 # seconds: every 5 seconds all user in simulation call it assigned node
     DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES = (1024, 10240)  # 1 KB to 10 KB
     DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (100, 1000)  # 100 B/ms to 1 KB/ms
     DEFAULT_DATA_SIZE_IN_BYTES = 512 * 1024  # 512 KB
