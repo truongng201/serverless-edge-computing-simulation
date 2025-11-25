@@ -137,11 +137,11 @@ class ExperimentRunner:
             return False
 
     def set_dataset(self, num_users: int) -> bool:
-        # dataset_name = 'taxiD_Replay'
-        dataset_name = f'random_generated'
+        dataset_name = 'taxiD_Replay'
+        # dataset_name = f'random_generated'
         try:
             print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
-            payload = {"dataset_name": dataset_name, "num_users": num_users}
+            payload = {"dataset_name": dataset_name, "sample_size": num_users}
             response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=10)
             if response.status_code == 200:
                 return True
@@ -509,12 +509,12 @@ class ExperimentRunner:
     
     def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 30):
         if not user_ranges:
-            user_ranges = [100]
+            user_ranges = [1000]
         if not edge_ranges:
             # edge_ranges = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
             edge_ranges = [10, 20]
         if not algorithms:
-            algorithms = ["predictive", "greedy", "convex optimization"]
+            algorithms = ["predictive", "greedy"]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():

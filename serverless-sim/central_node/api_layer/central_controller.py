@@ -46,13 +46,9 @@ class CentralNodeAPIController:
         if not container_id:
             raise BadRequestException(f"Failed to create or reuse container {time.time() - start_time}")
 
+        result = self.container_manager.execute_container(container_id, function_data)
         execution_time = time.time() - start_time
         self.response_times.append(execution_time)
-        result = self.container_manager.execute_container(container_id, function_data)
-        
-        if not self.container_manager.warm_container(container_id):
-            raise BadRequestException(f"Failed to warm container {container_id}")
-        
         self.active_requests += 1
         self.total_requests += 1
         return {
@@ -71,7 +67,8 @@ class CentralNodeAPIController:
         containers = self.container_manager.list_containers(ContainerState.WARM)
         for container in containers:
             # Reuse existing container (warm start)
-            if time.time() - container.stopped_at > Config.DEFAULT_MAX_WARM_TIME:
+            if time.time() - container.started_at > Config.DEFAULT_MAX_WARM_TIME:
+                container.state = ContainerState.DEAD
                 continue
 
             if self.container_manager.restart_container(container.container_id, function_name):
@@ -93,7 +90,13 @@ class CentralNodeAPIController:
         system_metrics = self.metrics_collector.get_detailed_metrics()
         containers = self.container_manager.list_containers()
         running_container = len([c for c in containers if c.state == ContainerState.RUNNING])
-        warm_container = len([c for c in containers if c.state == ContainerState.WARM])
+        warm_container = 0
+        for container in containers:
+            if container.state == ContainerState.WARM and time.time() - container.started_at > Config.DEFAULT_MAX_WARM_TIME:
+                container.state = ContainerState.DEAD
+                continue
+            if container.state == ContainerState.WARM:
+                warm_container += 1
         return {
             "node_id": "central_node",
             "cpu_usage": system_metrics["cpu_usage"] if system_metrics else 0,

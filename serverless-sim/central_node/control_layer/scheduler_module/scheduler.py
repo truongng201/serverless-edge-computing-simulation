@@ -49,9 +49,6 @@ class Scheduler:
             "current_step_id": None,
             "trajectories_px": {}
         }
-        # self.current_dataset = "none"
-        # self.random_sample_size = 0
-        # self.current_step_id = None
 
         self.history_max_points = getattr(Config, "TDRIVE_HISTORY_LENGTH", 20)
         self.predictor_adapter = None
@@ -485,6 +482,7 @@ class Scheduler:
             if x < Config.EDGE_NODE_UNHEALTHY_MEMORY_THRESHOLD:
                 return True
         return False  
+    
     
     def _greedy_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
         '''
