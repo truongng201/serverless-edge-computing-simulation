@@ -51,38 +51,6 @@ System metrics are collected every 10 seconds:
 
 - **CPU usage**: Reading from `/proc/stat`
 - **Memory usage**: Reading from `/proc/meminfo`
-- **Network I/O**: Reading from `/proc/net/dev`
-- **Disk I/O**: Reading from `/proc/diskstats`
-- **CPU Energy (kWh)**: Calculated as `usage (kW) × vCPUHours (h)`
-
-## Directory Structure
-
-``` plaintext
-serverless-sim/
-├── main.py                 # Entry point supporting both node types
-├── config.py              # Configuration and enums
-├── requirements.txt       # Dependencies
-├── README.md              # This file
-├── central_node/          # Central node implementation
-│   ├── control_layer/     # First layer - Control and orchestration
-│   │   ├── scheduler.py            # Request scheduling and load balancing
-│   │   ├── prediction.py           # Workload prediction using ML models
-│   │   ├── migration.py            # Container migration management
-│   │   ├── global_metrics.py       # Cluster-wide metrics collection
-│   │   ├── graph_visualizer.py     # Graph-based cluster visualization
-│   │   ├── data_manager.py         # Simulation data management
-│   │   └── ui_handler.py           # UI requests and legacy compatibility
-│   ├── api_layer/         # Second layer - API processing
-│   │   └── central_api.py          # Central node REST API
-│   └── resource_layer/    # Third layer - Same as edge nodes
-├── edge_node/             # Edge node implementation (Cloudlet nodes)
-│   ├── api_layer/         # First layer - Request processing
-│   │   └── edge_api.py             # Edge node REST API
-│   └── resource_layer/    # Second layer - Docker and metrics
-├── shared_resource_layer/                # Shared resourcer layer component
-│   ├── docker_manager.py           # Docker container lifecycle management
-│   └── system_metrics.py           # System metrics collection
-```
 
 ## Component Details
 
@@ -107,34 +75,6 @@ serverless-sim/
   - Performance forecasting
   - Model training and accuracy tracking
 
-#### Migration Manager (`migration.py`)
-
-- **Purpose**: Handles container migration between edge nodes
-- **Triggers**: High load, resource shortage, node failure, load balancing
-- **Features**:
-  - Migration decision logic
-  - Live migration execution
-  - Rollback on failure
-  - Migration statistics
-
-#### Global Metrics Collector (`global_metrics.py`)
-
-- **Purpose**: Aggregates metrics from all edge nodes
-- **Features**:
-  - Real-time cluster monitoring
-  - Health status tracking
-  - Metrics history and analytics
-  - Data export capabilities
-
-#### Graph Visualizer (`graph_visualizer.py`)
-
-- **Purpose**: Provides visual representation of cluster topology
-- **Features**:
-  - Node and edge visualization
-  - Force-directed layout algorithms
-  - Real-time cluster state representation
-  - Interactive graph data
-
 #### Data Manager (`data_manager.py`)
 
 - **Purpose**: Manages simulation datasets (DACT and vehicle data)
@@ -154,38 +94,6 @@ serverless-sim/
   - Legacy Flask endpoint compatibility
 
 ### API Layers
-
-#### Central Node API (`central_api.py`)
-
-- **Purpose**: Process requests from control layer of central node and simulation UI
-- **Endpoints**:
-  - `POST /api/v1/central/schedule` - Schedule requests
-  - `POST /api/v1/central/nodes/register` - Register edge nodes
-  - `POST /api/v1/central/nodes/{id}/metrics` - Receive metrics
-  - `GET /api/v1/central/cluster/status` - Cluster status
-  - `GET /api/v1/central/predict/{node_id}` - Workload predictions
-  - `GET /` - Simulation UI home
-  - `GET /get_sample` - Vehicle data by timestep (legacy compatibility)
-  - `GET /get_dact_sample` - DACT data by step ID
-  - `GET /simulation/status` - Simulation status
-  - `POST /simulation/start` - Start simulation
-  - `POST /simulation/stop` - Stop simulation
-  - Graph visualization endpoints
-
-#### Edge Node API (`edge_api.py`)
-
-- **Purpose**: Process requests from control layer of central node
-- **Features**:
-  - Identify cold start and warm start replicas
-  - Run containers (replicas)
-  - Kill containers
-  - Logging and monitoring
-- **Endpoints**:
-  - `POST /api/v1/edge/execute` - Execute functions
-  - `GET /api/v1/edge/status` - Node status
-  - `GET /api/v1/edge/containers` - List containers
-  - `GET /api/v1/edge/containers/{id}/stats` - Container stats
-  - `POST /api/v1/edge/cleanup` - Clean up idle containers
 
 ### Resource Layer (Shared)
 
