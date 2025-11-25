@@ -142,7 +142,7 @@ class ExperimentRunner:
         try:
             print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
             payload = {"dataset_name": dataset_name, "sample_size": num_users}
-            response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=10)
+            response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=50)
             if response.status_code == 200:
                 return True
             else:
