@@ -80,71 +80,78 @@ fi
 echo ""
 echo "🐳 Setting up container images..."
 
+# Get script directory and project root
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+PROJECT_ROOT="$( cd "$SCRIPT_DIR/.." && pwd )"
+
 # Create a simple serverless handler image
 HANDLER_IMAGE="python-serverless-handler:latest"
 
-if docker images | grep -q "python-serverless-handler"; then
-    echo "✅ Python serverless handler image already exists"
-else
-    echo "Building python serverless handler image..."
-
-    cd ..
-    if docker build -t "$HANDLER_IMAGE" -f $PWD/function_template/Dockerfile function_template; then
+echo "Building python serverless handler image..."
+if [ -f "$PROJECT_ROOT/function_template/Dockerfile" ]; then
+    if docker build -t "$HANDLER_IMAGE" -f "$PROJECT_ROOT/function_template/Dockerfile" "$PROJECT_ROOT/function_template"; then
         echo "✅ Python serverless handler image built successfully"
     else
         echo "❌ Failed to build python serverless handler image"
         exit 1
     fi
+else
+    echo "⚠️  Dockerfile not found at $PROJECT_ROOT/function_template/Dockerfile"
+    echo "   Skipping handler image build"
 fi
 
-# Create a simple edge node image
+# Create edge node image
 EDGE_IMAGE="edge-node:latest"
-if docker images | grep -q "edge-node"; then
-    echo "✅ Python edge-node image already exists"
-else
-    echo "Building python edge-node image..."
 
-    cd ..
-    if docker build -t "$EDGE_IMAGE" -f $PWD/Dockerfile; then
-        echo "✅ Python edge-node image built successfully"
+echo "Building edge node image..."
+
+if [ -f "$PROJECT_ROOT/Dockerfile" ]; then
+    if docker build -t "$EDGE_IMAGE" -f "$PROJECT_ROOT/Dockerfile" "$PROJECT_ROOT"; then
+        echo "✅ Edge node image built successfully"
     else
-        echo "❌ Failed to build python edge-node image"
+        echo "❌ Failed to build edge node image"
         exit 1
     fi
+else
+    echo "❌ Dockerfile not found at $PROJECT_ROOT/Dockerfile"
+    echo "   Cannot build edge node image"
+    exit 1
 fi
 
 # Test container creation and execution
 echo ""
 echo "🧪 Testing container operations..."
 
-# Test container creation
-echo "Testing container creation..."
-if CONTAINER_ID=$(docker create --name test-serverless-container "$HANDLER_IMAGE" 2>/dev/null); then
-    echo "✅ Container creation successful"
-    
-    # Test container start
-    echo "Testing container start..."
-    if docker start "$CONTAINER_ID" &> /dev/null; then
-        echo "✅ Container start successful"
+# Test container creation with handler image if it exists
+if docker images | grep -q "python-serverless-handler"; then
+    echo "Testing handler container creation..."
+    if CONTAINER_ID=$(docker create --name test-serverless-container "$HANDLER_IMAGE" 2>/dev/null); then
+        echo "✅ Handler container creation successful"
         
-        # Wait a moment
-        sleep 2
-        
-        # Test container stop
-        echo "Testing container stop..."
-        if docker stop "$CONTAINER_ID" &> /dev/null; then
-            echo "✅ Container stop successful"
+        # Test container start
+        echo "Testing container start..."
+        if docker start "$CONTAINER_ID" &> /dev/null; then
+            echo "✅ Container start successful"
+            
+            # Wait a moment
+            sleep 2
+            
+            # Test container stop
+            echo "Testing container stop..."
+            if docker stop "$CONTAINER_ID" &> /dev/null; then
+                echo "✅ Container stop successful"
+            else
+                echo "⚠️  Container stop failed"
+            fi
         else
-            echo "⚠️  Container stop failed"
+            echo "⚠️  Container start failed"
         fi
+        
+        # Clean up test container
+        docker rm "$CONTAINER_ID" &> /dev/null
     else
-        echo "⚠️  Container start failed"
+        echo "❌ Handler container creation failed"
     fi
-    
-    # Clean up test container
-    docker rm "$CONTAINER_ID" &> /dev/null
-else
-    echo "❌ Container creation failed"
 fi
 
 # Display Docker system information
@@ -152,9 +159,11 @@ echo ""
 echo "📊 Docker System Information..."
 echo "------------------------------"
 docker version --format "Docker version: {{.Server.Version}}"
+echo ""
 echo "Available images:"
-docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | grep -E "(serverless|hello)"
+docker images --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}" | grep -E "(serverless|edge-node|python)"
 
+echo ""
 echo "Available networks:"
 docker network ls --format "table {{.Name}}\t{{.Driver}}\t{{.Scope}}"
 
@@ -173,6 +182,9 @@ echo "• Base container images are available"
 echo "• Container operations are working"
 echo ""
 echo "🚀 You can now deploy the serverless simulation:"
-echo "• Central node: ./deploy_central.sh"
-echo "• Edge nodes: ./deploy_edge.sh --node-id <ID> --central-url <URL>"
+echo "• Edge nodes: ./deploy_edge.sh --node-id <ID> --central-url <URL> --port <PORT>"
+echo ""
+echo "Examples:"
+echo "  ./deploy_edge.sh --node-id edge_001 --central-url http://localhost:8000 --port 8001"
+echo "  ./deploy_edge.sh --node-id edge_002 --central-url http://localhost:8000 --port 8002 --cpus 2 --memory 1g"
 echo ""

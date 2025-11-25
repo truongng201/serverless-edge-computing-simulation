@@ -63,7 +63,7 @@ class ExperimentRunner:
         print("Central node failed to start within timeout")
         return False
     
-    def deploy_edge_nodes(self, num_edges: int, start_port: int = 5701) -> bool:
+    def deploy_edge_nodes(self, num_edges: int, start_port: int = 5001) -> bool:
         print(f"\n{'-'*40}")
         print(f"Deploying {num_edges} edge nodes starting from port {start_port}")
         print(f"{'-'*40}")
@@ -79,7 +79,9 @@ class ExperimentRunner:
                     "./deploy_edge.sh",
                     "--node-id", node_id,
                     "--central-url", self.central_url,
-                    "--port", str(port)
+                    "--port", str(port),
+                    "--cpus", "2",
+                    "--memory", "1g"
                 ]
                 
                 print(f"Starting {node_id} on port {port}")
@@ -135,10 +137,11 @@ class ExperimentRunner:
             return False
 
     def set_dataset(self, num_users: int) -> bool:
-        dataset_name = 'taxiD_Replay'
+        # dataset_name = 'taxiD_Replay'
+        dataset_name = f'random_generated'
         try:
             print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
-            payload = {"dataset_name": dataset_name}
+            payload = {"dataset_name": dataset_name, "num_users": num_users}
             response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=10)
             if response.status_code == 200:
                 return True
@@ -506,10 +509,10 @@ class ExperimentRunner:
     
     def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 30):
         if not user_ranges:
-            user_ranges = [1000]
+            user_ranges = [100]
         if not edge_ranges:
             # edge_ranges = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-            edge_ranges = [10, 20, 30, 40, 50]
+            edge_ranges = [10, 20]
         if not algorithms:
             algorithms = ["predictive", "greedy", "convex optimization"]
         signal.signal(signal.SIGINT, self.signal_handler)
