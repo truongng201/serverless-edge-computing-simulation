@@ -1,1 +1,0 @@
-    p_train.add_argument('--mode', type=str, choices=['xy','curv','curv_step'], default='xy', help='Training target mode: Δx,Δy (xy) or Δs (curv)')
