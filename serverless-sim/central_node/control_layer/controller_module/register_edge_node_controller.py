@@ -18,7 +18,7 @@ class RegisterEdgeNodeController:
         if not self.node_data or "node_id" not in self.node_data or "endpoint" not in self.node_data:
             raise InvalidDataException("Invalid node data")
         
-    def _random_location_around_central(self, central_node_location, min_distance=100, max_distance=700):
+    def _random_location_around_central(self, central_node_location, min_distance=100, max_distance=1000):
         angle = random.uniform(0, 2 * math.pi)
         
         min_radius_squared = min_distance * min_distance

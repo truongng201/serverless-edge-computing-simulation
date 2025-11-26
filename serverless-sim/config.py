@@ -27,7 +27,7 @@ class Config:
     CLEANUP_DEAD_NODES_INTERVAL = 10  # seconds
 
     # Metrics Collection
-    METRICS_COLLECTION_INTERVAL = 3  # seconds
+    METRICS_COLLECTION_INTERVAL = 10  # seconds
     
     # Node Configuration
     CENTRAL_NODE_PORT = 8000
