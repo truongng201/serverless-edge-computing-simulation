@@ -509,10 +509,10 @@ class ExperimentRunner:
     
     def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 30):
         if not user_ranges:
-            user_ranges = [1000]
+            user_ranges = [100]  # Scenario 6: 100 users
         if not edge_ranges:
             # edge_ranges = [10, 20, 30, 40, 50, 60, 70, 80, 90, 100]
-            edge_ranges = [10, 20]
+            edge_ranges = [8]  # Scenario 6: 8 edge nodes
         if not algorithms:
             algorithms = ["predictive", "greedy"]
         signal.signal(signal.SIGINT, self.signal_handler)

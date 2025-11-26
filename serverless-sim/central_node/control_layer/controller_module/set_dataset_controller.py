@@ -139,6 +139,10 @@ class SetDatasetController:
                 sample_data["items"] = self._sample_points_on_edges(polylines_m, spawn_count)
             elif self.dataset_name == "taxiD_Replay":
                 trajectories = self._load_replay_trajectories()
+                # Apply sample_size limit if specified
+                if self.sample_size is not None and self.sample_size < len(trajectories):
+                    trajectories = trajectories[:self.sample_size]
+                    self.logger.info(f"TaxiD replay: limiting to {self.sample_size} trajectories")
                 trajectories_px: Dict[str, List[Dict[str, float]]] = {}
                 items = []
                 for idx, traj in enumerate(trajectories):
