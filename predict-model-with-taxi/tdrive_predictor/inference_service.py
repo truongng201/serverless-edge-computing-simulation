@@ -267,11 +267,132 @@ def cloudlet_probabilities(
     return np.stack(probs, axis=-1)
 
 
+# ============================================================================
+# BATCH INFERENCE FUNCTIONS (for performance with many users)
+# ============================================================================
+
+def prepare_batch_from_histories(
+    histories: Sequence[Sequence[HistoryRecord]],
+    bundle: PredictorBundle,
+) -> Tuple[torch.Tensor, List[Tuple[float, float]], List[np.ndarray]]:
+    """Convert multiple user histories into a batched tensor [N, L, F].
+    
+    Returns:
+        x_batch: Tensor of shape [N, L, F] with normalized features
+        base_positions: List of (x, y) tuples for each user's last position
+        heading_vectors: List of heading unit vectors for each user
+    """
+    batch_seqs = []
+    base_positions = []
+    heading_vectors = []
+    
+    for history in histories:
+        if len(history) < bundle.lookback:
+            raise ValueError(
+                f"Need at least {bundle.lookback} history points, got {len(history)}"
+            )
+        df = pd.DataFrame(list(history)).sort_values("ts")
+        df = df.tail(bundle.lookback)
+        df = _apply_scaler(df, bundle.scaler)
+        x_seq = torch.tensor(df[bundle.feature_cols].to_numpy(dtype=np.float32))
+        batch_seqs.append(x_seq)
+        
+        base_x = float(df["x"].iloc[-1])
+        base_y = float(df["y"].iloc[-1])
+        base_positions.append((base_x, base_y))
+        heading_vectors.append(_heading_vector(history))
+    
+    # Stack all sequences into batch tensor [N, L, F]
+    x_batch = torch.stack(batch_seqs, dim=0).to(bundle.device)
+    return x_batch, base_positions, heading_vectors
+
+
+def predict_future_positions_batch(
+    bundle: PredictorBundle,
+    histories: Sequence[Sequence[HistoryRecord]],
+    horizons: Sequence[int] = (1, 3, 5, 10),
+) -> List[List[Tuple[int, float, float]]]:
+    """Batch prediction for multiple users. Returns list of coordinate lists.
+    
+    This is much more efficient than calling predict_future_positions N times
+    because it runs a single forward pass through the model.
+    """
+    if not histories:
+        return []
+    
+    x_batch, base_positions, heading_vectors = prepare_batch_from_histories(histories, bundle)
+    
+    if bundle.mode != "curv_step":
+        raise NotImplementedError("Only curv_step models are supported in batch inference")
+    
+    # Single forward pass for all users
+    with torch.no_grad():
+        pred = bundle.model(x_batch, teacher=None, ss_prob=1.0)  # [N, max_steps]
+    
+    ds_batch = pred.cpu().numpy().astype(np.float32)  # [N, max_steps]
+    
+    # Process each user's predictions
+    results = []
+    for i, (base_pos, dir_vec, ds_seq) in enumerate(zip(base_positions, heading_vectors, ds_batch)):
+        x0, y0 = base_pos
+        
+        # For simplicity, use heading-based rollout (no graph constraint in batch mode)
+        # Graph-based rollout would require sequential processing anyway
+        coords = []
+        px, py = x0, y0
+        for step, ds in enumerate(ds_seq, start=1):
+            px += dir_vec[0] * float(ds)
+            py += dir_vec[1] * float(ds)
+            if step in horizons:
+                coords.append((step, px, py))
+        results.append(coords)
+    
+    return results
+
+
+def cloudlet_probabilities_batch(
+    predicted_coords_batch: Sequence[Sequence[Tuple[int, float, float]]],
+    cloudlets: Sequence[CloudletRecord],
+    temperature: float = 50.0,
+    max_radius: Optional[float] = None,
+) -> List[np.ndarray]:
+    """Compute cloudlet probabilities for a batch of users.
+    
+    Returns list of probability arrays, one per user.
+    """
+    if not cloudlets:
+        raise ValueError("cloudlets list cannot be empty")
+    
+    cloud_xy = np.array([(c["x"], c["y"]) for c in cloudlets], dtype=np.float32)
+    results = []
+    
+    for predicted_coords in predicted_coords_batch:
+        probs: List[np.ndarray] = []
+        for _, px, py in predicted_coords:
+            d = np.linalg.norm(cloud_xy - np.array([px, py]), axis=1)
+            if max_radius is not None:
+                mask = d <= max_radius
+                if not np.any(mask):
+                    mask = np.ones_like(d, dtype=bool)
+                d = np.where(mask, d, np.max(d[mask]) + 1e6)
+            score = -d / max(temperature, 1.0)
+            score -= score.max()
+            exp_score = np.exp(score)
+            probs.append(exp_score / exp_score.sum())
+        results.append(np.stack(probs, axis=-1) if probs else np.array([]))
+    
+    return results
+
+
 __all__ = [
     "PredictorBundle",
     "load_predictor_bundle",
     "prepare_sequence_from_history",
     "predict_future_positions",
     "cloudlet_probabilities",
+    # Batch inference functions
+    "prepare_batch_from_histories",
+    "predict_future_positions_batch",
+    "cloudlet_probabilities_batch",
 ]
 

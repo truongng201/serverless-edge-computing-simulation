@@ -175,23 +175,33 @@ class Scheduler:
         self._append_history_point(user_node, user_node.location)
 
     def _append_history_point(self, user_node: UserNodeInfo, location: Dict[str, float]) -> None:
+        """Append a history point with features computed in meters (consistent with model training).
+        
+        IMPORTANT: x,y are stored in METERS (converted from pixels) for consistency with 
+        the prediction model which was trained on projected GPS coordinates in meters.
+        """
         ts = time.time()
+        # Convert pixel coordinates to meters for consistent coordinate system
+        x_meters = float(location.get("x", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
+        y_meters = float(location.get("y", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
+        
         record = {
             "ts": ts,
-            "x": float(location.get("x", 0.0)),
-            "y": float(location.get("y", 0.0)),
+            "x": x_meters,  # Now in meters
+            "y": y_meters,  # Now in meters
         }
         prev = user_node.history[-1] if user_node.history else None
         if prev:
             dt = max(ts - prev.get("ts", ts), 1e-3)
-            dx = (record["x"] - prev.get("x", record["x"])) * Config.DEFAULT_PIXEL_TO_METERS
-            dy = (record["y"] - prev.get("y", record["y"])) * Config.DEFAULT_PIXEL_TO_METERS
+            # Now dx, dy are already in meters (both current and previous are in meters)
+            dx = record["x"] - prev.get("x", record["x"])
+            dy = record["y"] - prev.get("y", record["y"])
             dist = math.hypot(dx, dy)
-            v = dist / dt
+            v = dist / dt  # m/s
             prev_v = prev.get("v", 0.0)
             record["v"] = v
             record["delta_v"] = v - prev_v
-            record["a"] = record["delta_v"] / dt
+            record["a"] = record["delta_v"] / dt  # m/s^2
             heading = math.atan2(dy, dx) if dist > 1e-6 else prev.get("heading", 0.0)
             record["heading"] = heading
             prev_heading = prev.get("heading", heading)
@@ -208,7 +218,7 @@ class Scheduler:
                 "a": 0.0,
                 "heading": 0.0,
                 "delta_heading": 0.0,
-                "stop_flag": 0.0,
+                "stop_flag": 1.0,  # First point is stationary
                 "dw_time": 0.0,
             })
         dt_obj = datetime.fromtimestamp(ts)
@@ -225,44 +235,19 @@ class Scheduler:
 
         self.user_nodes[user_node.user_id] = user_node
 
-    def _pad_history_to_lookback(self, history: List[Dict[str, float]]) -> List[Dict[str, float]]:
-        """Pad history to have at least `history_max_points` entries by replicating the last point.
+    def _has_sufficient_history(self, history: List[Dict[str, float]]) -> bool:
+        """Check if user has enough history points for reliable prediction.
         
-        This allows prediction to work even when user has just been created.
-        The padded points represent a "stationary" user at the current position.
+        Rather than padding with synthetic data (which creates unrealistic patterns),
+        we require at least `history_max_points` actual observations.
         """
+        return len(history) >= self.history_max_points
+    
+    def _get_history_for_prediction(self, history: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        """Get the most recent history_max_points for prediction."""
         if len(history) >= self.history_max_points:
             return history[-self.history_max_points:]
-        
-        if not history:
-            return []
-        
-        # Get the last known point as template
-        last_point = history[-1].copy()
-        padded = list(history)
-        
-        # Calculate how many points we need to add
-        points_needed = self.history_max_points - len(history)
-        
-        # Create padded points with slightly earlier timestamps (1 second apart)
-        base_ts = last_point.get("ts", time.time())
-        
-        for i in range(points_needed):
-            # Create a copy of the last point with modified timestamp
-            padded_point = last_point.copy()
-            # Set timestamp slightly before the earliest existing point
-            # Insert at the beginning to maintain chronological order
-            padded_point["ts"] = base_ts - (points_needed - i) * 60.0  # 1 minute apart
-            # For padded points, user is stationary
-            padded_point["v"] = 0.0
-            padded_point["delta_v"] = 0.0
-            padded_point["a"] = 0.0
-            padded_point["delta_heading"] = 0.0
-            padded_point["stop_flag"] = 1.0
-            padded_point["dw_time"] = float(points_needed - i) * 60.0  # dwell time accumulates
-            padded.insert(0, padded_point)
-        
-        return padded
+        return history  # Return as-is, caller should check sufficiency first
     
     def clear_all_users(self):
         self.user_nodes = {}
@@ -330,8 +315,13 @@ class Scheduler:
     
     
     def _calculate_distance(self, location1: Dict[str, float], location2: Dict[str, float]) -> float:
-        dx = location1["x"] - location2["x"]
-        dy = location1["y"] - location2["y"]
+        """Calculate distance between two locations in METERS.
+        
+        Locations are expected to be in pixels (UI coordinates), 
+        and the result is converted to meters for physical calculations.
+        """
+        dx = (location1["x"] - location2["x"]) * Config.DEFAULT_PIXEL_TO_METERS
+        dy = (location1["y"] - location2["y"]) * Config.DEFAULT_PIXEL_TO_METERS
         return (dx ** 2 + dy ** 2) ** 0.5
     
     def node_assignment(self) -> dict:
@@ -372,39 +362,41 @@ class Scheduler:
             self.logger.warning("No edge nodes registered; using greedy assignment")
             return self._assign_users_greedy()
         
-        # Collect user states - pad history if insufficient
+        # Separate users into those with sufficient history (for prediction) 
+        # and those without (for greedy fallback)
         user_states = []
-        users_no_history = 0
-        users_padded = 0
+        users_insufficient_history = []
         
         for user in self.user_nodes.values():
-            if not user.history:
-                users_no_history += 1
-                continue
-            
-            # Pad history to ensure we have enough points for prediction
-            history = self._pad_history_to_lookback(user.history)
-            
-            if len(user.history) < self.history_max_points:
-                users_padded += 1
-            
-            user_states.append({"user_id": user.user_id, "history": history})
+            if self._has_sufficient_history(user.history):
+                # User has enough history for reliable prediction
+                history = self._get_history_for_prediction(user.history)
+                user_states.append({"user_id": user.user_id, "history": history})
+            else:
+                # User doesn't have enough history - will use greedy
+                users_insufficient_history.append(user.user_id)
         
         # Log summary of user history status
         total_users = len(self.user_nodes)
-        if users_no_history > 0 or users_padded > 0:
+        predictable_users = len(user_states)
+        if users_insufficient_history:
             self.logger.info(
-                f"Predictive assignment: {total_users} users total, "
-                f"{users_no_history} with no history, "
-                f"{users_padded} padded to {self.history_max_points} points"
+                f"Predictive assignment: {predictable_users}/{total_users} users have sufficient history, "
+                f"{len(users_insufficient_history)} will use greedy fallback"
             )
         
+        # If no users have sufficient history, use greedy for all
         if not user_states:
-            self.logger.warning("No users with history data, falling back to greedy assignment")
+            self.logger.info("No users with sufficient history, using greedy assignment for all")
             return self._assign_users_greedy()
         
+        # Convert cloudlet positions from pixels to meters (consistent with user history)
         cloudlet_records = [
-            {"id": node_id, "x": info.location["x"], "y": info.location["y"]}
+            {
+                "id": node_id, 
+                "x": info.location["x"] * Config.DEFAULT_PIXEL_TO_METERS, 
+                "y": info.location["y"] * Config.DEFAULT_PIXEL_TO_METERS
+            }
             for node_id, info in self.edge_nodes.items()
         ]
         try:
