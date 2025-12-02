@@ -137,8 +137,8 @@ class ExperimentRunner:
             return False
 
     def set_dataset(self, num_users: int) -> bool:
-        dataset_name = 'taxiD_Replay'
-        # dataset_name = f'random_generated'
+        # dataset_name = 'taxiD_Replay'
+        dataset_name = f'random_generated'
         try:
             print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
             payload = {"dataset_name": dataset_name, "sample_size": num_users}
@@ -507,11 +507,11 @@ class ExperimentRunner:
             print(f"Saved duration plot to {duration_path}")
         
     
-    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 100):
+    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 50):
         if not user_ranges:
-            user_ranges = [100]  # Scenario 6: 100 users
+            user_ranges = [100, 200]
         if not edge_ranges:
-            edge_ranges = [50]
+            edge_ranges = [10, 20]
         if not algorithms:
             algorithms = ["predictive", "greedy"]
         signal.signal(signal.SIGINT, self.signal_handler)
