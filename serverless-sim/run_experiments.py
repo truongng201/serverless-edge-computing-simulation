@@ -137,8 +137,8 @@ class ExperimentRunner:
             return False
 
     def set_dataset(self, num_users: int) -> bool:
-        # dataset_name = 'taxiD_Replay'
-        dataset_name = f'random_generated'
+        # Use taxiD_Replay for proper predictive model testing (trained on T-drive data)
+        dataset_name = 'taxiD_Replay'
         try:
             print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
             payload = {"dataset_name": dataset_name, "sample_size": num_users}
@@ -204,7 +204,7 @@ class ExperimentRunner:
             return {"error": f"Failed to set algorithm to {algorithm}"}
         
         if not self.set_dataset(num_users):
-            return {"error": f"Failed to set dataset random_generated for {num_users} users"}
+            return {"error": f"Failed to set dataset taxiD_Replay for {num_users} users"}
         
         metrics = self.run_simulation_workload(duration=experiment_duration)
         

@@ -74,31 +74,52 @@ class SetDatasetController:
         """
         Load trajectories exported by export_taxid_replay_last1k.py.
 
-        Path is configurable via env if needed; by default we use
-        serverless-sim/mock_data/taxid_replay_last1k.pkl under repo root.
+        Supports two file formats:
+        1. Basic: ts, x_m, y_m only (features recomputed by scheduler)
+        2. With features: ts, x_m, y_m, v, a, delta_v, etc. (features used directly)
+
+        Path is configurable via env; tries features file first, then basic file.
         """
-        default_path = (
-            Path(__file__)
-            .resolve()
-            .parents[3]
-            / "mock_data"
-            / "taxid_replay_last1k.pkl"
-        )
-        path_str = getattr(
-            Config,
-            "TAXID_REPLAY_PATH",
-            str(default_path),
-        )
-        path = Path(path_str)
-        if not path.exists():
+        mock_data_dir = Path(__file__).resolve().parents[3] / "mock_data"
+        
+        # Try to find the best available file (prefer features version)
+        candidates = [
+            mock_data_dir / "taxid_replay_features.pkl",      # With features
+            mock_data_dir / "taxid_replay_100_features.pkl",  # 100 trips with features
+            mock_data_dir / "taxid_replay_all_features.pkl",  # All trips with features
+            mock_data_dir / "taxid_replay_last1k.pkl",        # Legacy basic format
+            mock_data_dir / "taxid_replay_1000.pkl",          # 1000 trips basic
+            mock_data_dir / "taxid_replay_100.pkl",           # 100 trips basic
+        ]
+        
+        # Allow override via config
+        config_path = getattr(Config, "TAXID_REPLAY_PATH", None)
+        if config_path:
+            candidates.insert(0, Path(config_path))
+        
+        path = None
+        for candidate in candidates:
+            if candidate.exists():
+                path = candidate
+                break
+        
+        if path is None:
             raise FileNotFoundError(
-                f"TaxiD replay pickle not found at '{path}'. "
+                f"TaxiD replay pickle not found. Tried: {[str(c) for c in candidates[:3]]}. "
                 f"Run export_taxid_replay_last1k.py first."
             )
+        
         self.logger.info(f"TaxiD replay: loading trajectories from '{path}'")
         trajectories = pd.read_pickle(path)
         if not isinstance(trajectories, list):
             raise ValueError("Replay pickle must contain a list of trajectories")
+        
+        # Check if features are included
+        if trajectories and trajectories[0].get("points"):
+            first_point = trajectories[0]["points"][0]
+            has_features = "v" in first_point
+            self.logger.info(f"TaxiD replay: features included = {has_features}")
+        
         return trajectories
     
         
@@ -145,6 +166,12 @@ class SetDatasetController:
                     self.logger.info(f"TaxiD replay: limiting to {self.sample_size} trajectories")
                 trajectories_px: Dict[str, List[Dict[str, float]]] = {}
                 items = []
+                
+                # Feature columns to copy if available
+                feature_cols = ["v", "a", "delta_v", "delta_heading", 
+                               "tod_sin", "tod_cos", "dow_sin", "dow_cos",
+                               "rush_hour", "stop_flag", "dw_time"]
+                
                 for idx, traj in enumerate(trajectories):
                     trip_id = str(traj.get("trip_id", idx))
                     pts = traj.get("points", [])
@@ -161,12 +188,20 @@ class SetDatasetController:
                         "y": yp,
                     })
                     # Store full trajectory in pixel space for later replay
+                    # Include features if they exist in the source data
                     seq_px: List[Dict[str, float]] = []
                     for pt in pts:
                         xmp = float(pt["x_m"])
                         ymp = float(pt["y_m"])
                         px, py = self._to_px(xmp, ymp, minx, maxy)
-                        seq_px.append({"ts": pt["ts"], "x": px, "y": py})
+                        point_data = {"ts": pt["ts"], "x": px, "y": py}
+                        
+                        # Copy features if available (from --include-features export)
+                        for feat in feature_cols:
+                            if feat in pt:
+                                point_data[feat] = float(pt[feat])
+                        
+                        seq_px.append(point_data)
                     trajectories_px[f"user_{user_id}"] = seq_px
                 sample_data["items"] = items
                 self.scheduler.set_trajectories_px(trajectories_px)

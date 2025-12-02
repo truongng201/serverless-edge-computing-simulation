@@ -169,6 +169,69 @@ class Scheduler:
         user.location = new_location
         self._append_history_point(user, new_location)
         return True
+    
+    def update_user_node_with_features(self, user_id: str, point_data: Dict[str, float]) -> bool:
+        """Update user with pre-computed features from trajectory data.
+        
+        This is more efficient than update_user_node() when features are already
+        available from the exported trajectory file (with --include-features).
+        
+        Args:
+            user_id: User identifier
+            point_data: Dict containing x, y (pixels) and optionally pre-computed features
+                       (v, a, delta_v, delta_heading, tod_sin, tod_cos, etc.)
+        """
+        if user_id not in self.user_nodes:
+            return False
+        
+        user = self.user_nodes[user_id]
+        user.location = {"x": point_data.get("x", 0.0), "y": point_data.get("y", 0.0)}
+        
+        # Check if features are pre-computed
+        has_features = "v" in point_data
+        
+        if has_features:
+            # Use pre-computed features directly
+            self._append_history_point_with_features(user, point_data)
+        else:
+            # Fall back to computing features
+            self._append_history_point(user, user.location)
+        
+        return True
+    
+    def _append_history_point_with_features(self, user_node: UserNodeInfo, point_data: Dict[str, float]) -> None:
+        """Append a history point using pre-computed features from trajectory data.
+        
+        This uses features that were computed during prepare.py (from actual GPS data)
+        which are more accurate than computing them from simulated pixel movements.
+        """
+        # Convert pixel coordinates to meters
+        x_meters = float(point_data.get("x", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
+        y_meters = float(point_data.get("y", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
+        
+        record = {
+            "ts": time.time(),
+            "x": x_meters,
+            "y": y_meters,
+            # Copy pre-computed features
+            "v": float(point_data.get("v", 0.0)),
+            "a": float(point_data.get("a", 0.0)),
+            "delta_v": float(point_data.get("delta_v", 0.0)),
+            "delta_heading": float(point_data.get("delta_heading", 0.0)),
+            "tod_sin": float(point_data.get("tod_sin", 0.0)),
+            "tod_cos": float(point_data.get("tod_cos", 0.0)),
+            "dow_sin": float(point_data.get("dow_sin", 0.0)),
+            "dow_cos": float(point_data.get("dow_cos", 0.0)),
+            "rush_hour": float(point_data.get("rush_hour", 0.0)),
+            "stop_flag": float(point_data.get("stop_flag", 0.0)),
+            "dw_time": float(point_data.get("dw_time", 0.0)),
+        }
+        
+        user_node.history.append(record)
+        if len(user_node.history) > self.history_max_points:
+            user_node.history = user_node.history[-self.history_max_points:]
+        
+        self.user_nodes[user_node.user_id] = user_node
 
     def create_user_node(self, user_node: UserNodeInfo):
         self.user_nodes[user_node.user_id] = user_node

@@ -158,12 +158,11 @@ class GetAllUsersController:
         """
         Advance all TaxiD replay users by one step along their preloaded trajectories.
 
-        Trajectories are stored on scheduler.current_dataset as:
-          {
-            "name": "taxid_replay",
-            "trajectories_px": {user_id: [{"ts": ..., "x": float, "y": float}, ...]},
-            "step": int,
-          }
+        Trajectories are stored on scheduler as:
+          trajectories_px: {user_id: [{"ts": ..., "x": float, "y": float, ...}, ...]}
+          
+        If features (v, a, delta_v, etc.) are included in trajectory points,
+        they will be used directly instead of being recomputed.
         """
         if not self.simulation:
             return False
@@ -173,6 +172,7 @@ class GetAllUsersController:
         if not trajectories_px:
             print("No trajectories found for TaxiD replay.")
             return False
+        
         max_len = 0
         for user_id, seq in trajectories_px.items():
             if not seq:
@@ -181,9 +181,12 @@ class GetAllUsersController:
             max_len = max(max_len, len(seq))
             idx = min(step, len(seq) - 1)
             pt = seq[idx]
-            location = {"x": pt.get("x", 0.0), "y": pt.get("y", 0.0)}
+            
             if user_id in self.scheduler.user_nodes:
-                self.scheduler.update_user_node(user_id, location)
+                # Use update_user_node_with_features if features are available
+                # This automatically falls back to computing features if not present
+                self.scheduler.update_user_node_with_features(user_id, pt)
+                
                 user_node = self.scheduler.user_nodes[user_id]
                 dist_m = getattr(user_node.latency, "distance", 0.0)
                 user_node.latency.propagation_delay = (
@@ -194,6 +197,7 @@ class GetAllUsersController:
                     + getattr(user_node.latency, "transmission_delay", 0.0)
                     + getattr(user_node.latency, "computation_delay", 0.0)
                 )
+        
         if max_len == 0:
             return False
         self.current_step_id = min(step + 1, max_len - 1) 
