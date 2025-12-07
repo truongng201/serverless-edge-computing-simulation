@@ -16,7 +16,7 @@ class CentralCoreController:
         
         CentralNodeAPIAgent(self.central_node_api_controller).start_all_tasks()
         SchedulerAgent(self.scheduler).start_all_tasks()
-        UsersAgent(self.scheduler).start_all_tasks()
+        # UsersAgent(self.scheduler).start_all_tasks()
 
     def register_edge_node(self, request_data):
         controller = RegisterEdgeNodeController(self.scheduler, request_data)
