@@ -1,5 +1,6 @@
 import random
 import time
+import requests
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.helper_module.data_manager import DataManager
@@ -16,6 +17,7 @@ class GetAllUsersController:
         self.random_sample_size = self.scheduler.get_sample_size()
         self.simulation = self.scheduler.simulation
         self.response = []
+        self.execution_stats = None
        
     def _update_scheduler(self):
         self.scheduler.set_current_dataset(self.current_dataset)
@@ -216,6 +218,11 @@ class GetAllUsersController:
         elif dataset_name == "taxiD_Replay":
             self._update_taxid_replay_sample()
             self.scheduler.node_assignment()
+        
+        # Execute functions at this timestep if simulation is active and users_agent is available
+        if self.simulation and self.scheduler.user_nodes and self.current_step_id % 5 == 0:
+            self._execute_function()
+        
         for user_id, user_node in self.scheduler.user_nodes.items():
             assigned_edge = None
             assigned_central = None
@@ -236,6 +243,50 @@ class GetAllUsersController:
                 "last_executed_period": time.time() - user_node.last_executed,
                 "latency": user_node.latency
             })
+            
+    def _execute_function(self):
+        for node_id, user_node in self.scheduler.user_nodes.items():
+            # Simulate function execution by updating last_executed timestamp
+            assigned_node = user_node.assigned_node_id
+            if not assigned_node:
+                continue
+            central_node = self.scheduler.central_node
+            if central_node["node_id"] == assigned_node:
+                try:
+                    url = f"http://{central_node['endpoint']}/api/v1/central/execute"
+                    result = requests.Session().post(
+                        url,
+                        json={"user_id": user_node.user_id},
+                        timeout=10  # Increased to 10 seconds
+                    )
+                    
+                    if result.status_code == 200:
+                        data = result.json().get("data", {})
+                        user_node.latency.computation_delay = data.get("execution_time", 0.0) * 1000
+                        user_node.latency.container_status = data.get("container_status", "unknown")
+                        user_node.last_executed = time.time()
+                        
+                except Exception:
+                    continue
+            
+            edge_node = self.scheduler.edge_nodes.get(assigned_node)
+            if edge_node:
+                try:
+                    url = f"http://{edge_node.endpoint}/api/v1/edge/execute"
+                    
+                    result = requests.Session().post(
+                        url,
+                        json={"user_id": user_node.user_id},
+                        timeout=10  # Increased to 10 seconds
+                    )
+                    
+                    if result.status_code == 200:
+                        data = result.json()
+                        user_node.latency.computation_delay = data.get("execution_time", 0.0) * 1000
+                        user_node.latency.container_status = data.get("container_status", "unknown")
+                        user_node.last_executed = time.time()
+                except Exception:
+                    continue
 
 
     def execute(self):
