@@ -711,12 +711,12 @@ def prepare_phase_b(
         pass
     # 5) Features already computed per-chunk; proceed to scaler/saves
     print(f"[Phase B] Split sizes | train={len(train_df)} val={len(val_df)} test={len(test_df)}", flush=True)
-      feature_cols = [
-          'v', 'a', 'delta_v', 'delta_heading', 'tod_sin', 'tod_cos',
-          'dow_sin', 'dow_cos', 'rush_hour', 'stop_flag', 'dw_time'
-      ]
-      if use_graph_context:
-          feature_cols = feature_cols + ['node_degree', 'is_junction']
+    feature_cols = [
+        'v', 'a', 'delta_v', 'delta_heading', 'tod_sin', 'tod_cos',
+        'dow_sin', 'dow_cos', 'rush_hour', 'stop_flag', 'dw_time'
+    ]
+    if use_graph_context:
+        feature_cols = feature_cols + ['node_degree', 'is_junction']
     scaler = fit_scaler(train_df, feature_cols)
     train_df_s = apply_scaler(train_df, scaler)
     val_df_s = apply_scaler(val_df, scaler)
@@ -734,7 +734,7 @@ def prepare_phase_b(
     pd.Series(split).to_json(os.path.join(out_dir, 'split.json'))
     # map-matching fallback ratio (no candidate -> fallback to original xy)
     match_fallback_ratio = float(total_nomatch) / float(total_obs) if total_obs > 0 else None
-      meta = {
+    meta = {
         'num_taxis': int(num_taxis),
         'phase': 'B',
         'feature_cols': feature_cols,
@@ -746,8 +746,8 @@ def prepare_phase_b(
         'candidate_radius_m': float(candidate_radius_m),
         'k_candidates': int(k_candidates),
         'use_shortest_path': bool(use_shortest_path),
-          'use_road_resample': bool(use_road_resample),
-          'use_graph_context_features': bool(use_graph_context),
+        'use_road_resample': bool(use_road_resample),
+        'use_graph_context_features': bool(use_graph_context),
         'graph_source': 'graphml' if graphml else ('xml' if xml else ('place/bbox' if (place or bbox) else 'unknown')),
         'beam_size': int(beam_size),
         'turn_penalty': float(turn_penalty),
