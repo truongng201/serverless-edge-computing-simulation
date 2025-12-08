@@ -301,7 +301,6 @@ def fit_scaler(train_df: pd.DataFrame, feature_cols: List[str]) -> Dict[str, Tup
 
 def apply_scaler(df: pd.DataFrame, scaler: Dict[str, Tuple[float, float]]) -> pd.DataFrame:
     """Apply a (mu, sigma) mapping to standardize feature columns in a DataFrame."""
-    df = df.copy()
     for c, (mu, sigma) in scaler.items():
         if c in df.columns:
             df[c] = (df[c] - mu) / sigma
