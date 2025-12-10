@@ -349,3 +349,12 @@ id.graphml
   ckpt = torch.load(ckpt_path, map_location=device)
 Metrics: {'ADE': 704.5794067382812, 'FDE': 1326.8875732421875, 'Hit@100': 0.44184792041778564, 'Hit@200': 0.5092555284500122, 'Hit@400': 0.5633185505867004, 'PerHorizonError': {'h1': 244.22714233398438, 'h3': 496.4449462890625, 'h5': 750.757080078125, 'h10': 1326.8875732421875}, 'PerHorizonHit@200': {'h1': 0.6894228988389862, 'h3': 0.566739198938261, 'h5': 0.5362888112753595, 'h10': 0.5092555450321831}}
 
+
+[Phase B] Segmented trips=221331 | max_idle_gap_min=15
+[Phase B] Graph loaded | source=graphml | elapsed=4.9s
+[Phase B] Graph-context features enabled | nodes=55328 | junction_nodes=48237
+[Phase B] HMM params | sigma=12.0 | radius=150.0 | K=6 | beam=10 | turn_penalty=0.0 | sp=False | road_resample=True
+[Phase B] Split sizes | train=17660259 val=2475145 test=1973089                                                                                                                             
+[Phase B] Saved artifacts to tdrive_predictor_artifacts/phase_b_7k_fast | fallback_ratio=0.19781298763084515 | elapsed=10037.7s
+(serverless-sim) truongnx@jackson:~/Serverless-edge-computing-simulation/predict-model-with-taxi$ python -m tdrive_predictor.cli prepare   --tdrive-root "./T-drive Taxi Trajectories/release/taxi_log_2008_by_id"   --num-taxis 7000   --max-idle-gap-min 15   --use-osm   --graphml ./osm/beijing_taxid.graphml   --cand-radius-m 150   --k-candidates 6   --beam-size 10   --sigma-gps-m 12   --road-resample   --out-dir tdrive_predictor_artifacts/phase_b_7k_fast^C
+(serverless-sim) truongnx@jackson:~/Serverless-edge-computing-simulation/predict-model-with-taxi$ 

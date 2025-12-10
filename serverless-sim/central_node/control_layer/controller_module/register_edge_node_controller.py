@@ -152,7 +152,12 @@ class RegisterEdgeNodeController:
         self.edge_node_info = EdgeNodeInfo(
             node_id=node_id,
             endpoint=self.node_data.get("endpoint"),
-            location=self._grid_based_location(node_id, total_nodes=estimated_total),
+            # location=self._grid_based_location(node_id, total_nodes=estimated_total),
+            location=self._random_location_around_central(
+                central_node_location=self.scheduler.central_node.get("location", {'x': 0, 'y': 0}),
+                min_distance=100,
+                max_distance=1000
+            ),
             system_info=self.node_data.get("system_info", {}),
             last_heartbeat=time.time(),
             metrics_info=self.node_metrics,
