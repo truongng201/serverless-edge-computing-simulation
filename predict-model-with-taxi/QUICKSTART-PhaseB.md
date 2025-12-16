@@ -358,3 +358,5 @@ Metrics: {'ADE': 704.5794067382812, 'FDE': 1326.8875732421875, 'Hit@100': 0.4418
 [Phase B] Saved artifacts to tdrive_predictor_artifacts/phase_b_7k_fast | fallback_ratio=0.19781298763084515 | elapsed=10037.7s
 (serverless-sim) truongnx@jackson:~/Serverless-edge-computing-simulation/predict-model-with-taxi$ python -m tdrive_predictor.cli prepare   --tdrive-root "./T-drive Taxi Trajectories/release/taxi_log_2008_by_id"   --num-taxis 7000   --max-idle-gap-min 15   --use-osm   --graphml ./osm/beijing_taxid.graphml   --cand-radius-m 150   --k-candidates 6   --beam-size 10   --sigma-gps-m 12   --road-resample   --out-dir tdrive_predictor_artifacts/phase_b_7k_fast^C
 (serverless-sim) truongnx@jackson:~/Serverless-edge-computing-simulation/predict-model-with-taxi$ 
+
+python -m tdrive_predictor.cli prepare   --tdrive-root "./T-drive Taxi Trajectories/release/taxi_log_2008_by_id"   --num-taxis 10000   --max-idle-gap-min 15   --use-osm   --graphml ./osm/beijing_taxid.graphml   --cand-radius-m 150   --k-candidates 6   --beam-size 10   --sigma-gps-m 12   --road-resample   --out-dir tdrive_predictor_artifacts/phase_b_10k_fast
