@@ -74,6 +74,9 @@ class Config:
     ASSIGNMENT_SCAN_INTERVAL = 0.5  # seconds between reassignment scans
     LOAD_AWARE_ALPHA = 1.0  # weight for CPU load in load-aware score
 
+    # Edge node deployment configuration
+    EXPECTED_TOTAL_EDGE_NODES = int(os.getenv("EXPECTED_EDGE_NODES", "10"))
+    
     # Predictive scheduling parameters
     TDRIVE_ARTIFACT_DIR = os.getenv(
         "TDRIVE_ARTIFACT_DIR",
@@ -132,9 +135,10 @@ class Config:
         ),
     )
     # Initial viewport for mapping meters->pixels (used for road rendering)
-    TAXID_VIEWPORT_WIDTH_PX = int(os.getenv("TAXID_VIEWPORT_WIDTH_PX", "1800"))
-    TAXID_VIEWPORT_HEIGHT_PX = int(os.getenv("TAXID_VIEWPORT_HEIGHT_PX", "1200"))
-    TAXID_VIEWPORT_MARGIN_PX = int(os.getenv("TAXID_VIEWPORT_MARGIN_PX", "80"))
+    # ACTUAL Beijing TaxiD map bounds: 58782m x 36695m = 5878px x 3670px
+    TAXID_VIEWPORT_WIDTH_PX = int(os.getenv("TAXID_VIEWPORT_WIDTH_PX", "5878"))
+    TAXID_VIEWPORT_HEIGHT_PX = int(os.getenv("TAXID_VIEWPORT_HEIGHT_PX", "3670"))
+    TAXID_VIEWPORT_MARGIN_PX = int(os.getenv("TAXID_VIEWPORT_MARGIN_PX", "200"))
 
     # Preprocessed roads JSON (gz) path for fast UI serving
     TAXID_ROADS_JSON_GZ_PATH = os.getenv(

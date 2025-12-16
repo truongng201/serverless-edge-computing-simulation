@@ -68,6 +68,9 @@ class ExperimentRunner:
         print(f"Deploying {num_edges} edge nodes starting from port {start_port}")
         print(f"{'-'*40}")
         try:
+            # Set expected total edge nodes for proper grid placement
+            os.environ["EXPECTED_EDGE_NODES"] = str(num_edges)
+            
             self.cleanup_processes()
             
             # Start edge nodes

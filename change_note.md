@@ -2,7 +2,28 @@
 
 ## Overview
 
-This session focused on fixing bugs in the predictive scheduling system and improving experiment configuration for the serverless edge computing simulation.
+This session focused on fixing bugs in the predictive scheduling system, improving experiment configuration, and fixing critical edge node placement issues for the serverless edge computing simulation.
+
+---
+
+## CRITICAL FIXES (Dec 3, 2025 - Latest)
+
+### Central Node Relocation & Edge Placement
+
+**Problem:** Central node was at (730, 1070) - near bottom-left of 1800x1200 map. Edge nodes were placed randomly around this off-center location, causing poor coverage and high turnaround times for ALL algorithms.
+
+**Solution:** 
+1. Moved central node to map center (900, 600)
+2. Enabled grid-based placement for uniform coverage
+3. Made edge node count configurable via `run_experiments.py`
+
+**Files Modified:**
+- `scheduler.py`: Central node location → (900, 600)
+- `config.py`: Added `EXPECTED_TOTAL_EDGE_NODES` parameter
+- `register_edge_node_controller.py`: Enabled grid placement, reads from Config
+- `run_experiments.py`: Sets `EXPECTED_EDGE_NODES` environment variable
+
+**Impact:** Expected 60-75% reduction in average user-to-edge distance.
 
 ---
 
