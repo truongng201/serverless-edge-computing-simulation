@@ -1,5 +1,6 @@
 import logging
 import time
+import random
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 import cvxpy as cp
@@ -387,6 +388,53 @@ class Scheduler:
         dy = (location1["y"] - location2["y"]) * Config.DEFAULT_PIXEL_TO_METERS
         return (dx ** 2 + dy ** 2) ** 0.5
     
+    def _calculate_propagation_delay_deterministic(self, distance_meters: float) -> float:
+        """Calculate deterministic network propagation delay (no jitter).
+        
+        Used for optimization algorithms (CVX) that need consistent values.
+        
+        Returns:
+            Propagation delay in milliseconds (without random jitter)
+        """
+        network_type = getattr(Config, 'NETWORK_TYPE', 'EDGE')
+        params = Config.NETWORK_LATENCY_PARAMS.get(network_type, Config.NETWORK_LATENCY_PARAMS['EDGE'])
+        
+        distance_km = distance_meters / 1000.0
+        base_latency = params['base_latency_ms']
+        distance_latency = distance_km * params['per_km_latency_ms']
+        
+        return max(0.0, base_latency + distance_latency)
+    
+    def _calculate_propagation_delay(self, distance_meters: float) -> float:
+        """Calculate realistic network propagation delay in milliseconds.
+        
+        Uses a realistic network latency model instead of speed of light.
+        The model includes:
+        - Base latency: Radio access + core network baseline (depends on network type)
+        - Distance-based latency: Fiber/backhaul propagation
+        - Jitter: Random variation to simulate real-world conditions
+        
+        Network types:
+        - EDGE: Ultra-low latency (MEC co-located with base station) - DEFAULT
+        - 5G: Low latency urban network
+        - 4G: Higher latency rural/suburban network
+        
+        Returns:
+            Propagation delay in milliseconds
+        """
+        # Get deterministic part
+        base_delay = self._calculate_propagation_delay_deterministic(distance_meters)
+        
+        # Add optional jitter (random variation)
+        jitter = 0.0
+        if getattr(Config, 'NETWORK_JITTER_ENABLED', True):
+            network_type = getattr(Config, 'NETWORK_TYPE', 'EDGE')
+            params = Config.NETWORK_LATENCY_PARAMS.get(network_type, Config.NETWORK_LATENCY_PARAMS['EDGE'])
+            jitter_max = params['jitter_max_ms']
+            jitter = random.uniform(-jitter_max, jitter_max)
+        
+        return max(0.0, base_delay + jitter)
+    
     def node_assignment(self) -> dict:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             return self._assign_users_greedy()
@@ -405,9 +453,7 @@ class Scheduler:
             assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
             user_node.assigned_node_id = assigned_node_id
             user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = (
-                assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-            )
+            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
             total_turnaround_time = (
                 user_node.latency.propagation_delay
                 + user_node.latency.transmission_delay
@@ -504,9 +550,7 @@ class Scheduler:
                 assigned_node_distance = self._calculate_distance(user_node.location, location)
             user_node.assigned_node_id = assigned_node_id
             user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = (
-                assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-            )
+            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
             total_turnaround_time = (
                 user_node.latency.propagation_delay
                 + user_node.latency.transmission_delay
@@ -586,7 +630,7 @@ class Scheduler:
                     continue
                 cloudlet = self.edge_nodes[cloudlet_id]
                 distance = self._calculate_distance(user_node.location, cloudlet.location)
-            propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+            propagation_delay = self._calculate_propagation_delay(distance)
             transmission_delay = user_node.data_size_demand / user_node.bandwidth_demand
             computation_delay = user_node.latency.computation_delay if user_node.latency.computation_delay else 0
             turnaround_time = propagation_delay + transmission_delay + computation_delay
@@ -626,7 +670,9 @@ class Scheduler:
                 else:
                     distance = self._calculate_distance(user_loc, self.edge_nodes[cloudlet_id].location)
 
-                propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                # For CVX optimization, use deterministic propagation delay (no jitter)
+                # to ensure consistent optimization results
+                propagation_delay = self._calculate_propagation_delay_deterministic(distance)
                 computation_delay = getattr(user_node.latency, "computation_delay", 0.0)
                 transmission_delay = getattr(user_node.latency, "transmission_delay", 0.0)
                 T[i, j] = propagation_delay + transmission_delay + computation_delay
@@ -718,7 +764,7 @@ class Scheduler:
                     # Update user node assignment and latency information
                     user_node.assigned_node_id = assigned_cloudlet
                     user_node.latency.distance = distance
-                    user_node.latency.propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                    user_node.latency.propagation_delay = self._calculate_propagation_delay(distance)
                     total_turnaround_time = (
                         user_node.latency.propagation_delay +
                         getattr(user_node.latency, "transmission_delay", 0.0) +
@@ -739,7 +785,7 @@ class Scheduler:
                 assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
                 user_node.assigned_node_id = assigned_node_id
                 user_node.latency.distance = assigned_node_distance
-                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
                 total_turnaround_time = (
                     user_node.latency.propagation_delay +
                     getattr(user_node.latency, "transmission_delay", 0.0) +

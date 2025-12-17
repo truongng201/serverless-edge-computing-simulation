@@ -48,7 +48,7 @@ class GetAllUsersController:
                 user_node.speed = item.get("speed", user_node.speed)
                 # Refresh propagation delay and total time with updated distance
                 dist_m = getattr(user_node.latency, 'distance', 0)
-                user_node.latency.propagation_delay = dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.propagation_delay = self.scheduler._calculate_propagation_delay(dist_m)
                 user_node.latency.total_turnaround_time = (
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, 'transmission_delay', 0)
@@ -112,7 +112,7 @@ class GetAllUsersController:
                 user_node = self.scheduler.user_nodes[user_id]
                 # Refresh propagation delay and total time with updated distance
                 dist_m = getattr(user_node.latency, 'distance', 0)
-                user_node.latency.propagation_delay = dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.propagation_delay = self.scheduler._calculate_propagation_delay(dist_m)
                 user_node.latency.total_turnaround_time = (
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, 'transmission_delay', 0)
@@ -191,9 +191,7 @@ class GetAllUsersController:
                 
                 user_node = self.scheduler.user_nodes[user_id]
                 dist_m = getattr(user_node.latency, "distance", 0.0)
-                user_node.latency.propagation_delay = (
-                    dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-                )
+                user_node.latency.propagation_delay = self.scheduler._calculate_propagation_delay(dist_m)
                 user_node.latency.total_turnaround_time = (
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, "transmission_delay", 0.0)

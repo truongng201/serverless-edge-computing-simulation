@@ -57,11 +57,50 @@ class Config:
     # User Configuration
     DEFAULT_EXECUTION_TIME_INTERVAL = 10 # seconds: every 5 seconds all user in simulation call it assigned node
     DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES = (1024, 10240)  # 1 KB to 10 KB
-    DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (100, 1000)  # 100 B/ms to 1 KB/ms
-    DEFAULT_DATA_SIZE_IN_BYTES = 512 * 1024  # 512 KB
-    DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND = 512  # 512 B/ms
-    DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s)
+    DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (10000, 50000)  # 10-50 KB/ms = 80-400 Mbps
+    DEFAULT_DATA_SIZE_IN_BYTES = 512 * 1024  # 512 KB (typical serverless payload)
+    
+    # Bandwidth settings per network type (B/ms)
+    # Transmission delay = data_size / bandwidth
+    NETWORK_BANDWIDTH_BYTES_PER_MS = {
+        "4G": 5000,      # 5 KB/ms = 40 Mbps (typical 4G LTE)
+        "5G": 25000,     # 25 KB/ms = 200 Mbps (typical 5G)
+        "EDGE": 50000,   # 50 KB/ms = 400 Mbps (edge/MEC local connection)
+    }
+    DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND = NETWORK_BANDWIDTH_BYTES_PER_MS.get(
+        os.getenv("NETWORK_TYPE", "EDGE"), 50000
+    )  # Default: EDGE = 400 Mbps
+    DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s) - DEPRECATED, use NETWORK_LATENCY_PARAMS
     DEFAULT_PIXEL_TO_METERS = 10 # 1 pixel = 10 m
+    
+    # Realistic Network Latency Model
+    # Instead of using speed of light, model real wireless/edge network behavior
+    # Includes: radio access latency, backhaul, routing delays
+    NETWORK_TYPE = os.getenv("NETWORK_TYPE", "EDGE")  # Options: "4G", "5G", "EDGE"
+    
+    NETWORK_LATENCY_PARAMS = {
+        "4G": {
+            "base_latency_ms": 30.0,      # Radio access + core network baseline
+            "per_km_latency_ms": 0.01,    # Fiber propagation (not speed of light)
+            "jitter_max_ms": 5.0,         # Random variation (+/-)
+            "description": "4G LTE network - higher latency, suitable for rural/suburban"
+        },
+        "5G": {
+            "base_latency_ms": 5.0,       # Ultra-low latency 5G
+            "per_km_latency_ms": 0.005,   # Faster backhaul
+            "jitter_max_ms": 1.0,
+            "description": "5G network - low latency, suitable for urban areas"
+        },
+        "EDGE": {
+            "base_latency_ms": 1.0,       # Direct edge connection (MEC)
+            "per_km_latency_ms": 0.003,   # Minimal routing
+            "jitter_max_ms": 0.2,
+            "description": "Edge computing (MEC) - ultra-low latency, co-located with base station"
+        }
+    }
+    
+    # Enable/disable jitter (random latency variation)
+    NETWORK_JITTER_ENABLED = os.getenv("NETWORK_JITTER_ENABLED", "true").lower() == "true"
 
     # User cleanup
     # If a user hasn't been updated for this many seconds, remove it
