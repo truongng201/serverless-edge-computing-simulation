@@ -146,6 +146,10 @@ def main():
         )
         print(f"Saved checkpoint: {ckpt}")
     elif args.cmd == 'eval':
+        print(
+            f"[Eval] Starting | mode={args.mode} | data_dir={args.data_dir} | ckpt={args.ckpt or 'auto'} | graphml={args.graphml or 'n/a'}",
+            flush=True,
+        )
         stats = evaluate_gru(
             data_dir=args.data_dir,
             ckpt_path=args.ckpt,

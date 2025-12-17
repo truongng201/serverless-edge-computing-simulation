@@ -188,3 +188,16 @@ python run_experiments.py
 2. Connection pool warnings when running with many users
 3. Cold start penalty calculation may need tuning
 
+---
+
+## Predictor UX Improvements (Dec 17, 2025)
+
+**Problem:** Running `python -m tdrive_predictor.cli eval --mode curv_step` on large Phase B artifacts (e.g. 7k) could appear “stuck” for hours with no console output.
+
+**Solution:**
+- Added explicit progress/log prints for eval startup and heavy load steps (meta/test/ckpt loading).
+- Added a per-trip progress bar for `curv_step` evaluation (uses `tqdm` when available; otherwise prints periodic status).
+
+**Files Modified:**
+- `predict-model-with-taxi/tdrive_predictor/cli.py`
+- `predict-model-with-taxi/tdrive_predictor/evaluate.py`
