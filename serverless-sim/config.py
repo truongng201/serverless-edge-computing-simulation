@@ -123,7 +123,7 @@ class Config:
             os.path.dirname(os.path.dirname(__file__)),
             "predict-model-with-taxi",
             "tdrive_predictor_artifacts",
-            "phase_b_5k_fast",
+            "phase_b_7k_fast",
         ),
     )
     TDRIVE_CKPT_NAME = os.getenv("TDRIVE_CKPT_NAME", "gru_phase_curv_step.pt")
