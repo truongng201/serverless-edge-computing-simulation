@@ -359,4 +359,22 @@ Metrics: {'ADE': 704.5794067382812, 'FDE': 1326.8875732421875, 'Hit@100': 0.4418
 (serverless-sim) truongnx@jackson:~/Serverless-edge-computing-simulation/predict-model-with-taxi$ python -m tdrive_predictor.cli prepare   --tdrive-root "./T-drive Taxi Trajectories/release/taxi_log_2008_by_id"   --num-taxis 7000   --max-idle-gap-min 15   --use-osm   --graphml ./osm/beijing_taxid.graphml   --cand-radius-m 150   --k-candidates 6   --beam-size 10   --sigma-gps-m 12   --road-resample   --out-dir tdrive_predictor_artifacts/phase_b_7k_fast^C
 (serverless-sim) truongnx@jackson:~/Serverless-edge-computing-simulation/predict-model-with-taxi$ 
 
-python -m tdrive_predictor.cli prepare   --tdrive-root "./T-drive Taxi Trajectories/release/taxi_log_2008_by_id"   --num-taxis 10000   --max-idle-gap-min 15   --use-osm   --graphml ./osm/beijing_taxid.graphml   --cand-radius-m 150   --k-candidates 6   --beam-size 10   --sigma-gps-m 12   --road-resample   --out-dir tdrive_predictor_artifacts/phase_b_10k_fast
+Metrics: {
+  'ADE': 201.66151428222656,
+  'FDE': 417.7447204589844,
+  'Hit@100': 0.70894855260849,
+  'Hit@200': 0.74758476018,
+  'Hit@400': 0.7856186628341675,
+  'PerHorizonError': {
+    'h1': 27.6619930267334,
+    'h3': 120.45806884765625,
+    'h5': 240.7806396484375,
+    'h10': 417.7447204589844
+  },
+  'PerHorizonHit@200': {
+    'h1': 0.9621487944834411,
+    'h3': 0.8175736028049158,
+    'h5': 0.7031487938357145,
+    'h10': 0.7475847890451278
+  }
+}
