@@ -62,45 +62,22 @@ class Config:
     
     # Bandwidth settings per network type (B/ms)
     # Transmission delay = data_size / bandwidth
-    NETWORK_BANDWIDTH_BYTES_PER_MS = {
-        "4G": 5000,      # 5 KB/ms = 40 Mbps (typical 4G LTE)
-        "5G": 25000,     # 25 KB/ms = 200 Mbps (typical 5G)
-        "EDGE": 50000,   # 50 KB/ms = 400 Mbps (edge/MEC local connection)
-    }
-    DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND = NETWORK_BANDWIDTH_BYTES_PER_MS.get(
-        os.getenv("NETWORK_TYPE", "EDGE"), 50000
-    )  # Default: EDGE = 400 Mbps
-    DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s) - DEPRECATED, use NETWORK_LATENCY_PARAMS
+    # Fixed network type for this simulator configuration.
+    # (Previously supported: 4G/5G/EDGE selectable via env var.)
+    NETWORK_TYPE = "4G"
+
+    # 4G uplink/downlink throughput used for transmission delay.
+    # 3000 bytes/ms ~ 24 Mbps.
+    DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND = 3000
+
+    DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s) - DEPRECATED, use NETWORK_*_LATENCY_MS below
     DEFAULT_PIXEL_TO_METERS = 10 # 1 pixel = 10 m
     
-    # Realistic Network Latency Model
-    # Instead of using speed of light, model real wireless/edge network behavior
-    # Includes: radio access latency, backhaul, routing delays
-    NETWORK_TYPE = os.getenv("NETWORK_TYPE", "EDGE")  # Options: "4G", "5G", "EDGE"
-    
-    NETWORK_LATENCY_PARAMS = {
-        "4G": {
-            "base_latency_ms": 30.0,      # Radio access + core network baseline
-            "per_km_latency_ms": 0.01,    # Fiber propagation (not speed of light)
-            "jitter_max_ms": 5.0,         # Random variation (+/-)
-            "description": "4G LTE network - higher latency, suitable for rural/suburban"
-        },
-        "5G": {
-            "base_latency_ms": 5.0,       # Ultra-low latency 5G
-            "per_km_latency_ms": 0.005,   # Faster backhaul
-            "jitter_max_ms": 1.0,
-            "description": "5G network - low latency, suitable for urban areas"
-        },
-        "EDGE": {
-            "base_latency_ms": 1.0,       # Direct edge connection (MEC)
-            "per_km_latency_ms": 0.003,   # Minimal routing
-            "jitter_max_ms": 0.2,
-            "description": "Edge computing (MEC) - ultra-low latency, co-located with base station"
-        }
-    }
-    
-    # Enable/disable jitter (random latency variation)
-    NETWORK_JITTER_ENABLED = os.getenv("NETWORK_JITTER_ENABLED", "true").lower() == "true"
+    # Network propagation delay model (4G)
+    # Propagation delay (ms) = base + per_km * distance_km
+    # Note: jitter is intentionally removed for this configuration.
+    NETWORK_BASE_LATENCY_MS = 48.0
+    NETWORK_PER_KM_LATENCY_MS = 0.01
 
     # User cleanup
     # If a user hasn't been updated for this many seconds, remove it
@@ -189,4 +166,3 @@ class Config:
             "beijing_taxid_roads.json.gz",
         ),
     )
-

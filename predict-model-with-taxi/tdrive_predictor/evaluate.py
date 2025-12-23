@@ -44,6 +44,8 @@ def evaluate_gru(
     graphml: str = None,
     place: str = None,
     bbox: tuple = None,
+    max_windows_per_trip: int = None,
+    window_stride: int = 1,
 ) -> dict:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
     print(f"[Eval] Loading meta: {os.path.join(data_dir, 'meta.json')}", flush=True)
@@ -61,7 +63,19 @@ def evaluate_gru(
     if mode is None:
         mode = ckpt.get('mode', 'xy')
     if mode == 'curv_step':
-        return _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, place, bbox, data_dir)
+        return _evaluate_curv_step(
+            test_df,
+            feature_cols,
+            ckpt,
+            device,
+            lookback,
+            graphml,
+            place,
+            bbox,
+            data_dir,
+            max_windows_per_trip=max_windows_per_trip,
+            window_stride=window_stride,
+        )
     if mode == 'curv':
         # manual window loop to map Δs→XY
         model = GRUDisplacementRoad(input_size=len(feature_cols))
@@ -334,7 +348,19 @@ def evaluate_gru(
     print({k: (round(v, 3) if isinstance(v, float) else v) for k, v in res.items()})
     return res
 
-def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, place, bbox, data_dir):
+def _evaluate_curv_step(
+    test_df,
+    feature_cols,
+    ckpt,
+    device,
+    lookback,
+    graphml,
+    place,
+    bbox,
+    data_dir,
+    max_windows_per_trip: int = None,
+    window_stride: int = 1,
+):
     from .osm.loader import load_graph
     from .mapmatch.hmm import CandidateGenerator
     import numpy as np
@@ -400,9 +426,20 @@ def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, 
         if n < (lookback or 20) + max(steps_all):
             continue
         base_idx = g.index.min()
+        windows_seen = 0
+        stride = int(max(1, window_stride or 1))
+        limit = None if max_windows_per_trip is None else int(max_windows_per_trip)
         for end in range(base_idx + (lookback or 20) - 1, base_idx + n):
             if end + max(steps_all) >= base_idx + n:
                 break
+            if stride > 1:
+                # Use a stable stride based on window index within the trip.
+                widx = end - (base_idx + (lookback or 20) - 1)
+                if (widx % stride) != 0:
+                    continue
+            if limit is not None and windows_seen >= limit:
+                break
+            windows_seen += 1
             x_seq = (
                 torch.tensor(
                     df_sorted.loc[end - (lookback or 20) + 1 : end, feature_cols].to_numpy(
@@ -534,4 +571,3 @@ def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, 
         "h10": ph_hit200[3],
     }
     return res
-

@@ -66,9 +66,23 @@ def main():
     p_eval.add_argument('--ckpt', type=str, default=None)
     p_eval.add_argument('--lookback', type=int, default=None)
     p_eval.add_argument('--mode', type=str, choices=['xy','curv','curv_step'], default=None, help='Eval mode; if omitted, inferred from ckpt')
+    p_eval.add_argument('--device', type=str, choices=['auto','cpu','cuda'], default='auto', help='Compute device to use for model forward pass')
     p_eval.add_argument('--graphml', type=str, default=None)
     p_eval.add_argument('--place', type=str, default=None)
     p_eval.add_argument('--bbox', type=float, nargs=4, default=None, metavar=('NORTH','SOUTH','EAST','WEST'))
+    # Speed controls for large Phase B eval (curv_step): reduce the number of windows evaluated.
+    p_eval.add_argument(
+        '--max-windows-per-trip',
+        type=int,
+        default=None,
+        help='(curv_step only) Limit evaluated sliding windows per trip (e.g., 1 or 5). Default: evaluate all windows.',
+    )
+    p_eval.add_argument(
+        '--window-stride',
+        type=int,
+        default=1,
+        help='(curv_step only) Evaluate every k-th window (stride). Default: 1 (evaluate all windows).',
+    )
 
     p_ctrv = sub.add_parser('eval-ctrv', help='Evaluate CTRV EKF baseline on test set')
     p_ctrv.add_argument('--data-dir', type=str, default='tdrive_predictor_artifacts/phase_a')
@@ -155,9 +169,12 @@ def main():
             ckpt_path=args.ckpt,
             lookback=args.lookback,
             mode=args.mode,
+            device=(None if args.device == 'auto' else args.device),
             graphml=args.graphml,
             place=args.place,
             bbox=tuple(args.bbox) if args.bbox is not None else None,
+            max_windows_per_trip=args.max_windows_per_trip,
+            window_stride=args.window_stride,
         )
         print("Metrics:", stats)
     elif args.cmd == 'eval-ctrv':

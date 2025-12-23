@@ -201,3 +201,19 @@ python run_experiments.py
 **Files Modified:**
 - `predict-model-with-taxi/tdrive_predictor/cli.py`
 - `predict-model-with-taxi/tdrive_predictor/evaluate.py`
+
+---
+
+## Faster `curv_step` evaluation controls (Dec 17, 2025)
+
+**Problem:** `python -m tdrive_predictor.cli eval --mode curv_step` on large Phase B artifacts (e.g., 7k) evaluates *all sliding windows* per trip (often ~60–80 windows/trip), leading to multi-hour runtimes even without `--graphml`.
+
+**Solution:**
+- Added optional eval flags to reduce evaluated windows (applies to `curv_step` only):
+  - `--max-windows-per-trip N` (e.g., 1 or 5)
+  - `--window-stride K` (evaluate every K-th window)
+- Added `--device {auto,cpu,cuda}` for eval to explicitly choose GPU for the model forward pass.
+
+**Files Modified:**
+- `predict-model-with-taxi/tdrive_predictor/cli.py`
+- `predict-model-with-taxi/tdrive_predictor/evaluate.py`

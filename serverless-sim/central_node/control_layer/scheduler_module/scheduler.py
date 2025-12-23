@@ -389,19 +389,16 @@ class Scheduler:
         return (dx ** 2 + dy ** 2) ** 0.5
     
     def _calculate_propagation_delay_deterministic(self, distance_meters: float) -> float:
-        """Calculate deterministic network propagation delay (no jitter).
+        """Calculate deterministic network propagation delay.
         
         Used for optimization algorithms (CVX) that need consistent values.
         
         Returns:
-            Propagation delay in milliseconds (without random jitter)
+            Propagation delay in milliseconds
         """
-        network_type = getattr(Config, 'NETWORK_TYPE', 'EDGE')
-        params = Config.NETWORK_LATENCY_PARAMS.get(network_type, Config.NETWORK_LATENCY_PARAMS['EDGE'])
-        
         distance_km = distance_meters / 1000.0
-        base_latency = params['base_latency_ms']
-        distance_latency = distance_km * params['per_km_latency_ms']
+        base_latency = Config.NETWORK_BASE_LATENCY_MS
+        distance_latency = distance_km * Config.NETWORK_PER_KM_LATENCY_MS
         
         return max(0.0, base_latency + distance_latency)
     
@@ -410,30 +407,13 @@ class Scheduler:
         
         Uses a realistic network latency model instead of speed of light.
         The model includes:
-        - Base latency: Radio access + core network baseline (depends on network type)
+        - Base latency: Radio access + core network baseline
         - Distance-based latency: Fiber/backhaul propagation
-        - Jitter: Random variation to simulate real-world conditions
-        
-        Network types:
-        - EDGE: Ultra-low latency (MEC co-located with base station) - DEFAULT
-        - 5G: Low latency urban network
-        - 4G: Higher latency rural/suburban network
         
         Returns:
             Propagation delay in milliseconds
         """
-        # Get deterministic part
-        base_delay = self._calculate_propagation_delay_deterministic(distance_meters)
-        
-        # Add optional jitter (random variation)
-        jitter = 0.0
-        if getattr(Config, 'NETWORK_JITTER_ENABLED', True):
-            network_type = getattr(Config, 'NETWORK_TYPE', 'EDGE')
-            params = Config.NETWORK_LATENCY_PARAMS.get(network_type, Config.NETWORK_LATENCY_PARAMS['EDGE'])
-            jitter_max = params['jitter_max_ms']
-            jitter = random.uniform(-jitter_max, jitter_max)
-        
-        return max(0.0, base_delay + jitter)
+        return self._calculate_propagation_delay_deterministic(distance_meters)
     
     def node_assignment(self) -> dict:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
