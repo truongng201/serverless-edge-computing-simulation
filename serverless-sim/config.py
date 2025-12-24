@@ -19,7 +19,7 @@ class Config:
     DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
-    DEFAULT_MAX_WARM_TIME = 8  # seconds: warm time larger than execution time to allow reuse
+    DEFAULT_MAX_WARM_TIME = 150  # seconds: warm time larger than execution time to allow reuse
 
     # Function naming / reuse strategy
     # When enabled, each user will consistently invoke the same logical function name derived
