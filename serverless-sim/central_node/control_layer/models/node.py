@@ -61,3 +61,8 @@ class UserNodeInfo:
     previous_node_id: Optional[str] = None  # For migration tracking
     migration_cost: float = 0.0       # Current migration cost
     cold_start_penalty: float = 0.0   # Cold start penalty
+    # Simulated execution / prewarm bookkeeping
+    last_executed_node_id: Optional[str] = None
+    last_executed_step_id: Optional[int] = None
+    planned_node_id: Optional[str] = None
+    planned_step_id: Optional[int] = None

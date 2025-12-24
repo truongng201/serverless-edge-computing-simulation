@@ -215,6 +215,8 @@ class GetAllUsersController:
             self.scheduler.node_assignment()
         elif dataset_name == "taxiD_Replay":
             self._update_taxid_replay_sample()
+            # Keep scheduler step in sync so predictive planning uses the correct timestep.
+            self.scheduler.set_current_step_id(self.current_step_id)
             self.scheduler.node_assignment()
         
         # Execute functions at this timestep if simulation is active and users_agent is available
@@ -243,8 +245,38 @@ class GetAllUsersController:
             })
             
     def _execute_function(self):
-        for node_id, user_node in self.scheduler.user_nodes.items():
-            # Simulate function execution by updating last_executed timestamp
+        # NOTE: In large experiments, real /execute calls can dominate runtime.
+        # `EXECUTION_MODE=simulated` avoids network/Docker and assigns computation_delay analytically.
+        if getattr(Config, "EXECUTION_MODE", "real") == "simulated":
+            step_id = self.current_step_id or 0
+            for _, user_node in self.scheduler.user_nodes.items():
+                assigned_node = user_node.assigned_node_id
+                if not assigned_node:
+                    continue
+                is_edge = assigned_node != "central_node"
+
+                warm_ms = Config.SIM_EXEC_WARM_MS_EDGE if is_edge else Config.SIM_EXEC_WARM_MS_CENTRAL
+                cold_penalty_ms = (
+                    Config.SIM_EXEC_COLD_PENALTY_MS_EDGE if is_edge else Config.SIM_EXEC_COLD_PENALTY_MS_CENTRAL
+                )
+
+                # Consider node warm if:
+                # - user executed on the same node previously, OR
+                # - predictive prewarm-only has planned this node for the current step
+                warm = user_node.last_executed_node_id == assigned_node
+                if getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
+                    if user_node.planned_node_id == assigned_node and user_node.planned_step_id == step_id:
+                        warm = True
+
+                user_node.latency.computation_delay = warm_ms if warm else (warm_ms + cold_penalty_ms)
+                user_node.latency.container_status = "warm" if warm else "cold"
+                user_node.last_executed = time.time()
+                user_node.last_executed_node_id = assigned_node
+                user_node.last_executed_step_id = step_id
+            return
+
+        # Real execution (Docker-backed) via HTTP
+        for _, user_node in self.scheduler.user_nodes.items():
             assigned_node = user_node.assigned_node_id
             if not assigned_node:
                 continue
@@ -255,7 +287,7 @@ class GetAllUsersController:
                     result = requests.Session().post(
                         url,
                         json={"user_id": user_node.user_id},
-                        timeout=10  # Increased to 10 seconds
+                        timeout=10
                     )
                     
                     if result.status_code == 200:
@@ -275,7 +307,7 @@ class GetAllUsersController:
                     result = requests.Session().post(
                         url,
                         json={"user_id": user_node.user_id},
-                        timeout=10  # Increased to 10 seconds
+                        timeout=10
                     )
                     
                     if result.status_code == 200:

@@ -20,6 +20,14 @@ class Config:
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
     DEFAULT_MAX_WARM_TIME = 8  # seconds: warm time larger than execution time to allow reuse
+
+    # Function naming / reuse strategy
+    # When enabled, each user will consistently invoke the same logical function name derived
+    # from user_id (instead of a random name per call). This makes warm/cold behavior more
+    # meaningful for mobility experiments and enables intentional prewarming.
+    STICKY_FUNCTION_PER_USER = os.getenv("STICKY_FUNCTION_PER_USER", "0").lower() in ("1", "true", "yes")
+    # Optional: reduce number of distinct functions by hashing user_id into K buckets (0=disabled).
+    FUNCTION_NAME_BUCKETS = int(os.getenv("FUNCTION_NAME_BUCKETS", "0"))
     
     
     # Cleanup
@@ -117,10 +125,21 @@ class Config:
     # Which horizon (in minutes) to use when selecting the "best" edge from the
     # predictor output. For curv_step we currently expose horizons (1,3,5,10).
     PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
-
     # Dataset playback speed (Scenario 2 / vehicles)
     # Multiply timestep advancement per poll to make movements appear faster on canvas
     DATASET_STEP_MULTIPLIER = 8
+
+    # ============================================================
+    # Execution model (real Docker vs simulated)
+    # ============================================================
+    # `real`: call /execute on nodes (Docker-backed)
+    # `simulated`: do not call /execute; instead assign computation_delay analytically
+    EXECUTION_MODE = os.getenv("EXECUTION_MODE", "real").lower()
+    # Defaults derived from local benchmarking (median warm + median cold-warm delta).
+    SIM_EXEC_WARM_MS_CENTRAL = float(os.getenv("SIM_EXEC_WARM_MS_CENTRAL", "300"))
+    SIM_EXEC_COLD_PENALTY_MS_CENTRAL = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_CENTRAL", "900"))
+    SIM_EXEC_WARM_MS_EDGE = float(os.getenv("SIM_EXEC_WARM_MS_EDGE", "300"))
+    SIM_EXEC_COLD_PENALTY_MS_EDGE = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_EDGE", "1050"))
     
     # User Movement Configuration
     USER_MIN_SPEED = 1  # m/s - minimum user movement speed (walking speed)

@@ -444,6 +444,9 @@ class Scheduler:
         return self.assignment_matrix
 
     def _predictive_assignment(self) -> dict:
+        if getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
+            return self._predictive_prewarm_only_assignment()
+
         if not self.predictor_adapter or not get_mobility_prediction:
             self.logger.warning("Predictor not available, falling back to greedy assignment")
             return self._assign_users_greedy()
@@ -556,6 +559,132 @@ class Scheduler:
                 f"{greedy_fallback_assignments} greedy fallback"
             )
         
+        return self.assignment_matrix
+
+    def _apply_assignment_latency(self, user_node: UserNodeInfo, assigned_node_id: str) -> Tuple[str, float]:
+        if assigned_node_id == "central_node":
+            location = self.central_node["location"]
+        else:
+            location = self.edge_nodes[assigned_node_id].location
+        assigned_node_distance = self._calculate_distance(user_node.location, location)
+        user_node.assigned_node_id = assigned_node_id
+        user_node.latency.distance = assigned_node_distance
+        user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
+        user_node.latency.total_turnaround_time = (
+            user_node.latency.propagation_delay
+            + user_node.latency.transmission_delay
+            + user_node.latency.computation_delay
+        )
+        return assigned_node_id, assigned_node_distance
+
+    def _predictive_prewarm_only_assignment(self) -> dict:
+        """Predictive mode that plans ahead but does not reassign immediately.
+
+        - Keeps current assignment for serving requests "now".
+        - On planning ticks, stores (planned_node_id, planned_step_id) per user based on horizon.
+        - Switches assignment only when planned_step_id is reached.
+
+        This mode is designed for experiments where wall-clock steps are slow (many users),
+        so Docker warm TTL is not meaningful; the execution layer can model prewarm analytically.
+        """
+        if not self.predictor_adapter or not get_mobility_prediction:
+            self.logger.warning("Predictor not available, falling back to greedy assignment")
+            return self._assign_users_greedy()
+        if not self.edge_nodes:
+            self.logger.warning("No edge nodes registered; using greedy assignment")
+            return self._assign_users_greedy()
+
+        current_step = self.get_current_step_id() or 0
+        lead_steps = int(getattr(Config, "PREDICTIVE_PREWARM_LEAD_STEPS", 5))
+        exec_interval = int(getattr(Config, "PREDICTIVE_EXECUTE_INTERVAL_STEPS", 5))
+
+        # Apply due switches first
+        for user_node in self.user_nodes.values():
+            if not user_node.planned_node_id or user_node.planned_step_id is None:
+                continue
+            if current_step < int(user_node.planned_step_id):
+                continue
+            candidate = user_node.planned_node_id
+            if candidate != "central_node" and candidate not in self.edge_nodes:
+                candidate = "central_node"
+            if candidate != "central_node" and not self._check_resource_constraints(user_node, candidate):
+                continue
+            self._apply_assignment_latency(user_node, candidate)
+            user_node.planned_node_id = None
+            user_node.planned_step_id = None
+
+        # Ensure an initial assignment exists (greedy) for any unassigned user
+        for user_node in self.user_nodes.values():
+            if user_node.assigned_node_id:
+                continue
+            assigned_node_id, _ = self._greedy_assignment(user_node.location)
+            self._apply_assignment_latency(user_node, assigned_node_id)
+
+        # Current assignment matrix reflects what serves requests "now"
+        self.assignment_matrix = {
+            user_id: (user.assigned_node_id, user.latency.distance)
+            for user_id, user in self.user_nodes.items()
+        }
+
+        # Only plan on interval ticks (avoid expensive prediction every step)
+        if exec_interval <= 0 or (current_step % exec_interval != 0):
+            return self.assignment_matrix
+
+        # Build prediction inputs for users with sufficient history
+        user_states = []
+        for user in self.user_nodes.values():
+            if self._has_sufficient_history(user.history):
+                history = self._get_history_for_prediction(user.history)
+                user_states.append({"user_id": user.user_id, "history": history})
+
+        if not user_states:
+            return self.assignment_matrix
+
+        cloudlet_records = [
+            {
+                "id": node_id,
+                "x": info.location["x"] * Config.DEFAULT_PIXEL_TO_METERS,
+                "y": info.location["y"] * Config.DEFAULT_PIXEL_TO_METERS,
+            }
+            for node_id, info in self.edge_nodes.items()
+        ]
+
+        try:
+            prob_map = get_mobility_prediction(user_states, cloudlet_records, self.predictor_adapter)
+        except Exception as exc:
+            self.logger.warning("Predictive inference failed: %s", exc)
+            return self.assignment_matrix
+
+        desired_h = getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5)
+        horizons = (1, 3, 5, 10)
+        for user_id, user_node in self.user_nodes.items():
+            probs = prob_map.get(user_id)
+            if probs is None or probs.ndim != 2 or probs.shape[1] <= 0:
+                continue
+            if probs.shape[1] == len(horizons) and desired_h in horizons:
+                horizon_idx = horizons.index(desired_h)
+            else:
+                horizon_idx = min(max(int(desired_h) - 1, 0), probs.shape[1] - 1)
+
+            order = np.argsort(probs[:, horizon_idx])[::-1]
+            planned = None
+            for idx in order:
+                node_id = cloudlet_records[idx]["id"]
+                if self._check_resource_constraints(user_node, node_id):
+                    planned = node_id
+                    break
+            if planned is None:
+                planned = "central_node"
+
+            user_node.planned_node_id = planned
+            user_node.planned_step_id = int(current_step) + int(lead_steps)
+
+        self.logger.info(
+            "Predictive(prewarm-only): planned at step=%s -> switch at step+%s",
+            current_step,
+            lead_steps,
+        )
+
         return self.assignment_matrix
 
     def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:

@@ -91,6 +91,53 @@ This session focused on fixing bugs in the predictive scheduling system, improvi
 
 **How to override:** set `PREDICTIVE_TARGET_HORIZON_MIN` to `1`, `3`, `5`, or `10` in the environment when starting central.
 
+---
+
+## Sticky Function Per User (Dec 24, 2025)
+
+**Goal:** Make warm/cold behavior meaningful for mobility experiments by ensuring each user invokes a stable logical function name (instead of a random name each call).
+
+**What changed:**
+- When enabled, `/execute` uses `function_name = fn_user_{user_id}` (sanitized), so the first execute on a node tends to be `cold`, subsequent executes (within warm TTL) are `warm`. This aligns coldstart with node migration much better.
+- Optional `FUNCTION_NAME_BUCKETS` lets you hash users into K shared “functions” (reduce container count).
+
+**Files modified:**
+- `serverless-sim/config.py`: added `STICKY_FUNCTION_PER_USER` (default off) and `FUNCTION_NAME_BUCKETS`.
+- `serverless-sim/central_node/api_layer/central_controller.py`: stable function naming + prefer warm reuse for same function when sticky is enabled.
+- `serverless-sim/edge_node/api_layer/edge_controller.py`: same as central.
+
+**How to enable:**
+- PowerShell: `$env:STICKY_FUNCTION_PER_USER="1"` (optional: `$env:FUNCTION_NAME_BUCKETS="128"`)
+- Linux: `export STICKY_FUNCTION_PER_USER=1` (optional: `export FUNCTION_NAME_BUCKETS=128`)
+
+---
+
+## Simulated Execution Mode + Predictive Prewarm-Only (Dec 24, 2025)
+
+**Problem:** In large experiments, a single “timestep” can take minutes wall-clock due to many `/execute` calls. Docker warm TTL (`DEFAULT_MAX_WARM_TIME=8s`) becomes meaningless, so “prewarm in advance” cannot be evaluated fairly.
+
+**Solution (two parts):**
+1) Add `EXECUTION_MODE=simulated` to skip real `/execute` HTTP+Docker calls and assign `computation_delay` analytically using measured warm/cold penalties.
+2) Add `PREDICTIVE_PREWARM_ONLY=1` predictive mode:
+   - does **not** reassign users immediately based on the predicted horizon,
+   - instead plans a future node `(planned_node_id, planned_step_id)` and switches only when due.
+
+**Files modified:**
+- `serverless-sim/config.py`: added `EXECUTION_MODE` and simulated timing knobs; added prewarm-only knobs (`PREDICTIVE_PREWARM_ONLY`, lead steps, planning interval).
+- `serverless-sim/central_node/control_layer/models/node.py`: added fields for simulated execution + planning (`last_executed_node_id`, `planned_node_id`, etc.).
+- `serverless-sim/central_node/control_layer/controller_module/get_all_users_controller.py`: when `EXECUTION_MODE=simulated`, sets `container_status` and `computation_delay` without calling `/execute`; also syncs `current_step_id` before calling `node_assignment()` for TaxiD replay.
+- `serverless-sim/central_node/control_layer/scheduler_module/scheduler.py`: implements prewarm-only planning/switching logic.
+
+**Suggested env for experiments:**
+- PowerShell:
+  - `$env:EXECUTION_MODE="simulated"`
+  - `$env:PREDICTIVE_PREWARM_ONLY="1"`
+  - `$env:PREDICTIVE_TARGET_HORIZON_MIN="5"`
+- Linux:
+  - `export EXECUTION_MODE=simulated`
+  - `export PREDICTIVE_PREWARM_ONLY=1`
+  - `export PREDICTIVE_TARGET_HORIZON_MIN=5`
+
 ## 4. Trajectory Export Script Enhancement
 
 **File:** `serverless-sim/scripts/export_taxid_replay_last1k.py`
