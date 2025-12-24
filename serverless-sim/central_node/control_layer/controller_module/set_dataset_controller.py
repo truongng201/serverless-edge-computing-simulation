@@ -84,12 +84,7 @@ class SetDatasetController:
         
         # Try to find the best available file (prefer features version)
         candidates = [
-            mock_data_dir / "taxid_replay_features.pkl",      # With features
-            mock_data_dir / "taxid_replay_100_features.pkl",  # 100 trips with features
-            mock_data_dir / "taxid_replay_all_features.pkl",  # All trips with features
-            mock_data_dir / "taxid_replay_last1k.pkl",        # Legacy basic format
-            mock_data_dir / "taxid_replay_1000.pkl",          # 1000 trips basic
-            mock_data_dir / "taxid_replay_100.pkl",           # 100 trips basic
+            mock_data_dir / "taxid_replay_1000_features.pkl", # 1000 trips with features (common export)
         ]
         
         # Allow override via config
@@ -170,7 +165,9 @@ class SetDatasetController:
                 # Feature columns to copy if available
                 feature_cols = ["v", "a", "delta_v", "delta_heading", 
                                "tod_sin", "tod_cos", "dow_sin", "dow_cos",
-                               "rush_hour", "stop_flag", "dw_time"]
+                               "rush_hour", "stop_flag", "dw_time",
+                               # Optional graph-context features (present if replay export included them)
+                               "node_degree", "is_junction"]
                 
                 for idx, traj in enumerate(trajectories):
                     trip_id = str(traj.get("trip_id", idx))

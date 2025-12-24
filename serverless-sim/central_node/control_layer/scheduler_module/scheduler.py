@@ -226,6 +226,9 @@ class Scheduler:
             "rush_hour": float(point_data.get("rush_hour", 0.0)),
             "stop_flag": float(point_data.get("stop_flag", 0.0)),
             "dw_time": float(point_data.get("dw_time", 0.0)),
+            # Optional graph-context features (present only if replay export included them)
+            "node_degree": float(point_data.get("node_degree", 0.0)),
+            "is_junction": float(point_data.get("is_junction", 0.0)),
         }
         
         user_node.history.append(record)

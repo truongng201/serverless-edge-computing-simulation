@@ -59,6 +59,8 @@ FEATURE_COLS = [
     "v", "a", "delta_v", "delta_heading",
     "tod_sin", "tod_cos", "dow_sin", "dow_cos",
     "rush_hour", "stop_flag", "dw_time"
+    # Optional graph-context features (present if Phase B was prepared with graph context enabled)
+    , "node_degree", "is_junction"
 ]
 
 

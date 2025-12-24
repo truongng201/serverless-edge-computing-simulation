@@ -147,6 +147,20 @@ def _apply_scaler(df: pd.DataFrame, scaler: Dict[str, Tuple[float, float]]) -> p
     return df
 
 
+def _ensure_feature_cols(df: pd.DataFrame, feature_cols: Sequence[str]) -> pd.DataFrame:
+    """Ensure all requested feature columns exist in df.
+
+    Serverless-sim histories may not contain optional features (e.g., graph context),
+    but the model expects the full training-time feature set. Missing columns are
+    filled with 0.0 (in *raw* space, before scaling).
+    """
+    df = df.copy()
+    missing = [c for c in feature_cols if c not in df.columns]
+    for c in missing:
+        df[c] = 0.0
+    return df
+
+
 def prepare_sequence_from_history(
     history: Sequence[HistoryRecord],
     bundle: PredictorBundle,
@@ -156,9 +170,10 @@ def prepare_sequence_from_history(
     if len(history) < bundle.lookback:
         raise ValueError(
             f"Need at least {bundle.lookback} history points, got {len(history)}"
-        )
+    )
     df = pd.DataFrame(list(history)).sort_values("ts")
     df = df.tail(bundle.lookback)
+    df = _ensure_feature_cols(df, bundle.feature_cols)
     df = _apply_scaler(df, bundle.scaler)
     x_seq = torch.tensor(df[bundle.feature_cols].to_numpy(dtype=np.float32))
     base_x = float(df["x"].iloc[-1])
@@ -293,6 +308,7 @@ def prepare_batch_from_histories(
             )
         df = pd.DataFrame(list(history)).sort_values("ts")
         df = df.tail(bundle.lookback)
+        df = _ensure_feature_cols(df, bundle.feature_cols)
         df = _apply_scaler(df, bundle.scaler)
         x_seq = torch.tensor(df[bundle.feature_cols].to_numpy(dtype=np.float32))
         batch_seqs.append(x_seq)
@@ -395,4 +411,3 @@ __all__ = [
     "predict_future_positions_batch",
     "cloudlet_probabilities_batch",
 ]
-

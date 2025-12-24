@@ -188,3 +188,7 @@ class Config:
             "beijing_taxid_roads.json.gz",
         ),
     )
+
+    # TaxiD replay dataset (pickled trajectories exported by serverless-sim/scripts/export_taxid_replay_last1k.py)
+    # If set, overrides the default candidate search under serverless-sim/mock_data.
+    TAXID_REPLAY_PATH = os.getenv("TAXID_REPLAY_PATH") or None
