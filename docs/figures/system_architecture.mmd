@@ -1,0 +1,102 @@
+flowchart TB
+  %% Paper-ready high-level system architecture (runtime + offline ML artifacts)
+
+  %% --- Client/UI ---
+  subgraph UI["Simulation UI (Next.js / Canvas Digital Twin)"]
+    UI1["Control Panel\n(scenarios, algorithms, simulation start/stop)"]
+    UI2["Metrics Panel\n(latency/load/cold-start analytics)"]
+    UI3["Canvas Simulation\n(users, cloudlets, roads)"]
+  end
+
+  %% --- Central node ---
+  subgraph CN["Central Node (Flask)"]
+    subgraph CN_API["API Layer (REST)"]
+      CN_API1["User lifecycle API\n/create_user_node\n/update_user_node\n/delete_user(s)"]
+      CN_API2["Cluster status API\n/cluster/status\n/nodes/*"]
+      CN_API3["TaxiD roads API\n/taxid/roads*"]
+      CN_API4["Function exec API\n/execute (central)"]
+      CN_API5["Assignment API\n/assignment_algorithm"]
+    end
+
+    subgraph CN_CTRL["Control Layer"]
+      SCH["Scheduler\n(greedy / convex / predictive)"]
+      PRED["Predictive assignment\n(T-Drive mobility inference)"]
+      DATA["Dataset Manager\n(DACT, random, TaxiD replay)"]
+      OSM["OSM Loader\n(OSM XML/GraphML -> road polylines)"]
+      MIG["Migration Manager\n(policy + bookkeeping)"]
+      AGG["Metrics Aggregation\n(health + node state)"]
+    end
+
+    subgraph CN_RES["Resource Layer"]
+      CN_CM["Container Manager\n(Docker API)"]
+      CN_MET["System Metrics Collector"]
+    end
+  end
+
+  %% --- Edge nodes ---
+  subgraph EN["Edge Node(s) / Cloudlets (Flask)"]
+    subgraph EN_API["API Layer (REST)"]
+      EN_EXE["Execute API\n/edge/execute"]
+      EN_STATUS["Status API\n/edge/status"]
+    end
+    subgraph EN_BG["Background Agents"]
+      EN_REG["Auto registration\n(nodes/register)"]
+      EN_REP["Metrics reporting\n(every 10s)"]
+      EN_CLEAN["Warm-container cleanup\n(TTL-based)"]
+    end
+    subgraph EN_RES["Resource Layer"]
+      EN_CM["Container Manager\n(Docker API)"]
+      EN_MET["System Metrics Collector"]
+    end
+  end
+
+  %% --- Container runtime ---
+  subgraph DOCKER["Docker Engine"]
+    NET["Docker network\nserverless-network"]
+    subgraph FN["Function Container(s)\n(python-serverless-handler image)"]
+      EXEC["Invocation via docker exec\npython -u /app/main.py"]
+      HANDLER["handler(event, context)\n(simulated CPU work)"]
+    end
+  end
+
+  %% --- Data + ML artifacts ---
+  subgraph ART["Datasets & ML Artifacts (local files)"]
+    DACT["DACT samples\n(serverless-sim/mock_data)"]
+    TAXID["TaxiD trajectories (replay)\n(serverless-sim/mock_data/*.pkl)"]
+    OSMF["OSM map\n(OSM XML / GraphML cache)"]
+    TDRIVE["T-Drive predictor artifacts\n(predict-model-with-taxi/tdrive_predictor_artifacts/*)"]
+  end
+
+  %% --- Interactions ---
+  UI -->|"REST (NEXT_PUBLIC_API_URL)\ncreate/update users, get status, load roads"| CN_API
+  CN_API --> CN_CTRL
+  CN_CTRL --> CN_API
+
+  %% Assignment + execution loop
+  SCH -->|"select assigned node\nper user + timestep"| SCH
+  SCH -->|"invoke assigned node\n(central or edge)"| CN_API4
+  CN_API4 --> CN_CM
+  SCH -->|"POST /edge/execute\n(per assigned user)"| EN_EXE
+
+  %% Edge -> Docker
+  EN_EXE --> EN_CM --> NET --> EXEC --> HANDLER
+  CN_CM --> NET --> EXEC
+
+  %% Metrics / health
+  EN_REG -->|"POST /central/nodes/register"| CN_API2
+  EN_REP -->|"POST /central/nodes/{id}/metrics"| CN_API2
+  CN_API2 --> AGG
+  EN_MET --> EN_REP
+  CN_MET --> AGG
+
+  %% Data and prediction dependencies
+  DATA --> DACT
+  DATA --> TAXID
+  OSM --> OSMF
+  PRED --> TDRIVE
+  PRED --> SCH
+
+  %% Styling
+  classDef dashed stroke-dasharray: 6 4,stroke-width:1px;
+  class ART dashed;
+
