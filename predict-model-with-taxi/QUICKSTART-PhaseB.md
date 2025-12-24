@@ -378,3 +378,8 @@ Metrics: {
     'h10': 0.7475847890451278
   }
 }
+
+
+export TDRIVE_ARTIFACT_DIR="$HOME/Serverless-edge-computing-simulation/predict-model-with-taxi/tdrive_predictor_artifacts/phase_b_7k_fast"
+export TDRIVE_CKPT_NAME="gru_phase_curv_step.pt"
+export TDRIVE_DEVICE="cuda"
