@@ -79,6 +79,18 @@ This session focused on fixing bugs in the predictive scheduling system, improvi
 
 ---
 
+## Predictive Horizon Alignment (Dec 24, 2025)
+
+**Problem:** Predictive scheduling was effectively using the last predictor horizon (t+10) for selecting the best edge node, which can be misaligned with the experiment loop cadence and the short warm-container TTL (default 8s), making “prewarm ahead” ineffective.
+
+**Solution:** Switch the default horizon used for predictive selection to **t+5** (minutes), matching the TaxiD replay step (~1 minute per step) and the simulation’s execution cadence (every 5 steps).
+
+**Files Modified:**
+- `serverless-sim/config.py`: Added `PREDICTIVE_TARGET_HORIZON_MIN` (default `5`, env-overridable).
+- `serverless-sim/central_node/control_layer/scheduler_module/scheduler.py`: Use `PREDICTIVE_TARGET_HORIZON_MIN` to choose the horizon column (defaults to `h5` for (1,3,5,10)).
+
+**How to override:** set `PREDICTIVE_TARGET_HORIZON_MIN` to `1`, `3`, `5`, or `10` in the environment when starting central.
+
 ## 4. Trajectory Export Script Enhancement
 
 **File:** `serverless-sim/scripts/export_taxid_replay_last1k.py`
@@ -217,3 +229,24 @@ python run_experiments.py
 **Files Modified:**
 - `predict-model-with-taxi/tdrive_predictor/cli.py`
 - `predict-model-with-taxi/tdrive_predictor/evaluate.py`
+
+---
+
+## Experiment results visualization (Dec 23, 2025)
+
+**Goal:** Visualize `serverless-sim/experiment_results_*.csv` with clear scaling and summary stats, even on machines where `pandas/matplotlib` are broken due to NumPy ABI mismatches.
+
+**Added:**
+- `serverless-sim/scripts/plot_experiment_results.py`
+  - Reads CSV with stdlib `csv` (no pandas).
+  - Writes `summary.md` with mean/median/p95/p99 for:
+    - total turnaround time (sum over users)
+    - avg per user (ms/user)
+  - Tries matplotlib first; if unavailable/broken, falls back to generating static `.svg` plots.
+  - `--force-svg` flag to skip matplotlib entirely.
+
+**Typical usage:**
+```bash
+cd serverless-sim
+python scripts/plot_experiment_results.py --csv experiment_results_20251223_195950.csv --out-dir plots/experiment_results_20251223_195950
+```

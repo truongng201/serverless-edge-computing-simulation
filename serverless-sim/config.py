@@ -114,6 +114,9 @@ class Config:
     PREDICTIVE_COLD_START_MS = 300  # expected cold start penalty
     PREDICTIVE_HANDOFF_COST = 0.05  # score penalty for handoff
     PREDICTIVE_WARM_BASE_PROB = 0.2  # base warm probability when metrics are missing
+    # Which horizon (in minutes) to use when selecting the "best" edge from the
+    # predictor output. For curv_step we currently expose horizons (1,3,5,10).
+    PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
 
     # Dataset playback speed (Scenario 2 / vehicles)
     # Multiply timestep advancement per poll to make movements appear faster on canvas

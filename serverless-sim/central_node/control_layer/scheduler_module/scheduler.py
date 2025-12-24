@@ -513,7 +513,17 @@ class Scheduler:
                 greedy_fallback_assignments += 1
             else:
                 predictive_assignments += 1
-                horizon_idx = probs.shape[1] - 1 if probs.ndim == 2 else -1
+                horizon_idx = -1
+                if probs.ndim == 2 and probs.shape[1] > 0:
+                    # Inference currently returns probabilities for horizons (1,3,5,10).
+                    # Default to using horizon=5 (aligns better with the replay step and
+                    # execution cadence), but clamp if the shape is unexpected.
+                    desired_h = getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5)
+                    horizons = (1, 3, 5, 10)
+                    if probs.shape[1] == len(horizons) and desired_h in horizons:
+                        horizon_idx = horizons.index(desired_h)
+                    else:
+                        horizon_idx = min(max(int(desired_h) - 1, 0), probs.shape[1] - 1)
                 order = np.argsort(probs[:, horizon_idx])[::-1]
                 assigned_node_id = None
                 for idx in order:
