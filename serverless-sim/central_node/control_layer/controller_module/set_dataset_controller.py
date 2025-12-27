@@ -84,7 +84,7 @@ class SetDatasetController:
         
         # Try to find the best available file (prefer features version)
         candidates = [
-            mock_data_dir / "taxid_replay_1000_features.pkl", # 1000 trips with features (common export)
+            mock_data_dir / "taxid_replay_5000_features.pkl",
         ]
         
         # Allow override via config
