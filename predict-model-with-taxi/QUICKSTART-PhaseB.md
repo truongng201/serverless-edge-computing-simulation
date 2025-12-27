@@ -225,7 +225,6 @@ Saved checkpoint: tdrive_predictor_artifacts\phase_b\gru_phase_curv.pt
 Per-horizon mean error (m): {'h1': 387.57, 'h3': 695.68, 'h5': 1034.68, 'h10': 1850.95}
 Per-horizon Hit@200: {'h1': 0.525, 'h3': 0.399, 'h5': 0.36, 'h10': 0.321}
 {'ADE': 992.218, 'FDE': 1850.949, 'Hit@100': 0.27, 'Hit@200': 0.321, 'Hit@400': 0.351, 'PerHorizonError': {'h1': 387.56951904296875, 'h3': 695.6753540039062, 'h5': 1034.6790771484375, 'h10': 1850.9493408203125}, 'PerHorizonHit@200': {'h1': 0.5250265213617513, 'h3': 0.39945992863342655, 'h5': 0.359918989295014, 'h10': 0.32114958048027775}}
-Metrics: {'ADE': 992.2183227539062, 'FDE': 1850.9493408203125, 'Hit@100': 0.2697463631629944, 'Hit@200': 0.3211495876312256, 'Hit@400': 0.35123926401138306, 'PerHorizonError': {'h1': 387.56951904296875, 'h3': 695.6753540039062, 'h5': 1034.6790771484375, 'h10': 1850.9493408203125}, 'PerHorizonHit@200': {'h1': 0.5250265213617513, 'h3': 0.39945992863342655, 'h5': 0.359918989295014, 'h10': 0.32114958048027775}}
 
 
 
@@ -379,7 +378,7 @@ Metrics: {
   }
 }
 
-
-export TDRIVE_ARTIFACT_DIR="$HOME/Serverless-edge-computing-simulation/predict-model-with-taxi/tdrive_predictor_artifacts/phase_b_7k_fast"
-export TDRIVE_CKPT_NAME="gru_phase_curv_step.pt"
-export TDRIVE_DEVICE="cuda"
+export EXECUTION_MODE=simulated
+export STICKY_FUNCTION_PER_USER=1
+export PREDICTIVE_PREWARM_ONLY=1
+export PREDICTIVE_TARGET_HORIZON_MIN=5

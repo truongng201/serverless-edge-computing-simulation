@@ -32,8 +32,8 @@ class SetDatasetController:
         if self.dataset_name and self.dataset_name not in ["none", "dact", "random_generated", "taxiD", "taxiD_Replay"]:
             raise InvalidDataException(f"Dataset {self.dataset_name} is not available.")
 
-        if self.sample_size is not None and (not isinstance(self.sample_size, int) or self.sample_size <= 0 or self.sample_size > 1000):
-            raise InvalidDataException("Sample size must be a positive integer not exceeding 1000.")
+        if self.sample_size is not None and (not isinstance(self.sample_size, int) or self.sample_size <= 0):
+            raise InvalidDataException("Sample size must be a positive integer.")
         
         
     def _to_px(self, x_m: float, y_m: float, minx: float, maxy: float):

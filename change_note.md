@@ -138,21 +138,6 @@ This session focused on fixing bugs in the predictive scheduling system, improvi
   - `export PREDICTIVE_PREWARM_ONLY=1`
   - `export PREDICTIVE_TARGET_HORIZON_MIN=5`
 
----
-
-## Fix: Batch Predictor Missing Feature Columns (Dec 24, 2025)
-
-**Problem:** Predictive inference in `serverless-sim` failed with `KeyError: "['node_degree', 'is_junction'] not in index"` causing `0/N users predicted successfully` and full greedy fallback, so predictive and greedy produced identical results.
-
-**Cause:** `predict_users_batch()` uses batch preprocessing in `predict-model-with-taxi/tdrive_predictor/inference_service.py`, which previously assumed all `feature_cols` existed in history DataFrames.
-
-**Fix:** Fill any missing feature columns with `0.0` before scaling in both:
-- `prepare_sequence_from_history()` (single-user) and
-- `prepare_batch_from_histories()` (batch).
-
-**Files modified:**
-- `predict-model-with-taxi/tdrive_predictor/inference_service.py`
-
 ## 4. Trajectory Export Script Enhancement
 
 **File:** `serverless-sim/scripts/export_taxid_replay_last1k.py`
@@ -313,20 +298,16 @@ cd serverless-sim
 python scripts/plot_experiment_results.py --csv experiment_results_20251223_195950.csv --out-dir plots/experiment_results_20251223_195950
 ```
 
+python scripts/plot_experiment_results.py --csv experiment_results_20251224_140805.csv --out-dir plots/experiment_results_20251224_140805.csv
+
 ---
 
-## TaxiD replay: load Phase B features (Dec 24, 2025)
+## Allow sample_size > 1000 for TaxiD replay (Dec 24, 2025)
 
-**Problem:** Predictive scheduler fell back to greedy because T-Drive inference crashed with `KeyError: ["node_degree", "is_junction"] not in index` when replay trajectories lacked these columns.
+**Problem:** `run_experiments.py` failed to set dataset when `sample_size` (num_users) was > 1000 (HTTP 400: "Sample size must be a positive integer not exceeding 1000.").
 
-**Fix / Improvements:**
-- TaxiD replay loader now recognizes `serverless-sim/mock_data/taxid_replay_1000_features.pkl` (common output of the export script).
-- TaxiD replay point feature-copy list now includes optional `node_degree` / `is_junction` when present in the replay pickle.
-- Scheduler stores `node_degree` / `is_junction` into `user_node.history` when updating from pre-computed replay features.
-- Added `Config.TAXID_REPLAY_PATH` (env `TAXID_REPLAY_PATH`) to override which replay pickle file is loaded.
+**Change:**
+- Removed the hard upper bound (1000) in dataset validation; now `sample_size` only needs to be a positive integer.
 
-**Files Modified:**
-- `serverless-sim/config.py`
+**File Modified:**
 - `serverless-sim/central_node/control_layer/controller_module/set_dataset_controller.py`
-- `serverless-sim/central_node/control_layer/scheduler_module/scheduler.py`
-- `serverless-sim/scripts/export_taxid_replay_last1k.py`
