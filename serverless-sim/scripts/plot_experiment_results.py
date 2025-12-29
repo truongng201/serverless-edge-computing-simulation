@@ -4,6 +4,10 @@ Plot and summarize experiment CSV results produced by `serverless-sim/run_experi
 The CSV is expected to have columns:
   num_users,num_edges,algorithm,experiment_duration,total_experiment_time,timestep,total_turnaround_time
 
+Newer CSVs (Dec 2025+) may also include (optional) warm/cold breakdown columns:
+  total_turnaround_time_warm,total_turnaround_time_cold,total_turnaround_time_unknown,
+  warm_count,cold_count,unknown_count
+
 Notes
 -----
 `total_turnaround_time` in serverless-sim is computed as the SUM across all current users:
@@ -34,6 +38,10 @@ class Series:
     total_tat_ms: List[float]
     num_users: int
     num_edges: int
+    # Optional (new CSV format): sum of turnaround times for users that were cold on that timestep
+    cold_tat_ms: Optional[List[float]] = None
+    # Optional (new CSV format): number of users that were cold on that timestep
+    cold_count: Optional[List[int]] = None
 
 
 def _percentile(values: List[float], q: float) -> float:
@@ -56,6 +64,8 @@ def _percentile(values: List[float], q: float) -> float:
 
 def load_csv(path: Path) -> Dict[str, Series]:
     series: Dict[str, List[Tuple[int, float]]] = {}
+    cold_tat_by_alg: Dict[str, Dict[int, float]] = {}
+    cold_count_by_alg: Dict[str, Dict[int, int]] = {}
     num_users: Optional[int] = None
     num_edges: Optional[int] = None
 
@@ -72,11 +82,30 @@ def load_csv(path: Path) -> Dict[str, Series]:
         if missing:
             raise ValueError(f"CSV missing columns: {sorted(missing)}")
 
+        has_cold_tat = "total_turnaround_time_cold" in (reader.fieldnames or [])
+        has_cold_count = "cold_count" in (reader.fieldnames or [])
+
         for row in reader:
             alg = row["algorithm"].strip()
             t = int(float(row["timestep"]))
             total = float(row["total_turnaround_time"])
             series.setdefault(alg, []).append((t, total))
+
+            if has_cold_tat:
+                raw = (row.get("total_turnaround_time_cold") or "").strip()
+                try:
+                    cold_tat = float(raw) if raw != "" else float("nan")
+                except Exception:
+                    cold_tat = float("nan")
+                cold_tat_by_alg.setdefault(alg, {})[t] = cold_tat
+
+            if has_cold_count:
+                raw = (row.get("cold_count") or "").strip()
+                try:
+                    cold_cnt = int(float(raw)) if raw != "" else 0
+                except Exception:
+                    cold_cnt = 0
+                cold_count_by_alg.setdefault(alg, {})[t] = cold_cnt
 
             if num_users is None:
                 num_users = int(float(row["num_users"]))
@@ -89,11 +118,22 @@ def load_csv(path: Path) -> Dict[str, Series]:
     out: Dict[str, Series] = {}
     for alg, pairs in series.items():
         pairs_sorted = sorted(pairs, key=lambda x: x[0])
+        ts_sorted = [t for t, _ in pairs_sorted]
+        cold_tat = None
+        cold_count = None
+        if cold_tat_by_alg:
+            m = cold_tat_by_alg.get(alg, {})
+            cold_tat = [m.get(t, float("nan")) for t in ts_sorted]
+        if cold_count_by_alg:
+            m = cold_count_by_alg.get(alg, {})
+            cold_count = [int(m.get(t, 0)) for t in ts_sorted]
         out[alg] = Series(
-            timesteps=[t for t, _ in pairs_sorted],
+            timesteps=ts_sorted,
             total_tat_ms=[v for _, v in pairs_sorted],
             num_users=num_users,
             num_edges=num_edges,
+            cold_tat_ms=cold_tat,
+            cold_count=cold_count,
         )
     return out
 
@@ -159,6 +199,32 @@ def write_markdown_summary(
         lines.append(f"- p99: `{_fmt_ms(avg_stats['p99_ms'])}`")
         lines.append(f"- min/max: `{_fmt_ms(avg_stats['min_ms'])}` / `{_fmt_ms(avg_stats['max_ms'])}`")
         lines.append("")
+
+    # Add simple cross-algorithm comparison (requested for experiments)
+    if "predictive" in series and "greedy" in series:
+        sp = series["predictive"]
+        sg = series["greedy"]
+        p_mean = compute_stats(sp.total_tat_ms)["mean_ms"]
+        g_mean = compute_stats(sg.total_tat_ms)["mean_ms"]
+        if math.isfinite(p_mean) and math.isfinite(g_mean) and g_mean != 0.0:
+            pct = (p_mean - g_mean) / g_mean * 100.0
+            lines.append("## Comparison (predictive vs greedy)")
+            lines.append(f"- Mean total TAT delta: `{pct:+.2f}%` (predictive vs greedy)")
+
+            # Optional: also compare cold-start time/count if present in this CSV.
+            if sp.cold_tat_ms is not None and sg.cold_tat_ms is not None:
+                pc = compute_stats(sp.cold_tat_ms)["mean_ms"]
+                gc = compute_stats(sg.cold_tat_ms)["mean_ms"]
+                if math.isfinite(pc) and math.isfinite(gc) and gc != 0.0:
+                    pct_c = (pc - gc) / gc * 100.0
+                    lines.append(f"- Mean cold-start time delta: `{pct_c:+.2f}%` (predictive vs greedy)")
+            if sp.cold_count is not None and sg.cold_count is not None:
+                pcnt = mean([float(x) for x in sp.cold_count]) if sp.cold_count else float('nan')
+                gcnt = mean([float(x) for x in sg.cold_count]) if sg.cold_count else float('nan')
+                if math.isfinite(pcnt) and math.isfinite(gcnt) and gcnt != 0.0:
+                    pct_n = (pcnt - gcnt) / gcnt * 100.0
+                    lines.append(f"- Mean cold-start count delta: `{pct_n:+.2f}%` (predictive vs greedy)")
+            lines.append("")
 
     out_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
@@ -324,6 +390,39 @@ def plot(
             colors,
         )
 
+        # Optional (new CSV format): cold start count and cold-only turnaround time
+        if any(s.cold_count is not None for s in series.values()):
+            ys_cold_count = {
+                alg: [float(v) for v in (s.cold_count or [])]
+                for alg, s in series.items()
+                if s.cold_count is not None
+            }
+            if ys_cold_count:
+                _write_svg(
+                    out_dir / "coldstart_count.svg",
+                    {alg: series[alg].timesteps for alg in ys_cold_count.keys()},
+                    ys_cold_count,
+                    "Cold starts (count)",
+                    f"{title} - Cold starts (count)",
+                    colors,
+                )
+
+        if any(s.cold_tat_ms is not None for s in series.values()):
+            ys_cold_tat = {
+                alg: (s.cold_tat_ms or [])
+                for alg, s in series.items()
+                if s.cold_tat_ms is not None
+            }
+            if ys_cold_tat:
+                _write_svg(
+                    out_dir / "coldstart_time_ms.svg",
+                    {alg: series[alg].timesteps for alg in ys_cold_tat.keys()},
+                    ys_cold_tat,
+                    "Cold-start turnaround time (ms)",
+                    f"{title} - Cold-start turnaround time (sum)",
+                    colors,
+                )
+
         if "predictive" in series and "greedy" in series:
             sp = series["predictive"]
             sg = series["greedy"]
@@ -413,6 +512,46 @@ def plot(
         ax.legend()
         fig.tight_layout()
         fig.savefig(out_dir / "delta_predictive_minus_greedy_ms.png")
+        plt.close(fig)
+
+    # Plot 4: cold starts count (if present in CSV)
+    if any(s.cold_count is not None for s in series.values()):
+        fig, ax = plt.subplots(figsize=(10, 4), dpi=160)
+        any_plotted = False
+        for alg, s in sorted(series.items()):
+            if s.cold_count is None:
+                continue
+            ax.plot(s.timesteps, s.cold_count, label=alg, linewidth=2)
+            any_plotted = True
+        if any_plotted:
+            ax.set_title(f"{title} - Cold starts (count)")
+            ax.set_xlabel("Timestep")
+            ax.set_ylabel("Cold starts (count)")
+            ax.yaxis.set_major_formatter(FuncFormatter(fmt_thousands))
+            ax.grid(True, alpha=0.25)
+            ax.legend()
+            fig.tight_layout()
+            fig.savefig(out_dir / "coldstart_count.png")
+        plt.close(fig)
+
+    # Plot 5: cold-start turnaround time (sum over cold users) (if present in CSV)
+    if any(s.cold_tat_ms is not None for s in series.values()):
+        fig, ax = plt.subplots(figsize=(10, 4), dpi=160)
+        any_plotted = False
+        for alg, s in sorted(series.items()):
+            if s.cold_tat_ms is None:
+                continue
+            ax.plot(s.timesteps, s.cold_tat_ms, label=alg, linewidth=2)
+            any_plotted = True
+        if any_plotted:
+            ax.set_title(f"{title} - Cold-start turnaround time (sum)")
+            ax.set_xlabel("Timestep")
+            ax.set_ylabel("Cold-start turnaround time (ms)")
+            ax.yaxis.set_major_formatter(FuncFormatter(fmt_thousands))
+            ax.grid(True, alpha=0.25)
+            ax.legend()
+            fig.tight_layout()
+            fig.savefig(out_dir / "coldstart_time_ms.png")
         plt.close(fig)
 
     if show:

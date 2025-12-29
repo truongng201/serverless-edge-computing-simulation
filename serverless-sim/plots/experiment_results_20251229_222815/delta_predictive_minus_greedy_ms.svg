@@ -1,0 +1,36 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1100" height="520" viewBox="0 0 1100 520">
+<rect x="0" y="0" width="100%" height="100%" fill="white"/>
+<text x="550.0" y="28" text-anchor="middle" font-family="Arial" font-size="18" fill="#111">experiment_results_20251229_222815 — Difference (predictive - greedy)</text>
+<line x1="90" y1="450.00" x2="1080" y2="450.00" stroke="#e6e6e6" stroke-width="1"/>
+<text x="80" y="454.00" text-anchor="end" font-family="Arial" font-size="12" fill="#333">-16,050</text>
+<line x1="90" y1="371.00" x2="1080" y2="371.00" stroke="#e6e6e6" stroke-width="1"/>
+<text x="80" y="375.00" text-anchor="end" font-family="Arial" font-size="12" fill="#333">33,120</text>
+<line x1="90" y1="292.00" x2="1080" y2="292.00" stroke="#e6e6e6" stroke-width="1"/>
+<text x="80" y="296.00" text-anchor="end" font-family="Arial" font-size="12" fill="#333">82,290</text>
+<line x1="90" y1="213.00" x2="1080" y2="213.00" stroke="#e6e6e6" stroke-width="1"/>
+<text x="80" y="217.00" text-anchor="end" font-family="Arial" font-size="12" fill="#333">131,460</text>
+<line x1="90" y1="134.00" x2="1080" y2="134.00" stroke="#e6e6e6" stroke-width="1"/>
+<text x="80" y="138.00" text-anchor="end" font-family="Arial" font-size="12" fill="#333">180,630</text>
+<line x1="90" y1="55.00" x2="1080" y2="55.00" stroke="#e6e6e6" stroke-width="1"/>
+<text x="80" y="59.00" text-anchor="end" font-family="Arial" font-size="12" fill="#333">229,800</text>
+<line x1="90.00" y1="55" x2="90.00" y2="450" stroke="#f0f0f0" stroke-width="1"/>
+<text x="90.00" y="470" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">1</text>
+<line x1="290.00" y1="55" x2="290.00" y2="450" stroke="#f0f0f0" stroke-width="1"/>
+<text x="290.00" y="470" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">21</text>
+<line x1="490.00" y1="55" x2="490.00" y2="450" stroke="#f0f0f0" stroke-width="1"/>
+<text x="490.00" y="470" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">41</text>
+<line x1="680.00" y1="55" x2="680.00" y2="450" stroke="#f0f0f0" stroke-width="1"/>
+<text x="680.00" y="470" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">60</text>
+<line x1="880.00" y1="55" x2="880.00" y2="450" stroke="#f0f0f0" stroke-width="1"/>
+<text x="880.00" y="470" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">80</text>
+<line x1="1080.00" y1="55" x2="1080.00" y2="450" stroke="#f0f0f0" stroke-width="1"/>
+<text x="1080.00" y="470" text-anchor="middle" font-family="Arial" font-size="12" fill="#333">100</text>
+<line x1="90" y1="55" x2="90" y2="450" stroke="#111" stroke-width="1.5"/>
+<line x1="90" y1="450" x2="1080" y2="450" stroke="#111" stroke-width="1.5"/>
+<text x="550.0" y="495" text-anchor="middle" font-family="Arial" font-size="14" fill="#111">Timestep</text>
+<text x="22" y="260.0" transform="rotate(-90, 22, 260.0)" text-anchor="middle" font-family="Arial" font-size="14" fill="#111">Δ total turnaround time (ms)</text>
+<polyline fill="none" stroke="#8b0000" stroke-width="2" points="90.00,424.21 100.00,424.21 110.00,424.21 120.00,424.21 130.00,424.21 140.00,424.21 150.00,424.21 160.00,424.21 170.00,424.21 180.00,424.21 190.00,424.21 200.00,424.21 210.00,424.21 220.00,424.21 230.00,424.21 240.00,424.21 250.00,424.21 260.00,424.21 270.00,424.12 280.00,55.00 290.00,55.00 300.00,55.00 310.00,55.00 320.00,55.00 330.00,447.35 340.00,447.35 350.00,447.35 360.00,447.35 370.00,447.35 380.00,443.01 390.00,443.01 400.00,443.01 410.00,443.01 420.00,443.01 430.00,443.97 440.00,443.97 450.00,443.97 460.00,443.97 470.00,443.97 480.00,446.63 490.00,446.63 500.00,446.63 510.00,446.63 520.00,446.63 530.00,442.53 540.00,442.53 550.00,442.53 560.00,442.53 570.00,442.53 580.00,447.59 590.00,447.59 600.00,447.59 610.00,447.59 620.00,447.59 630.00,439.15 640.00,439.15 650.00,439.15 660.00,439.15 670.00,439.15 680.00,437.71 690.00,437.71 700.00,437.71 710.00,437.71 720.00,437.71 730.00,450.00 740.00,450.00 750.00,450.00 760.00,450.00 770.00,450.00 780.00,438.67 790.00,438.67 800.00,438.67 810.00,438.67 820.00,438.67 830.00,439.88 840.00,439.88 850.00,439.88 860.00,439.88 870.00,439.88 880.00,435.54 890.00,435.54 900.00,435.54 910.00,435.54 920.00,435.54 930.00,436.26 940.00,436.26 950.00,436.26 960.00,436.26 970.00,436.26 980.00,431.68 990.00,431.68 1000.00,431.68 1010.00,431.68 1020.00,431.68 1030.00,438.67 1040.00,438.67 1050.00,438.67 1060.00,438.67 1070.00,438.67 1080.00,436.26"/>
+<rect x="860" y="47" width="210" height="38" fill="white" stroke="#ddd"/>
+<line x1="872" y1="60" x2="892" y2="60" stroke="#8b0000" stroke-width="3"/>
+<text x="900" y="64" font-family="Arial" font-size="12" fill="#111">predictive - greedy</text>
+</svg>

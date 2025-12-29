@@ -341,3 +341,34 @@ python scripts/plot_experiment_results.py --csv experiment_results_20251228_1311
 
 **File Modified:**
 - `serverless-sim/central_node/control_layer/scheduler_module/scheduler.py`
+
+---
+
+## Plot cold-start metrics in experiment plots (Dec 29, 2025)
+
+**Goal:** For new experiment CSV format (with warm/cold breakdown), plot and summarize cold-start behavior.
+
+**Added to plots:**
+- Cold start count vs timestep (`coldstart_count.png` / `.svg`)
+- Cold-start turnaround time (sum over cold users) vs timestep (`coldstart_time_ms.png` / `.svg`)
+
+**Added to `summary.md`:**
+- Percent difference of mean total turnaround time (predictive vs greedy).
+
+**File Modified:**
+- `serverless-sim/scripts/plot_experiment_results.py`
+
+---
+
+## Enable env-config for predictive prewarm-only mode (Dec 29, 2025)
+
+**Problem:** Scheduler and execution layer check `Config.PREDICTIVE_PREWARM_ONLY`, but `Config` did not read these env vars, so setting `PREDICTIVE_PREWARM_ONLY=1` had no effect (always False).
+
+**Change:**
+- Added env-backed config keys:
+  - `PREDICTIVE_PREWARM_ONLY`
+  - `PREDICTIVE_PREWARM_LEAD_STEPS`
+  - `PREDICTIVE_EXECUTE_INTERVAL_STEPS`
+
+**File Modified:**
+- `serverless-sim/config.py`

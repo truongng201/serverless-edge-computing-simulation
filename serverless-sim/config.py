@@ -125,6 +125,15 @@ class Config:
     # Which horizon (in minutes) to use when selecting the "best" edge from the
     # predictor output. For curv_step we currently expose horizons (1,3,5,10).
     PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
+
+    # Predictive "prewarm-only" mode:
+    # - Plan a future node using the predictor, but keep serving on the current node until the planned step.
+    # - Intended mainly for `EXECUTION_MODE=simulated`, where prewarm effects are modeled analytically.
+    PREDICTIVE_PREWARM_ONLY = os.getenv("PREDICTIVE_PREWARM_ONLY", "0").lower() in ("1", "true", "yes")
+    # How many simulation steps ahead to schedule the switch (lead time).
+    PREDICTIVE_PREWARM_LEAD_STEPS = int(os.getenv("PREDICTIVE_PREWARM_LEAD_STEPS", "5"))
+    # How often to run planning (in simulation steps). Lower = more compute.
+    PREDICTIVE_EXECUTE_INTERVAL_STEPS = int(os.getenv("PREDICTIVE_EXECUTE_INTERVAL_STEPS", "5"))
     # Dataset playback speed (Scenario 2 / vehicles)
     # Multiply timestep advancement per poll to make movements appear faster on canvas
     DATASET_STEP_MULTIPLIER = 8
