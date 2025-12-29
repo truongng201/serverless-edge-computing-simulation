@@ -607,14 +607,24 @@ class Scheduler:
                 continue
             if current_step < int(user_node.planned_step_id):
                 continue
+            # If we already passed the planned step, the prewarm signal is no longer needed.
+            # Clear it to avoid repeatedly "re-applying" the same switch on later steps.
+            if current_step > int(user_node.planned_step_id):
+                user_node.planned_node_id = None
+                user_node.planned_step_id = None
+                continue
             candidate = user_node.planned_node_id
             if candidate != "central_node" and candidate not in self.edge_nodes:
                 candidate = "central_node"
             if candidate != "central_node" and not self._check_resource_constraints(user_node, candidate):
+                # Cannot switch to planned node; drop the plan and keep current assignment.
+                user_node.planned_node_id = None
+                user_node.planned_step_id = None
                 continue
+            # Apply the switch, but KEEP planned_node_id/step_id for this step so that
+            # the execution layer can treat it as "prewarmed" on the switch step.
+            # (get_all_users_controller.py checks planned_node_id/step_id when simulating cold/warm.)
             self._apply_assignment_latency(user_node, candidate)
-            user_node.planned_node_id = None
-            user_node.planned_step_id = None
 
         # Ensure an initial assignment exists (greedy) for any unassigned user
         for user_node in self.user_nodes.values():
@@ -737,13 +747,27 @@ class Scheduler:
         return best_node, min_distance
 
    
-    def calculate_total_turnaround_time(self) -> Dict[str, float]:
-        total_turnaround_time = 0.0
-        
+    def calculate_turnaround_time_breakdown(self) -> Dict[str, float]:
+        """Return total turnaround time split by container status (warm/cold/unknown).
+
+        This is useful for comparing scheduling policies that trade off cold starts vs distance.
+
+        Returned keys:
+          - total_turnaround_time
+          - total_turnaround_time_warm
+          - total_turnaround_time_cold
+          - total_turnaround_time_unknown
+          - warm_count / cold_count / unknown_count
+        """
+        total = 0.0
+        warm_total = 0.0
+        cold_total = 0.0
+        unknown_total = 0.0
+        warm_count = 0
+        cold_count = 0
+        unknown_count = 0
+
         for _, user_node in self.user_nodes.items():
-            # Turnaround latency cost
-            distance = 0
-            turnaround_time = 0
             cloudlet_id = user_node.assigned_node_id
             if cloudlet_id == "central_node":
                 distance = self._calculate_distance(user_node.location, self.central_node["location"])
@@ -752,13 +776,36 @@ class Scheduler:
                     continue
                 cloudlet = self.edge_nodes[cloudlet_id]
                 distance = self._calculate_distance(user_node.location, cloudlet.location)
+
             propagation_delay = self._calculate_propagation_delay(distance)
             transmission_delay = user_node.data_size_demand / user_node.bandwidth_demand
-            computation_delay = user_node.latency.computation_delay if user_node.latency.computation_delay else 0
+            computation_delay = getattr(getattr(user_node, "latency", None), "computation_delay", 0.0) or 0.0
             turnaround_time = propagation_delay + transmission_delay + computation_delay
-            total_turnaround_time += turnaround_time
-        
-        return total_turnaround_time
+            total += turnaround_time
+
+            status = str(getattr(getattr(user_node, "latency", None), "container_status", "unknown") or "unknown")
+            if status == "warm":
+                warm_total += turnaround_time
+                warm_count += 1
+            elif status == "cold":
+                cold_total += turnaround_time
+                cold_count += 1
+            else:
+                unknown_total += turnaround_time
+                unknown_count += 1
+
+        return {
+            "total_turnaround_time": total,
+            "total_turnaround_time_warm": warm_total,
+            "total_turnaround_time_cold": cold_total,
+            "total_turnaround_time_unknown": unknown_total,
+            "warm_count": float(warm_count),
+            "cold_count": float(cold_count),
+            "unknown_count": float(unknown_count),
+        }
+
+    def calculate_total_turnaround_time(self) -> float:
+        return float(self.calculate_turnaround_time_breakdown()["total_turnaround_time"])
 
 
     def _convex_optimization_assignment_all_users(self):

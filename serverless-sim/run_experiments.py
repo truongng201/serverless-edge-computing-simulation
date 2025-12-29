@@ -173,8 +173,25 @@ class ExperimentRunner:
                 continue
             metrics_response = requests.get(f"{self.api_base}/performance_metrics")
             if metrics_response.status_code == 200:
-                metrics[timestep + 1] = metrics_response.json().get('data', {}).get("total_turnaround_time", 0)
-                print(f"Timestep {timestep + 1}: Total Turnaround Time = {metrics[timestep + 1]}")
+                m = metrics_response.json().get('data', {}) or {}
+                # Keep total turnaround time for plotting, but also store warm/cold totals for analysis.
+                metrics[timestep + 1] = {
+                    "total_turnaround_time": float(m.get("total_turnaround_time", 0.0) or 0.0),
+                    "total_turnaround_time_warm": float(m.get("total_turnaround_time_warm", 0.0) or 0.0),
+                    "total_turnaround_time_cold": float(m.get("total_turnaround_time_cold", 0.0) or 0.0),
+                    "total_turnaround_time_unknown": float(m.get("total_turnaround_time_unknown", 0.0) or 0.0),
+                    "warm_count": int(float(m.get("warm_count", 0) or 0)),
+                    "cold_count": int(float(m.get("cold_count", 0) or 0)),
+                    "unknown_count": int(float(m.get("unknown_count", 0) or 0)),
+                }
+                print(
+                    f"Timestep {timestep + 1}: "
+                    f"Total={metrics[timestep + 1]['total_turnaround_time']:.1f} | "
+                    f"Warm={metrics[timestep + 1]['total_turnaround_time_warm']:.1f} "
+                    f"(n={metrics[timestep + 1]['warm_count']}) | "
+                    f"Cold={metrics[timestep + 1]['total_turnaround_time_cold']:.1f} "
+                    f"(n={metrics[timestep + 1]['cold_count']})"
+                )
             else:
                 print(f"Failed to get metrics at timestep {timestep + 1}: {metrics_response.text}")
             time.sleep(delay_time)
@@ -253,6 +270,12 @@ class ExperimentRunner:
             "total_experiment_time",
             "timestep",
             "total_turnaround_time",
+            "total_turnaround_time_warm",
+            "total_turnaround_time_cold",
+            "total_turnaround_time_unknown",
+            "warm_count",
+            "cold_count",
+            "unknown_count",
         ]
 
         try:
@@ -285,7 +308,17 @@ class ExperimentRunner:
                                 timestep = k
                             row = dict(base_row)
                             row["timestep"] = timestep
-                            row["total_turnaround_time"] = v
+                            if isinstance(v, dict):
+                                row["total_turnaround_time"] = v.get("total_turnaround_time", "")
+                                row["total_turnaround_time_warm"] = v.get("total_turnaround_time_warm", "")
+                                row["total_turnaround_time_cold"] = v.get("total_turnaround_time_cold", "")
+                                row["total_turnaround_time_unknown"] = v.get("total_turnaround_time_unknown", "")
+                                row["warm_count"] = v.get("warm_count", "")
+                                row["cold_count"] = v.get("cold_count", "")
+                                row["unknown_count"] = v.get("unknown_count", "")
+                            else:
+                                # Backward-compatible: older runs stored just a float total_turnaround_time
+                                row["total_turnaround_time"] = v
                             writer.writerow(row)
                     else:
                         row = dict(base_row)

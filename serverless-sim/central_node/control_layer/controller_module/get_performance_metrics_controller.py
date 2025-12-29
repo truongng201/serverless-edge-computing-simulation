@@ -8,10 +8,9 @@ class GetPerformanceMetricsController:
         self.response = None
 
     def execute(self) -> Dict[str, Any]:
-        total_turnaround_time = self.scheduler.calculate_total_turnaround_time()
-        
-        self.response = {
-            "total_turnaround_time": total_turnaround_time
-        }
+        # Keep backward-compatible key `total_turnaround_time`, but include
+        # warm/cold breakdown for experiment analysis.
+        breakdown = self.scheduler.calculate_turnaround_time_breakdown()
+        self.response = dict(breakdown)
 
         return self.response

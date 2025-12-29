@@ -311,3 +311,33 @@ python scripts/plot_experiment_results.py --csv experiment_results_20251228_1311
 
 **File Modified:**
 - `serverless-sim/central_node/control_layer/controller_module/set_dataset_controller.py`
+
+---
+
+## Add warm/cold turnaround breakdown in experiments (Dec 29, 2025)
+
+**Problem:** When running `EXECUTION_MODE=simulated`, total turnaround time spikes (e.g. around timestep ~20) were hard to interpret because we only logged one aggregate number.
+
+**Change:**
+- Performance metrics endpoint now returns a breakdown of total turnaround time by `container_status`:
+  - `total_turnaround_time_warm`, `total_turnaround_time_cold`, `total_turnaround_time_unknown`
+  - `warm_count`, `cold_count`, `unknown_count`
+- `run_experiments.py` records these fields per timestep into the experiment CSV and prints a compact warm/cold summary.
+
+**Files Modified:**
+- `serverless-sim/central_node/control_layer/scheduler_module/scheduler.py`
+- `serverless-sim/central_node/control_layer/controller_module/get_performance_metrics_controller.py`
+- `serverless-sim/run_experiments.py`
+
+---
+
+## Fix predictive prewarm-only to actually count as warm on switch step (Dec 29, 2025)
+
+**Problem:** In `PREDICTIVE_PREWARM_ONLY` mode, the scheduler cleared `(planned_node_id, planned_step_id)` immediately when applying a due switch. Since execution is simulated *after* `node_assignment()`, the warm-check never saw the plan on the switch step, so switches were still counted as cold.
+
+**Change (B1):**
+- Keep `(planned_node_id, planned_step_id)` during the switch step (`current_step == planned_step_id`) so the execution layer can mark it warm.
+- Clear the plan on later steps (`current_step > planned_step_id`) to avoid re-applying.
+
+**File Modified:**
+- `serverless-sim/central_node/control_layer/scheduler_module/scheduler.py`
