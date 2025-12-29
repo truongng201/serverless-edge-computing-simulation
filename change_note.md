@@ -298,7 +298,7 @@ cd serverless-sim
 python scripts/plot_experiment_results.py --csv experiment_results_20251223_195950.csv --out-dir plots/experiment_results_20251223_195950
 ```
 
-python scripts/plot_experiment_results.py --csv experiment_results_20251224_140805.csv --out-dir plots/experiment_results_20251224_140805.csv
+python scripts/plot_experiment_results.py --csv experiment_results_20251228_131147.csv --out-dir plots/experiment_results_20251228_131147.csv
 
 ---
 
