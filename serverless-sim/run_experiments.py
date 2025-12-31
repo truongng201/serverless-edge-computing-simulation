@@ -547,7 +547,7 @@ class ExperimentRunner:
         if not user_ranges:
             user_ranges = [1000]  # 100 users
         if not edge_ranges:
-            edge_ranges = [50] 
+            edge_ranges = [100] 
         if not algorithms:
             algorithms = ["predictive", "greedy"]
         signal.signal(signal.SIGINT, self.signal_handler)
