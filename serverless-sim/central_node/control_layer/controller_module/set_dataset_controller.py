@@ -10,6 +10,7 @@ from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.helper_module.data_manager import DataManager
 from central_node.control_layer.models import Latency, UserNodeInfo
 from central_node.control_layer.helper_module.osm_loader import load_graph, graph_bounds_meters, edge_geometries
+from .register_edge_node_controller import RegisterEdgeNodeController
 
 from shared.custom_exception import InvalidDataException
 from config import Config
@@ -48,6 +49,29 @@ class SetDatasetController:
         cx_px, cy_px = self._to_px(cx_m, cy_m, minx, maxy)
         return cx_px, cy_px
 
+    def _spread_existing_edge_nodes(self):
+        """
+        Reposition already-registered edge nodes to better match the current TaxiD
+        viewport after (re)centering the central node.
+
+        This improves the UI demo experience because edge nodes may have been
+        registered before dataset selection, while dataset setup recenters the
+        central node based on the road-graph bounds.
+        """
+        if not getattr(self.scheduler, "edge_nodes", None):
+            return
+
+        total_nodes = len(self.scheduler.edge_nodes)
+        placer = RegisterEdgeNodeController.__new__(RegisterEdgeNodeController)
+        placer.scheduler = self.scheduler
+
+        for node_id, node_info in self.scheduler.edge_nodes.items():
+            node_info.location = RegisterEdgeNodeController._grid_based_location(
+                placer, node_id, total_nodes=total_nodes
+            )
+
+        self.logger.info(f"TaxiD: spread {total_nodes} edge nodes across viewport")
+
     
     def _sample_points_on_edges(self, polylines_m: List[List[Tuple[float, float]]], n: int) -> List[Tuple[float, float]]:
         pts: List[Tuple[float, float]] = []
@@ -84,7 +108,10 @@ class SetDatasetController:
         
         # Try to find the best available file (prefer features version)
         candidates = [
+            # Default exported by export_taxid_replay_last1k.py (basic format)
             mock_data_dir / "taxid_replay_5000_features.pkl",
+            # Optional fallback exports (if available)
+            mock_data_dir / "taxid_replay_last1k.pkl",
         ]
         
         # Allow override via config
@@ -139,6 +166,7 @@ class SetDatasetController:
             
             # Optionally re-center central node to bbox center (for better initial view)
             self.scheduler.central_node["location"] = {"x": cx_px, "y": cy_px}
+            self._spread_existing_edge_nodes()
             
             if self.dataset_name == "taxiD":
                 # Collect edge polylines (meters)

@@ -372,3 +372,41 @@ python scripts/plot_experiment_results.py --csv experiment_results_20251228_1311
 
 **File Modified:**
 - `serverless-sim/config.py`
+
+---
+
+## Improve edge node spatial distribution on registration (Dec 30, 2025)
+
+**Problem:** Edge nodes were often placed clustered in one region (not visually “even” on the UI). This happened especially when `EXPECTED_EDGE_NODES` was not perfectly aligned with the actual number of started edges, and because the previous placement sorted grid cells “center-first”.
+
+**Change:**
+- Updated the grid placement strategy to use **farthest-point sampling** over grid cell centers:
+  - First node is anchored near the **current central node location** (if available), otherwise the map center.
+  - Subsequent nodes pick the cell that maximizes the minimum distance to already chosen cells.
+- This produces a more even spread for the first few nodes and avoids clumping.
+
+**File Modified:**
+- `serverless-sim/central_node/control_layer/controller_module/register_edge_node_controller.py`
+
+**Additional integration:**
+- When selecting `taxiD` / `taxiD_Replay` dataset, the dataset setup recenters the central node based on road-graph bounds. Edge nodes may have been registered *before* dataset selection, so they could appear clustered/offset in the UI.
+- Added a step to re-spread existing edge nodes right after recentering the central node during dataset setup.
+
+**File Modified:**
+- `serverless-sim/central_node/control_layer/controller_module/set_dataset_controller.py`
+
+---
+
+## Fix TaxiD replay default pickle path (Dec 30, 2025)
+
+**Problem:** `taxiD_Replay` dataset loading was hardcoded to look for `serverless-sim/mock_data/taxid_replay_5000_features.pkl`, causing `FileNotFoundError` when only `taxid_replay_last1k.pkl` existed.
+
+**Change:**
+- Updated replay loader candidate list to try (in order):
+  - `serverless-sim/mock_data/taxid_replay_last1k.pkl`
+  - `serverless-sim/mock_data/taxid_replay_last1k_features.pkl`
+  - `serverless-sim/mock_data/taxid_replay_5000_features.pkl`
+- Still supports overriding via `TAXID_REPLAY_PATH` env var.
+
+**File Modified:**
+- `serverless-sim/central_node/control_layer/controller_module/set_dataset_controller.py`

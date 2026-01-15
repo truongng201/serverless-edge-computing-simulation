@@ -44,19 +44,22 @@ class RegisterEdgeNodeController:
     
     def _grid_based_location(self, node_id: str, total_nodes: int = 10):
         """
-        Distribute edge nodes in a grid pattern across the map, CENTER-FIRST.
+        Distribute edge nodes in a grid pattern across the map.
         
         Strategy:
         - Calculate optimal grid dimensions (cols x rows) for total_nodes
         - Generate all cell center positions
-        - Sort cells by distance from map center (closest first)
-        - Assign nodes to sorted cells (node 1 -> center, then spread outward)
+        - Pick cells using a farthest-point strategy (max-min distance) to ensure
+          early nodes are well-separated (avoids clumping near one area).
+        - Anchor the first cell near the current central node location (if known),
+          otherwise use the map center as anchor.
         
-        Example for 5 nodes on 1800x1200 map (3x2 grid):
-        - Node 1: Center cell
-        - Nodes 2-5: Spread outward from center
+        Example for 8 nodes:
+        - Node 1: near central node
+        - Node 2..N: progressively cover farthest remaining areas
         
-        This ensures central areas (higher traffic) get coverage first.
+        This is deterministic and produces a much more even spatial distribution
+        for arbitrary N (including when EXPECTED_EDGE_NODES is not perfectly set).
         """
         idx = self._get_edge_index_from_id(node_id)
         
@@ -75,32 +78,51 @@ class RegisterEdgeNodeController:
         cell_width = usable_width / cols
         cell_height = usable_height / rows
         
-        # Map center
+        # Anchor: use current central node location if available; else map center.
         map_center_x = self.MAP_WIDTH_PX / 2
         map_center_y = self.MAP_HEIGHT_PX / 2
+        anchor_x = map_center_x
+        anchor_y = map_center_y
+        try:
+            if getattr(self.scheduler, "central_node", None) and getattr(self.scheduler.central_node, "location", None):
+                anchor_x = float(self.scheduler.central_node.location.get("x", anchor_x))
+                anchor_y = float(self.scheduler.central_node.location.get("y", anchor_y))
+        except Exception:
+            anchor_x, anchor_y = map_center_x, map_center_y
         
-        # Generate all cell positions and sort by distance from center
-        cells = []
+        # Generate all cell positions
+        cells = []  # (x, y)
         for r in range(rows):
             for c in range(cols):
                 cx = self.MARGIN_PX + c * cell_width + cell_width / 2
                 cy = self.MARGIN_PX + r * cell_height + cell_height / 2
-                dist = math.hypot(cx - map_center_x, cy - map_center_y)
-                cells.append((dist, cx, cy, r, c))
-        
-        # Sort by distance from center (closest first)
-        cells.sort(key=lambda x: x[0])
-        
-        # Take only the first total_nodes cells
-        cells = cells[:total_nodes]
-        
+                cells.append((cx, cy))
+
+        def dist(p1, p2):
+            return math.hypot(p1[0] - p2[0], p1[1] - p2[1])
+
+        # Choose up to total_nodes representative cells using farthest-point sampling.
+        # 1) start near anchor (central node)
+        # 2) iteratively pick the point maximizing min-distance to already chosen points
+        remaining = cells[:]
+        start = min(remaining, key=lambda p: dist(p, (anchor_x, anchor_y)))
+        chosen = [start]
+        remaining.remove(start)
+
+        while remaining and len(chosen) < total_nodes:
+            def score(p):
+                return min(dist(p, q) for q in chosen)
+
+            # Deterministic tie-break: prefer lower x then lower y
+            next_p = max(remaining, key=lambda p: (score(p), -p[0], -p[1]))
+            chosen.append(next_p)
+            remaining.remove(next_p)
+
         # Get position for this node index
-        if idx < len(cells):
-            _, x, y, _, _ = cells[idx]
+        if idx < len(chosen):
+            x, y = chosen[idx]
         else:
-            # Fallback if index out of range
-            x = map_center_x
-            y = map_center_y
+            x, y = anchor_x, anchor_y
         
         return {'x': x, 'y': y}
     
