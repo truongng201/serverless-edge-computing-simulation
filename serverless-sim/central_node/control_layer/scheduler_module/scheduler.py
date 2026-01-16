@@ -671,6 +671,12 @@ class Scheduler:
         desired_h = getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5)
         horizons = (1, 3, 5, 10)
         for user_id, user_node in self.user_nodes.items():
+            # If this user is switching *now* (planned_step_id == current_step),
+            # keep the current plan fields intact for this step so the execution
+            # layer can mark it as warm (prewarmed). We'll plan the next switch
+            # on a later planning tick.
+            if user_node.planned_step_id is not None and int(user_node.planned_step_id) == int(current_step):
+                continue
             probs = prob_map.get(user_id)
             if probs is None or probs.ndim != 2 or probs.shape[1] <= 0:
                 continue

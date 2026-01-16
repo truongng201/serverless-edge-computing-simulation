@@ -410,3 +410,15 @@ python scripts/plot_experiment_results.py --csv experiment_results_20251228_1311
 
 **File Modified:**
 - `serverless-sim/central_node/control_layer/controller_module/set_dataset_controller.py`
+
+---
+
+## Fix prewarm-only plan overwrite on switch step (Jan 16, 2026)
+
+**Problem:** With `EXECUTION_MODE=simulated` and `PREDICTIVE_PREWARM_ONLY=1`, prewarm-only is supposed to count the *switch step* as warm when `planned_step_id == current_step`. However, on planning ticks (e.g. every 5 steps), the scheduler would apply the due switch and then immediately re-run planning in the same timestep, overwriting `planned_step_id` from `current_step` to `current_step + lead_steps`. This caused the execution layer to miss the `planned_step_id == step_id` condition, producing a large cold-start burst at the switch timestep (e.g. step 25).
+
+**Change:**
+- During the planning loop in `_predictive_prewarm_only_assignment()`, skip updating `planned_node_id/planned_step_id` for users whose `planned_step_id == current_step` (i.e., switching now). This keeps the plan fields intact for the current timestep so the simulated execution can mark the switch as warm. The next plan will be computed on a later planning tick.
+
+**File Modified:**
+- `serverless-sim/central_node/control_layer/scheduler_module/scheduler.py`
