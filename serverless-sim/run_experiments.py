@@ -545,7 +545,7 @@ class ExperimentRunner:
     
     def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 100):
         if not user_ranges:
-            user_ranges = [1000]  # 100 users
+            user_ranges = [5000]  # 100 users
         if not edge_ranges:
             edge_ranges = [100] 
         if not algorithms:
