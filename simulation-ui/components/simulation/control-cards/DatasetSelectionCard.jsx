@@ -22,10 +22,15 @@ export default function DatasetSelectionCard() {
   const { selectedDataset, setSelectedDataset, datasetInfo, setDatasetInfo, setRoads, setShowRoads } = useGlobalState();
   const [sampleSize, setSampleSize] = useState(100);
 
+  // Datasets that support sample size selection
+  const datasetsWithSampleSize = ["random_generated", "taxiD_Replay"];
+
   const handleDatasetChange = async (value, sampleSizeOverride = null) => {
     setSelectedDataset(value);
     const effectiveSampleSize = sampleSizeOverride !== null ? sampleSizeOverride : sampleSize;
-    await setDataset(value, value === "random_generated" ? effectiveSampleSize : null);
+    // Pass sample size for datasets that support it
+    const shouldPassSampleSize = datasetsWithSampleSize.includes(value);
+    await setDataset(value, shouldPassSampleSize ? effectiveSampleSize : null);
     if (value === "none") {
       await clearAllUsers();
       setRoads([])
@@ -78,15 +83,17 @@ export default function DatasetSelectionCard() {
           </Select>
         </div>
 
-        {selectedDataset === "random_generated" && (
+        {datasetsWithSampleSize.includes(selectedDataset) && (
           <div className="space-y-2">
-            <Label className="text-xs">Sample Size</Label>
+            <Label className="text-xs">
+              {selectedDataset === "taxiD_Replay" ? "Number of Trajectories" : "Sample Size"}
+            </Label>
             <Select
               value={sampleSize.toString()}
               onValueChange={(value) => {
                 const newSampleSize = Number(value);
                 setSampleSize(newSampleSize);
-                handleDatasetChange("random_generated", newSampleSize);
+                handleDatasetChange(selectedDataset, newSampleSize);
               }}
             >
               <SelectTrigger className="h-8">
@@ -100,6 +107,11 @@ export default function DatasetSelectionCard() {
                 ))}
               </SelectContent>
             </Select>
+            {selectedDataset === "taxiD_Replay" && (
+              <div className="text-xs text-blue-600">
+                Using T-drive taxi trajectories for predictive model testing
+              </div>
+            )}
           </div>
         )}
 

@@ -225,7 +225,6 @@ Saved checkpoint: tdrive_predictor_artifacts\phase_b\gru_phase_curv.pt
 Per-horizon mean error (m): {'h1': 387.57, 'h3': 695.68, 'h5': 1034.68, 'h10': 1850.95}
 Per-horizon Hit@200: {'h1': 0.525, 'h3': 0.399, 'h5': 0.36, 'h10': 0.321}
 {'ADE': 992.218, 'FDE': 1850.949, 'Hit@100': 0.27, 'Hit@200': 0.321, 'Hit@400': 0.351, 'PerHorizonError': {'h1': 387.56951904296875, 'h3': 695.6753540039062, 'h5': 1034.6790771484375, 'h10': 1850.9493408203125}, 'PerHorizonHit@200': {'h1': 0.5250265213617513, 'h3': 0.39945992863342655, 'h5': 0.359918989295014, 'h10': 0.32114958048027775}}
-Metrics: {'ADE': 992.2183227539062, 'FDE': 1850.9493408203125, 'Hit@100': 0.2697463631629944, 'Hit@200': 0.3211495876312256, 'Hit@400': 0.35123926401138306, 'PerHorizonError': {'h1': 387.56951904296875, 'h3': 695.6753540039062, 'h5': 1034.6790771484375, 'h10': 1850.9493408203125}, 'PerHorizonHit@200': {'h1': 0.5250265213617513, 'h3': 0.39945992863342655, 'h5': 0.359918989295014, 'h10': 0.32114958048027775}}
 
 
 
@@ -349,3 +348,39 @@ id.graphml
   ckpt = torch.load(ckpt_path, map_location=device)
 Metrics: {'ADE': 704.5794067382812, 'FDE': 1326.8875732421875, 'Hit@100': 0.44184792041778564, 'Hit@200': 0.5092555284500122, 'Hit@400': 0.5633185505867004, 'PerHorizonError': {'h1': 244.22714233398438, 'h3': 496.4449462890625, 'h5': 750.757080078125, 'h10': 1326.8875732421875}, 'PerHorizonHit@200': {'h1': 0.6894228988389862, 'h3': 0.566739198938261, 'h5': 0.5362888112753595, 'h10': 0.5092555450321831}}
 
+
+[Phase B] Segmented trips=221331 | max_idle_gap_min=15
+[Phase B] Graph loaded | source=graphml | elapsed=4.9s
+[Phase B] Graph-context features enabled | nodes=55328 | junction_nodes=48237
+[Phase B] HMM params | sigma=12.0 | radius=150.0 | K=6 | beam=10 | turn_penalty=0.0 | sp=False | road_resample=True
+[Phase B] Split sizes | train=17660259 val=2475145 test=1973089                                                                                                                             
+[Phase B] Saved artifacts to tdrive_predictor_artifacts/phase_b_7k_fast | fallback_ratio=0.19781298763084515 | elapsed=10037.7s
+(serverless-sim) truongnx@jackson:~/Serverless-edge-computing-simulation/predict-model-with-taxi$ python -m tdrive_predictor.cli prepare   --tdrive-root "./T-drive Taxi Trajectories/release/taxi_log_2008_by_id"   --num-taxis 7000   --max-idle-gap-min 15   --use-osm   --graphml ./osm/beijing_taxid.graphml   --cand-radius-m 150   --k-candidates 6   --beam-size 10   --sigma-gps-m 12   --road-resample   --out-dir tdrive_predictor_artifacts/phase_b_7k_fast^C
+(serverless-sim) truongnx@jackson:~/Serverless-edge-computing-simulation/predict-model-with-taxi$ 
+
+Metrics: {
+  'ADE': 201.66151428222656,
+  'FDE': 417.7447204589844,
+  'Hit@100': 0.70894855260849,
+  'Hit@200': 0.74758476018,
+  'Hit@400': 0.7856186628341675,
+  'PerHorizonError': {
+    'h1': 27.6619930267334,
+    'h3': 120.45806884765625,
+    'h5': 240.7806396484375,
+    'h10': 417.7447204589844
+  },
+  'PerHorizonHit@200': {
+    'h1': 0.9621487944834411,
+    'h3': 0.8175736028049158,
+    'h5': 0.7031487938357145,
+    'h10': 0.7475847890451278
+  }
+}
+
+$env:EXECUTION_MODE="simulated"
+$env:STICKY_FUNCTION_PER_USER="1"
+$env:PREDICTIVE_PREWARM_ONLY="1"
+$env:PREDICTIVE_TARGET_HORIZON_MIN="5"
+$env:PREDICTIVE_PREWARM_LEAD_STEPS="5"
+$env:PREDICTIVE_EXECUTE_INTERVAL_STEPS="5"

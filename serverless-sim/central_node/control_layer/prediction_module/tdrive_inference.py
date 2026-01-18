@@ -28,12 +28,17 @@ try:
         cloudlet_probabilities,
         load_predictor_bundle,
         predict_future_positions,
+        # Batch inference functions for performance
+        predict_future_positions_batch,
+        cloudlet_probabilities_batch,
     )
     load_error = None
-    logger.info("Successfully imported tdrive_predictor.inference_service")
+    BATCH_INFERENCE_AVAILABLE = True
+    logger.info("Successfully imported tdrive_predictor.inference_service (with batch support)")
 except ImportError as exc:  # pragma: no cover - optional dependency
     PredictorBundle = None  # type: ignore
     load_error = exc
+    BATCH_INFERENCE_AVAILABLE = False
     logger.error(f"Failed to import tdrive_predictor: {exc}")
     logger.error(f"TDRIVE_PKG_DIR exists: {TDRIVE_PKG_DIR.exists()}")
     logger.error(f"sys.path includes: {[p for p in sys.path if 'predict' in p.lower()]}")
@@ -69,6 +74,7 @@ class TDrivePredictorAdapter:
         return self.bundle
 
     def predict_user(self, user_state: Dict, cloudlets: Sequence[Dict]) -> np.ndarray:
+        """Single user prediction (legacy, use predict_users_batch for better performance)."""
         bundle = self.ensure_loaded()
         history = user_state.get("history", [])
         if not history:
@@ -80,6 +86,47 @@ class TDrivePredictorAdapter:
             temperature=self.temperature,
             max_radius=self.max_radius,
         )
+    
+    def predict_users_batch(
+        self, user_states: Sequence[Dict], cloudlets: Sequence[Dict]
+    ) -> Dict[str, np.ndarray]:
+        """Batch prediction for multiple users - much more efficient than sequential calls.
+        
+        Runs a single forward pass through the model for all users.
+        """
+        if not user_states:
+            return {}
+        
+        bundle = self.ensure_loaded()
+        
+        # Filter users with valid history and collect their data
+        valid_users = []
+        valid_histories = []
+        user_ids = []
+        
+        for user in user_states:
+            uid = user.get("user_id")
+            history = user.get("history", [])
+            if uid is None or len(history) < bundle.lookback:
+                continue
+            valid_users.append(user)
+            valid_histories.append(history)
+            user_ids.append(uid)
+        
+        if not valid_histories:
+            return {}
+        
+        # Run batch prediction
+        coords_batch = predict_future_positions_batch(bundle, valid_histories)
+        probs_batch = cloudlet_probabilities_batch(
+            coords_batch,
+            cloudlets,
+            temperature=self.temperature,
+            max_radius=self.max_radius,
+        )
+        
+        # Map results back to user IDs
+        return {uid: probs for uid, probs in zip(user_ids, probs_batch)}
 
 
 def get_mobility_prediction(
@@ -87,10 +134,29 @@ def get_mobility_prediction(
     cloudlets: Sequence[Dict],
     adapter: TDrivePredictorAdapter,
 ) -> Dict[str, np.ndarray]:
-    """Return probability tensors for each user."""
-
+    """Return probability tensors for each user.
+    
+    Uses batch inference when available for better performance with many users.
+    Falls back to sequential inference if batch functions aren't available.
+    """
     if not user_states:
         return {}
+    
+    # Try batch inference first (much faster for many users)
+    if BATCH_INFERENCE_AVAILABLE:
+        try:
+            result = adapter.predict_users_batch(user_states, cloudlets)
+            successful = len(result)
+            total = len(user_states)
+            if successful < total:
+                logger.info(
+                    f"Batch prediction: {successful}/{total} users predicted successfully"
+                )
+            return result
+        except Exception as e:
+            logger.warning(f"Batch inference failed, falling back to sequential: {e}")
+    
+    # Fallback to sequential inference
     result = {}
     failed_count = 0
     insufficient_history_count = 0
@@ -115,12 +181,12 @@ def get_mobility_prediction(
     successful = len(result)
     if insufficient_history_count > 0:
         logger.info(
-            f"Predictive assignment: {successful}/{total_users} users predicted, "
-            f"{insufficient_history_count} users lack sufficient history (need 20+ points)"
+            f"Sequential prediction: {successful}/{total_users} users predicted, "
+            f"{insufficient_history_count} users lack sufficient history"
         )
     if failed_count > 0:
         logger.warning(
-            f"Predictive assignment: {failed_count} users failed due to errors"
+            f"Sequential prediction: {failed_count} users failed due to errors"
         )
     
     return result

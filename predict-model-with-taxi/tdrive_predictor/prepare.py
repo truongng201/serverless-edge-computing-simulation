@@ -301,7 +301,6 @@ def fit_scaler(train_df: pd.DataFrame, feature_cols: List[str]) -> Dict[str, Tup
 
 def apply_scaler(df: pd.DataFrame, scaler: Dict[str, Tuple[float, float]]) -> pd.DataFrame:
     """Apply a (mu, sigma) mapping to standardize feature columns in a DataFrame."""
-    df = df.copy()
     for c, (mu, sigma) in scaler.items():
         if c in df.columns:
             df[c] = (df[c] - mu) / sigma
@@ -500,30 +499,30 @@ def prepare_phase_b(
             json.dump(graph_meta, f)
     except Exception:
         pass
-      # 3) Build candidate generator + matcher
-      cand_gen = CandidateGenerator(G, radius_m=candidate_radius_m, k=k_candidates)
-      # Optional graph-context features (node_degree / is_junction) for Phase B models.
-      use_graph_context = os.environ.get("TDRIVE_USE_GRAPH_CONTEXT_FEATURES", "").strip().lower() in (
-          "1",
-          "true",
-          "yes",
-          "y",
-      )
-      node_degree: Dict[int, int] = {}
-      junction_nodes: set = set()
-      junction_degree_threshold = 3
-      if use_graph_context:
-          try:
-              # Degree on projected graph; intersections typically have degree >= 3.
-              node_degree = dict(G.degree())
-              junction_nodes = {n for n, d in node_degree.items() if d >= junction_degree_threshold}
-              print(
-                  f"[Phase B] Graph-context features enabled | nodes={len(node_degree)} | junction_nodes={len(junction_nodes)}",
-                  flush=True,
-              )
-          except Exception:
-              # If anything goes wrong, fall back to no graph context but keep pipeline running.
-              use_graph_context = False
+    # 3) Build candidate generator + matcher
+    cand_gen = CandidateGenerator(G, radius_m=candidate_radius_m, k=k_candidates)
+    # Optional graph-context features (node_degree / is_junction) for Phase B models.
+    use_graph_context = os.environ.get("TDRIVE_USE_GRAPH_CONTEXT_FEATURES", "").strip().lower() in (
+        "1",
+        "true",
+        "yes",
+        "y",
+    )
+    node_degree: Dict[int, int] = {}
+    junction_nodes: set = set()
+    junction_degree_threshold = 3
+    if use_graph_context:
+        try:
+            # Degree on projected graph; intersections typically have degree >= 3.
+            node_degree = dict(G.degree())
+            junction_nodes = {n for n, d in node_degree.items() if d >= junction_degree_threshold}
+            print(
+                f"[Phase B] Graph-context features enabled | nodes={len(node_degree)} | junction_nodes={len(junction_nodes)}",
+                flush=True,
+            )
+        except Exception:
+            # If anything goes wrong, fall back to no graph context but keep pipeline running.
+            use_graph_context = False
     matcher = HMMMapMatcher(
         G,
         cand_gen,
@@ -545,62 +544,64 @@ def prepare_phase_b(
     chunk_parts: List[pd.DataFrame] = []
     chunk_files: List[str] = []
 
-      def _flush_chunk(parts: List[pd.DataFrame], idx: int) -> str:
-          if not parts:
-              return ''
-          dfc = pd.concat(parts, ignore_index=True)
-          for c in ['x', 'y']:
-              dfc[c] = pd.to_numeric(dfc[c], errors='coerce')
-            dfc[c] = dfc.groupby('trip_id')[c].transform(lambda s: pd.to_numeric(s, errors='coerce').interpolate().ffill().bfill())
+    def _flush_chunk(parts: List[pd.DataFrame], idx: int) -> str:
+        if not parts:
+            return ''
+        dfc = pd.concat(parts, ignore_index=True)
+        for c in ['x', 'y']:
+            dfc[c] = pd.to_numeric(dfc[c], errors='coerce')
+            dfc[c] = dfc.groupby('trip_id')[c].transform(
+                lambda s: pd.to_numeric(s, errors='coerce').interpolate().ffill().bfill()
+            )
         dfc = dfc.dropna(subset=['x', 'y'])
-          dfc = dfc.sort_values(['trip_id', 'ts']).reset_index(drop=True)
-          dx_ = dfc.groupby('trip_id')['x'].diff().astype('float64').fillna(0.0)
-          dy_ = dfc.groupby('trip_id')['y'].diff().astype('float64').fillna(0.0)
-          step_len_ = (dx_**2 + dy_**2).pow(0.5)
-          dfc['s_glob'] = step_len_.groupby(dfc['trip_id']).cumsum().astype('float64')
-          # Attach simple graph-context features if requested and possible.
-          if use_graph_context:
-              # Prefer edge column when available (road-resample path); otherwise query nearest edge.
-              if 'edge' in dfc.columns:
-                  edges = dfc['edge'].tolist()
-              else:
-                  edges = []
-                  xs = dfc['x'].to_numpy()
-                  ys = dfc['y'].to_numpy()
-                  for x, y in zip(xs, ys):
-                      try:
-                          cands = cand_gen.query(float(x), float(y))
-                      except Exception:
-                          cands = []
-                      if cands:
-                          edges.append(cands[0]['edge'])
-                      else:
-                          edges.append((-1, -1, -1))
-              deg_vals: List[float] = []
-              junc_flags: List[int] = []
-              for e in edges:
-                  try:
-                      u, v, _ = e
-                  except Exception:
-                      deg_vals.append(0.0)
-                      junc_flags.append(0)
-                      continue
-                  if u == -1 and v == -1:
-                      deg = 0.0
-                      is_junc = 0
-                  else:
-                      du = float(node_degree.get(u, 0))
-                      dv = float(node_degree.get(v, 0))
-                      deg = max(du, dv)
-                      is_junc = 1 if (u in junction_nodes or v in junction_nodes) else 0
-                  deg_vals.append(deg)
-                  junc_flags.append(is_junc)
-              dfc['node_degree'] = np.asarray(deg_vals, dtype='float32')
-              dfc['is_junction'] = np.asarray(junc_flags, dtype='int32')
-          feats_c = _compute_features(dfc)
-          fp = os.path.join(tmp_dir, f'feats_chunk_{idx:05d}.pkl')
-          feats_c.to_pickle(fp)
-          return fp
+        dfc = dfc.sort_values(['trip_id', 'ts']).reset_index(drop=True)
+        dx_ = dfc.groupby('trip_id')['x'].diff().astype('float64').fillna(0.0)
+        dy_ = dfc.groupby('trip_id')['y'].diff().astype('float64').fillna(0.0)
+        step_len_ = (dx_**2 + dy_**2).pow(0.5)
+        dfc['s_glob'] = step_len_.groupby(dfc['trip_id']).cumsum().astype('float64')
+        # Attach simple graph-context features if requested and possible.
+        if use_graph_context:
+            # Prefer edge column when available (road-resample path); otherwise query nearest edge.
+            if 'edge' in dfc.columns:
+                edges = dfc['edge'].tolist()
+            else:
+                edges = []
+                xs = dfc['x'].to_numpy()
+                ys = dfc['y'].to_numpy()
+                for x, y in zip(xs, ys):
+                    try:
+                        cands = cand_gen.query(float(x), float(y))
+                    except Exception:
+                        cands = []
+                    if cands:
+                        edges.append(cands[0]['edge'])
+                    else:
+                        edges.append((-1, -1, -1))
+            deg_vals: List[float] = []
+            junc_flags: List[int] = []
+            for e in edges:
+                try:
+                    u, v, _ = e
+                except Exception:
+                    deg_vals.append(0.0)
+                    junc_flags.append(0)
+                    continue
+                if u == -1 and v == -1:
+                    deg = 0.0
+                    is_junc = 0
+                else:
+                    du = float(node_degree.get(u, 0))
+                    dv = float(node_degree.get(v, 0))
+                    deg = max(du, dv)
+                    is_junc = 1 if (u in junction_nodes or v in junction_nodes) else 0
+                deg_vals.append(deg)
+                junc_flags.append(is_junc)
+            dfc['node_degree'] = np.asarray(deg_vals, dtype='float32')
+            dfc['is_junction'] = np.asarray(junc_flags, dtype='int32')
+        feats_c = _compute_features(dfc)
+        fp = os.path.join(tmp_dir, f'feats_chunk_{idx:05d}.pkl')
+        feats_c.to_pickle(fp)
+        return fp
 
     try:
         from tqdm import tqdm  # type: ignore
@@ -709,12 +710,12 @@ def prepare_phase_b(
         pass
     # 5) Features already computed per-chunk; proceed to scaler/saves
     print(f"[Phase B] Split sizes | train={len(train_df)} val={len(val_df)} test={len(test_df)}", flush=True)
-      feature_cols = [
-          'v', 'a', 'delta_v', 'delta_heading', 'tod_sin', 'tod_cos',
-          'dow_sin', 'dow_cos', 'rush_hour', 'stop_flag', 'dw_time'
-      ]
-      if use_graph_context:
-          feature_cols = feature_cols + ['node_degree', 'is_junction']
+    feature_cols = [
+        'v', 'a', 'delta_v', 'delta_heading', 'tod_sin', 'tod_cos',
+        'dow_sin', 'dow_cos', 'rush_hour', 'stop_flag', 'dw_time'
+    ]
+    if use_graph_context:
+        feature_cols = feature_cols + ['node_degree', 'is_junction']
     scaler = fit_scaler(train_df, feature_cols)
     train_df_s = apply_scaler(train_df, scaler)
     val_df_s = apply_scaler(val_df, scaler)
@@ -732,7 +733,7 @@ def prepare_phase_b(
     pd.Series(split).to_json(os.path.join(out_dir, 'split.json'))
     # map-matching fallback ratio (no candidate -> fallback to original xy)
     match_fallback_ratio = float(total_nomatch) / float(total_obs) if total_obs > 0 else None
-      meta = {
+    meta = {
         'num_taxis': int(num_taxis),
         'phase': 'B',
         'feature_cols': feature_cols,
@@ -744,8 +745,8 @@ def prepare_phase_b(
         'candidate_radius_m': float(candidate_radius_m),
         'k_candidates': int(k_candidates),
         'use_shortest_path': bool(use_shortest_path),
-          'use_road_resample': bool(use_road_resample),
-          'use_graph_context_features': bool(use_graph_context),
+        'use_road_resample': bool(use_road_resample),
+        'use_graph_context_features': bool(use_graph_context),
         'graph_source': 'graphml' if graphml else ('xml' if xml else ('place/bbox' if (place or bbox) else 'unknown')),
         'beam_size': int(beam_size),
         'turn_penalty': float(turn_penalty),

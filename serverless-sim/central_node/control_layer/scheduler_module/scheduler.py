@@ -1,5 +1,6 @@
 import logging
 import time
+import random
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
 import cvxpy as cp
@@ -35,7 +36,7 @@ class Scheduler:
         self.central_node = {
             "node_id": "central_node",
             "endpoint": "localhost:8000",
-            "location": {"x": 730, "y": 1070}, # default location
+            "location": {"x": 2939, "y": 1835},  # Map center (5878x3670 / 2) - Beijing TaxiD bounds
             "coverage": 0 # default coverage
         }
         self.user_nodes: Dict[str, UserNodeInfo] = {}
@@ -169,29 +170,105 @@ class Scheduler:
         user.location = new_location
         self._append_history_point(user, new_location)
         return True
+    
+    def update_user_node_with_features(self, user_id: str, point_data: Dict[str, float]) -> bool:
+        """Update user with pre-computed features from trajectory data.
+        
+        This is more efficient than update_user_node() when features are already
+        available from the exported trajectory file (with --include-features).
+        
+        Args:
+            user_id: User identifier
+            point_data: Dict containing x, y (pixels) and optionally pre-computed features
+                       (v, a, delta_v, delta_heading, tod_sin, tod_cos, etc.)
+        """
+        if user_id not in self.user_nodes:
+            return False
+        
+        user = self.user_nodes[user_id]
+        user.location = {"x": point_data.get("x", 0.0), "y": point_data.get("y", 0.0)}
+        
+        # Check if features are pre-computed
+        has_features = "v" in point_data
+        
+        if has_features:
+            # Use pre-computed features directly
+            self._append_history_point_with_features(user, point_data)
+        else:
+            # Fall back to computing features
+            self._append_history_point(user, user.location)
+        
+        return True
+    
+    def _append_history_point_with_features(self, user_node: UserNodeInfo, point_data: Dict[str, float]) -> None:
+        """Append a history point using pre-computed features from trajectory data.
+        
+        This uses features that were computed during prepare.py (from actual GPS data)
+        which are more accurate than computing them from simulated pixel movements.
+        """
+        # Convert pixel coordinates to meters
+        x_meters = float(point_data.get("x", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
+        y_meters = float(point_data.get("y", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
+        
+        record = {
+            "ts": time.time(),
+            "x": x_meters,
+            "y": y_meters,
+            # Copy pre-computed features
+            "v": float(point_data.get("v", 0.0)),
+            "a": float(point_data.get("a", 0.0)),
+            "delta_v": float(point_data.get("delta_v", 0.0)),
+            "delta_heading": float(point_data.get("delta_heading", 0.0)),
+            "tod_sin": float(point_data.get("tod_sin", 0.0)),
+            "tod_cos": float(point_data.get("tod_cos", 0.0)),
+            "dow_sin": float(point_data.get("dow_sin", 0.0)),
+            "dow_cos": float(point_data.get("dow_cos", 0.0)),
+            "rush_hour": float(point_data.get("rush_hour", 0.0)),
+            "stop_flag": float(point_data.get("stop_flag", 0.0)),
+            "dw_time": float(point_data.get("dw_time", 0.0)),
+            # Optional graph-context features (present only if replay export included them)
+            "node_degree": float(point_data.get("node_degree", 0.0)),
+            "is_junction": float(point_data.get("is_junction", 0.0)),
+        }
+        
+        user_node.history.append(record)
+        if len(user_node.history) > self.history_max_points:
+            user_node.history = user_node.history[-self.history_max_points:]
+        
+        self.user_nodes[user_node.user_id] = user_node
 
     def create_user_node(self, user_node: UserNodeInfo):
         self.user_nodes[user_node.user_id] = user_node
         self._append_history_point(user_node, user_node.location)
 
     def _append_history_point(self, user_node: UserNodeInfo, location: Dict[str, float]) -> None:
+        """Append a history point with features computed in meters (consistent with model training).
+        
+        IMPORTANT: x,y are stored in METERS (converted from pixels) for consistency with 
+        the prediction model which was trained on projected GPS coordinates in meters.
+        """
         ts = time.time()
+        # Convert pixel coordinates to meters for consistent coordinate system
+        x_meters = float(location.get("x", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
+        y_meters = float(location.get("y", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
+        
         record = {
             "ts": ts,
-            "x": float(location.get("x", 0.0)),
-            "y": float(location.get("y", 0.0)),
+            "x": x_meters,  # Now in meters
+            "y": y_meters,  # Now in meters
         }
         prev = user_node.history[-1] if user_node.history else None
         if prev:
             dt = max(ts - prev.get("ts", ts), 1e-3)
-            dx = (record["x"] - prev.get("x", record["x"])) * Config.DEFAULT_PIXEL_TO_METERS
-            dy = (record["y"] - prev.get("y", record["y"])) * Config.DEFAULT_PIXEL_TO_METERS
+            # Now dx, dy are already in meters (both current and previous are in meters)
+            dx = record["x"] - prev.get("x", record["x"])
+            dy = record["y"] - prev.get("y", record["y"])
             dist = math.hypot(dx, dy)
-            v = dist / dt
+            v = dist / dt  # m/s
             prev_v = prev.get("v", 0.0)
             record["v"] = v
             record["delta_v"] = v - prev_v
-            record["a"] = record["delta_v"] / dt
+            record["a"] = record["delta_v"] / dt  # m/s^2
             heading = math.atan2(dy, dx) if dist > 1e-6 else prev.get("heading", 0.0)
             record["heading"] = heading
             prev_heading = prev.get("heading", heading)
@@ -208,7 +285,7 @@ class Scheduler:
                 "a": 0.0,
                 "heading": 0.0,
                 "delta_heading": 0.0,
-                "stop_flag": 0.0,
+                "stop_flag": 1.0,  # First point is stationary
                 "dw_time": 0.0,
             })
         dt_obj = datetime.fromtimestamp(ts)
@@ -225,44 +302,19 @@ class Scheduler:
 
         self.user_nodes[user_node.user_id] = user_node
 
-    def _pad_history_to_lookback(self, history: List[Dict[str, float]]) -> List[Dict[str, float]]:
-        """Pad history to have at least `history_max_points` entries by replicating the last point.
+    def _has_sufficient_history(self, history: List[Dict[str, float]]) -> bool:
+        """Check if user has enough history points for reliable prediction.
         
-        This allows prediction to work even when user has just been created.
-        The padded points represent a "stationary" user at the current position.
+        Rather than padding with synthetic data (which creates unrealistic patterns),
+        we require at least `history_max_points` actual observations.
         """
+        return len(history) >= self.history_max_points
+    
+    def _get_history_for_prediction(self, history: List[Dict[str, float]]) -> List[Dict[str, float]]:
+        """Get the most recent history_max_points for prediction."""
         if len(history) >= self.history_max_points:
             return history[-self.history_max_points:]
-        
-        if not history:
-            return []
-        
-        # Get the last known point as template
-        last_point = history[-1].copy()
-        padded = list(history)
-        
-        # Calculate how many points we need to add
-        points_needed = self.history_max_points - len(history)
-        
-        # Create padded points with slightly earlier timestamps (1 second apart)
-        base_ts = last_point.get("ts", time.time())
-        
-        for i in range(points_needed):
-            # Create a copy of the last point with modified timestamp
-            padded_point = last_point.copy()
-            # Set timestamp slightly before the earliest existing point
-            # Insert at the beginning to maintain chronological order
-            padded_point["ts"] = base_ts - (points_needed - i) * 60.0  # 1 minute apart
-            # For padded points, user is stationary
-            padded_point["v"] = 0.0
-            padded_point["delta_v"] = 0.0
-            padded_point["a"] = 0.0
-            padded_point["delta_heading"] = 0.0
-            padded_point["stop_flag"] = 1.0
-            padded_point["dw_time"] = float(points_needed - i) * 60.0  # dwell time accumulates
-            padded.insert(0, padded_point)
-        
-        return padded
+        return history  # Return as-is, caller should check sufficiency first
     
     def clear_all_users(self):
         self.user_nodes = {}
@@ -330,9 +382,41 @@ class Scheduler:
     
     
     def _calculate_distance(self, location1: Dict[str, float], location2: Dict[str, float]) -> float:
-        dx = location1["x"] - location2["x"]
-        dy = location1["y"] - location2["y"]
+        """Calculate distance between two locations in METERS.
+        
+        Locations are expected to be in pixels (UI coordinates), 
+        and the result is converted to meters for physical calculations.
+        """
+        dx = (location1["x"] - location2["x"]) * Config.DEFAULT_PIXEL_TO_METERS
+        dy = (location1["y"] - location2["y"]) * Config.DEFAULT_PIXEL_TO_METERS
         return (dx ** 2 + dy ** 2) ** 0.5
+    
+    def _calculate_propagation_delay_deterministic(self, distance_meters: float) -> float:
+        """Calculate deterministic network propagation delay.
+        
+        Used for optimization algorithms (CVX) that need consistent values.
+        
+        Returns:
+            Propagation delay in milliseconds
+        """
+        distance_km = distance_meters / 1000.0
+        base_latency = Config.NETWORK_BASE_LATENCY_MS
+        distance_latency = distance_km * Config.NETWORK_PER_KM_LATENCY_MS
+        
+        return max(0.0, base_latency + distance_latency)
+    
+    def _calculate_propagation_delay(self, distance_meters: float) -> float:
+        """Calculate realistic network propagation delay in milliseconds.
+        
+        Uses a realistic network latency model instead of speed of light.
+        The model includes:
+        - Base latency: Radio access + core network baseline
+        - Distance-based latency: Fiber/backhaul propagation
+        
+        Returns:
+            Propagation delay in milliseconds
+        """
+        return self._calculate_propagation_delay_deterministic(distance_meters)
     
     def node_assignment(self) -> dict:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
@@ -352,9 +436,7 @@ class Scheduler:
             assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
             user_node.assigned_node_id = assigned_node_id
             user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = (
-                assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-            )
+            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
             total_turnaround_time = (
                 user_node.latency.propagation_delay
                 + user_node.latency.transmission_delay
@@ -365,6 +447,9 @@ class Scheduler:
         return self.assignment_matrix
 
     def _predictive_assignment(self) -> dict:
+        if getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
+            return self._predictive_prewarm_only_assignment()
+
         if not self.predictor_adapter or not get_mobility_prediction:
             self.logger.warning("Predictor not available, falling back to greedy assignment")
             return self._assign_users_greedy()
@@ -372,39 +457,41 @@ class Scheduler:
             self.logger.warning("No edge nodes registered; using greedy assignment")
             return self._assign_users_greedy()
         
-        # Collect user states - pad history if insufficient
+        # Separate users into those with sufficient history (for prediction) 
+        # and those without (for greedy fallback)
         user_states = []
-        users_no_history = 0
-        users_padded = 0
+        users_insufficient_history = []
         
         for user in self.user_nodes.values():
-            if not user.history:
-                users_no_history += 1
-                continue
-            
-            # Pad history to ensure we have enough points for prediction
-            history = self._pad_history_to_lookback(user.history)
-            
-            if len(user.history) < self.history_max_points:
-                users_padded += 1
-            
-            user_states.append({"user_id": user.user_id, "history": history})
+            if self._has_sufficient_history(user.history):
+                # User has enough history for reliable prediction
+                history = self._get_history_for_prediction(user.history)
+                user_states.append({"user_id": user.user_id, "history": history})
+            else:
+                # User doesn't have enough history - will use greedy
+                users_insufficient_history.append(user.user_id)
         
         # Log summary of user history status
         total_users = len(self.user_nodes)
-        if users_no_history > 0 or users_padded > 0:
+        predictable_users = len(user_states)
+        if users_insufficient_history:
             self.logger.info(
-                f"Predictive assignment: {total_users} users total, "
-                f"{users_no_history} with no history, "
-                f"{users_padded} padded to {self.history_max_points} points"
+                f"Predictive assignment: {predictable_users}/{total_users} users have sufficient history, "
+                f"{len(users_insufficient_history)} will use greedy fallback"
             )
         
+        # If no users have sufficient history, use greedy for all
         if not user_states:
-            self.logger.warning("No users with history data, falling back to greedy assignment")
+            self.logger.info("No users with sufficient history, using greedy assignment for all")
             return self._assign_users_greedy()
         
+        # Convert cloudlet positions from pixels to meters (consistent with user history)
         cloudlet_records = [
-            {"id": node_id, "x": info.location["x"], "y": info.location["y"]}
+            {
+                "id": node_id, 
+                "x": info.location["x"] * Config.DEFAULT_PIXEL_TO_METERS, 
+                "y": info.location["y"] * Config.DEFAULT_PIXEL_TO_METERS
+            }
             for node_id, info in self.edge_nodes.items()
         ]
         try:
@@ -432,7 +519,17 @@ class Scheduler:
                 greedy_fallback_assignments += 1
             else:
                 predictive_assignments += 1
-                horizon_idx = probs.shape[1] - 1 if probs.ndim == 2 else -1
+                horizon_idx = -1
+                if probs.ndim == 2 and probs.shape[1] > 0:
+                    # Inference currently returns probabilities for horizons (1,3,5,10).
+                    # Default to using horizon=5 (aligns better with the replay step and
+                    # execution cadence), but clamp if the shape is unexpected.
+                    desired_h = getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5)
+                    horizons = (1, 3, 5, 10)
+                    if probs.shape[1] == len(horizons) and desired_h in horizons:
+                        horizon_idx = horizons.index(desired_h)
+                    else:
+                        horizon_idx = min(max(int(desired_h) - 1, 0), probs.shape[1] - 1)
                 order = np.argsort(probs[:, horizon_idx])[::-1]
                 assigned_node_id = None
                 for idx in order:
@@ -449,9 +546,7 @@ class Scheduler:
                 assigned_node_distance = self._calculate_distance(user_node.location, location)
             user_node.assigned_node_id = assigned_node_id
             user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = (
-                assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-            )
+            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
             total_turnaround_time = (
                 user_node.latency.propagation_delay
                 + user_node.latency.transmission_delay
@@ -467,6 +562,148 @@ class Scheduler:
                 f"{greedy_fallback_assignments} greedy fallback"
             )
         
+        return self.assignment_matrix
+
+    def _apply_assignment_latency(self, user_node: UserNodeInfo, assigned_node_id: str) -> Tuple[str, float]:
+        if assigned_node_id == "central_node":
+            location = self.central_node["location"]
+        else:
+            location = self.edge_nodes[assigned_node_id].location
+        assigned_node_distance = self._calculate_distance(user_node.location, location)
+        user_node.assigned_node_id = assigned_node_id
+        user_node.latency.distance = assigned_node_distance
+        user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
+        user_node.latency.total_turnaround_time = (
+            user_node.latency.propagation_delay
+            + user_node.latency.transmission_delay
+            + user_node.latency.computation_delay
+        )
+        return assigned_node_id, assigned_node_distance
+
+    def _predictive_prewarm_only_assignment(self) -> dict:
+        """Predictive mode that plans ahead but does not reassign immediately.
+
+        - Keeps current assignment for serving requests "now".
+        - On planning ticks, stores (planned_node_id, planned_step_id) per user based on horizon.
+        - Switches assignment only when planned_step_id is reached.
+
+        This mode is designed for experiments where wall-clock steps are slow (many users),
+        so Docker warm TTL is not meaningful; the execution layer can model prewarm analytically.
+        """
+        if not self.predictor_adapter or not get_mobility_prediction:
+            self.logger.warning("Predictor not available, falling back to greedy assignment")
+            return self._assign_users_greedy()
+        if not self.edge_nodes:
+            self.logger.warning("No edge nodes registered; using greedy assignment")
+            return self._assign_users_greedy()
+
+        current_step = self.get_current_step_id() or 0
+        lead_steps = int(getattr(Config, "PREDICTIVE_PREWARM_LEAD_STEPS", 5))
+        exec_interval = int(getattr(Config, "PREDICTIVE_EXECUTE_INTERVAL_STEPS", 5))
+
+        # Apply due switches first
+        for user_node in self.user_nodes.values():
+            if not user_node.planned_node_id or user_node.planned_step_id is None:
+                continue
+            if current_step < int(user_node.planned_step_id):
+                continue
+            # If we already passed the planned step, the prewarm signal is no longer needed.
+            # Clear it to avoid repeatedly "re-applying" the same switch on later steps.
+            if current_step > int(user_node.planned_step_id):
+                user_node.planned_node_id = None
+                user_node.planned_step_id = None
+                continue
+            candidate = user_node.planned_node_id
+            if candidate != "central_node" and candidate not in self.edge_nodes:
+                candidate = "central_node"
+            if candidate != "central_node" and not self._check_resource_constraints(user_node, candidate):
+                # Cannot switch to planned node; drop the plan and keep current assignment.
+                user_node.planned_node_id = None
+                user_node.planned_step_id = None
+                continue
+            # Apply the switch, but KEEP planned_node_id/step_id for this step so that
+            # the execution layer can treat it as "prewarmed" on the switch step.
+            # (get_all_users_controller.py checks planned_node_id/step_id when simulating cold/warm.)
+            self._apply_assignment_latency(user_node, candidate)
+
+        # Ensure an initial assignment exists (greedy) for any unassigned user
+        for user_node in self.user_nodes.values():
+            if user_node.assigned_node_id:
+                continue
+            assigned_node_id, _ = self._greedy_assignment(user_node.location)
+            self._apply_assignment_latency(user_node, assigned_node_id)
+
+        # Current assignment matrix reflects what serves requests "now"
+        self.assignment_matrix = {
+            user_id: (user.assigned_node_id, user.latency.distance)
+            for user_id, user in self.user_nodes.items()
+        }
+
+        # Only plan on interval ticks (avoid expensive prediction every step)
+        if exec_interval <= 0 or (current_step % exec_interval != 0):
+            return self.assignment_matrix
+
+        # Build prediction inputs for users with sufficient history
+        user_states = []
+        for user in self.user_nodes.values():
+            if self._has_sufficient_history(user.history):
+                history = self._get_history_for_prediction(user.history)
+                user_states.append({"user_id": user.user_id, "history": history})
+
+        if not user_states:
+            return self.assignment_matrix
+
+        cloudlet_records = [
+            {
+                "id": node_id,
+                "x": info.location["x"] * Config.DEFAULT_PIXEL_TO_METERS,
+                "y": info.location["y"] * Config.DEFAULT_PIXEL_TO_METERS,
+            }
+            for node_id, info in self.edge_nodes.items()
+        ]
+
+        try:
+            prob_map = get_mobility_prediction(user_states, cloudlet_records, self.predictor_adapter)
+        except Exception as exc:
+            self.logger.warning("Predictive inference failed: %s", exc)
+            return self.assignment_matrix
+
+        desired_h = getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5)
+        horizons = (1, 3, 5, 10)
+        for user_id, user_node in self.user_nodes.items():
+            # If this user is switching *now* (planned_step_id == current_step),
+            # keep the current plan fields intact for this step so the execution
+            # layer can mark it as warm (prewarmed). We'll plan the next switch
+            # on a later planning tick.
+            if user_node.planned_step_id is not None and int(user_node.planned_step_id) == int(current_step):
+                continue
+            probs = prob_map.get(user_id)
+            if probs is None or probs.ndim != 2 or probs.shape[1] <= 0:
+                continue
+            if probs.shape[1] == len(horizons) and desired_h in horizons:
+                horizon_idx = horizons.index(desired_h)
+            else:
+                horizon_idx = min(max(int(desired_h) - 1, 0), probs.shape[1] - 1)
+
+            order = np.argsort(probs[:, horizon_idx])[::-1]
+            planned = None
+            for idx in order:
+                node_id = cloudlet_records[idx]["id"]
+                if self._check_resource_constraints(user_node, node_id):
+                    planned = node_id
+                    break
+            if planned is None:
+                planned = "central_node"
+
+            user_node.planned_node_id = planned
+            user_node.planned_step_id = int(current_step) + int(lead_steps)
+
+        self.logger.info(
+            "Predictive(prewarm-only): planned at step=%s -> switch at step+%s",
+            current_step,
+            lead_steps,
+        )
+
         return self.assignment_matrix
 
     def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:
@@ -516,13 +753,27 @@ class Scheduler:
         return best_node, min_distance
 
    
-    def calculate_total_turnaround_time(self) -> Dict[str, float]:
-        total_turnaround_time = 0.0
-        
+    def calculate_turnaround_time_breakdown(self) -> Dict[str, float]:
+        """Return total turnaround time split by container status (warm/cold/unknown).
+
+        This is useful for comparing scheduling policies that trade off cold starts vs distance.
+
+        Returned keys:
+          - total_turnaround_time
+          - total_turnaround_time_warm
+          - total_turnaround_time_cold
+          - total_turnaround_time_unknown
+          - warm_count / cold_count / unknown_count
+        """
+        total = 0.0
+        warm_total = 0.0
+        cold_total = 0.0
+        unknown_total = 0.0
+        warm_count = 0
+        cold_count = 0
+        unknown_count = 0
+
         for _, user_node in self.user_nodes.items():
-            # Turnaround latency cost
-            distance = 0
-            turnaround_time = 0
             cloudlet_id = user_node.assigned_node_id
             if cloudlet_id == "central_node":
                 distance = self._calculate_distance(user_node.location, self.central_node["location"])
@@ -531,13 +782,36 @@ class Scheduler:
                     continue
                 cloudlet = self.edge_nodes[cloudlet_id]
                 distance = self._calculate_distance(user_node.location, cloudlet.location)
-            propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+
+            propagation_delay = self._calculate_propagation_delay(distance)
             transmission_delay = user_node.data_size_demand / user_node.bandwidth_demand
-            computation_delay = user_node.latency.computation_delay if user_node.latency.computation_delay else 0
+            computation_delay = getattr(getattr(user_node, "latency", None), "computation_delay", 0.0) or 0.0
             turnaround_time = propagation_delay + transmission_delay + computation_delay
-            total_turnaround_time += turnaround_time
-        
-        return total_turnaround_time
+            total += turnaround_time
+
+            status = str(getattr(getattr(user_node, "latency", None), "container_status", "unknown") or "unknown")
+            if status == "warm":
+                warm_total += turnaround_time
+                warm_count += 1
+            elif status == "cold":
+                cold_total += turnaround_time
+                cold_count += 1
+            else:
+                unknown_total += turnaround_time
+                unknown_count += 1
+
+        return {
+            "total_turnaround_time": total,
+            "total_turnaround_time_warm": warm_total,
+            "total_turnaround_time_cold": cold_total,
+            "total_turnaround_time_unknown": unknown_total,
+            "warm_count": float(warm_count),
+            "cold_count": float(cold_count),
+            "unknown_count": float(unknown_count),
+        }
+
+    def calculate_total_turnaround_time(self) -> float:
+        return float(self.calculate_turnaround_time_breakdown()["total_turnaround_time"])
 
 
     def _convex_optimization_assignment_all_users(self):
@@ -571,7 +845,9 @@ class Scheduler:
                 else:
                     distance = self._calculate_distance(user_loc, self.edge_nodes[cloudlet_id].location)
 
-                propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                # For CVX optimization, use deterministic propagation delay (no jitter)
+                # to ensure consistent optimization results
+                propagation_delay = self._calculate_propagation_delay_deterministic(distance)
                 computation_delay = getattr(user_node.latency, "computation_delay", 0.0)
                 transmission_delay = getattr(user_node.latency, "transmission_delay", 0.0)
                 T[i, j] = propagation_delay + transmission_delay + computation_delay
@@ -663,7 +939,7 @@ class Scheduler:
                     # Update user node assignment and latency information
                     user_node.assigned_node_id = assigned_cloudlet
                     user_node.latency.distance = distance
-                    user_node.latency.propagation_delay = distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                    user_node.latency.propagation_delay = self._calculate_propagation_delay(distance)
                     total_turnaround_time = (
                         user_node.latency.propagation_delay +
                         getattr(user_node.latency, "transmission_delay", 0.0) +
@@ -684,7 +960,7 @@ class Scheduler:
                 assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
                 user_node.assigned_node_id = assigned_node_id
                 user_node.latency.distance = assigned_node_distance
-                user_node.latency.propagation_delay = assigned_node_distance / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
                 total_turnaround_time = (
                     user_node.latency.propagation_delay +
                     getattr(user_node.latency, "transmission_delay", 0.0) +

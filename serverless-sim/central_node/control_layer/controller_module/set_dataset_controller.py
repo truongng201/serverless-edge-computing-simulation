@@ -10,6 +10,7 @@ from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.helper_module.data_manager import DataManager
 from central_node.control_layer.models import Latency, UserNodeInfo
 from central_node.control_layer.helper_module.osm_loader import load_graph, graph_bounds_meters, edge_geometries
+from .register_edge_node_controller import RegisterEdgeNodeController
 
 from shared.custom_exception import InvalidDataException
 from config import Config
@@ -32,8 +33,8 @@ class SetDatasetController:
         if self.dataset_name and self.dataset_name not in ["none", "dact", "random_generated", "taxiD", "taxiD_Replay"]:
             raise InvalidDataException(f"Dataset {self.dataset_name} is not available.")
 
-        if self.sample_size is not None and (not isinstance(self.sample_size, int) or self.sample_size <= 0 or self.sample_size > 1000):
-            raise InvalidDataException("Sample size must be a positive integer not exceeding 1000.")
+        if self.sample_size is not None and (not isinstance(self.sample_size, int) or self.sample_size <= 0):
+            raise InvalidDataException("Sample size must be a positive integer.")
         
         
     def _to_px(self, x_m: float, y_m: float, minx: float, maxy: float):
@@ -47,6 +48,29 @@ class SetDatasetController:
         cy_m = (miny + maxy) / 2.0
         cx_px, cy_px = self._to_px(cx_m, cy_m, minx, maxy)
         return cx_px, cy_px
+
+    def _spread_existing_edge_nodes(self):
+        """
+        Reposition already-registered edge nodes to better match the current TaxiD
+        viewport after (re)centering the central node.
+
+        This improves the UI demo experience because edge nodes may have been
+        registered before dataset selection, while dataset setup recenters the
+        central node based on the road-graph bounds.
+        """
+        if not getattr(self.scheduler, "edge_nodes", None):
+            return
+
+        total_nodes = len(self.scheduler.edge_nodes)
+        placer = RegisterEdgeNodeController.__new__(RegisterEdgeNodeController)
+        placer.scheduler = self.scheduler
+
+        for node_id, node_info in self.scheduler.edge_nodes.items():
+            node_info.location = RegisterEdgeNodeController._grid_based_location(
+                placer, node_id, total_nodes=total_nodes
+            )
+
+        self.logger.info(f"TaxiD: spread {total_nodes} edge nodes across viewport")
 
     
     def _sample_points_on_edges(self, polylines_m: List[List[Tuple[float, float]]], n: int) -> List[Tuple[float, float]]:
@@ -74,31 +98,50 @@ class SetDatasetController:
         """
         Load trajectories exported by export_taxid_replay_last1k.py.
 
-        Path is configurable via env if needed; by default we use
-        serverless-sim/mock_data/taxid_replay_last1k.pkl under repo root.
+        Supports two file formats:
+        1. Basic: ts, x_m, y_m only (features recomputed by scheduler)
+        2. With features: ts, x_m, y_m, v, a, delta_v, etc. (features used directly)
+
+        Path is configurable via env; tries features file first, then basic file.
         """
-        default_path = (
-            Path(__file__)
-            .resolve()
-            .parents[3]
-            / "mock_data"
-            / "taxid_replay_last1k.pkl"
-        )
-        path_str = getattr(
-            Config,
-            "TAXID_REPLAY_PATH",
-            str(default_path),
-        )
-        path = Path(path_str)
-        if not path.exists():
+        mock_data_dir = Path(__file__).resolve().parents[3] / "mock_data"
+        
+        # Try to find the best available file (prefer features version)
+        candidates = [
+            # Default exported by export_taxid_replay_last1k.py (basic format)
+            mock_data_dir / "taxid_replay_5000_features.pkl",
+            # Optional fallback exports (if available)
+            mock_data_dir / "taxid_replay_last1k.pkl",
+        ]
+        
+        # Allow override via config
+        config_path = getattr(Config, "TAXID_REPLAY_PATH", None)
+        if config_path:
+            candidates.insert(0, Path(config_path))
+        
+        path = None
+        for candidate in candidates:
+            if candidate.exists():
+                path = candidate
+                break
+        
+        if path is None:
             raise FileNotFoundError(
-                f"TaxiD replay pickle not found at '{path}'. "
+                f"TaxiD replay pickle not found. Tried: {[str(c) for c in candidates[:3]]}. "
                 f"Run export_taxid_replay_last1k.py first."
             )
+        
         self.logger.info(f"TaxiD replay: loading trajectories from '{path}'")
         trajectories = pd.read_pickle(path)
         if not isinstance(trajectories, list):
             raise ValueError("Replay pickle must contain a list of trajectories")
+        
+        # Check if features are included
+        if trajectories and trajectories[0].get("points"):
+            first_point = trajectories[0]["points"][0]
+            has_features = "v" in first_point
+            self.logger.info(f"TaxiD replay: features included = {has_features}")
+        
         return trajectories
     
         
@@ -123,6 +166,7 @@ class SetDatasetController:
             
             # Optionally re-center central node to bbox center (for better initial view)
             self.scheduler.central_node["location"] = {"x": cx_px, "y": cy_px}
+            self._spread_existing_edge_nodes()
             
             if self.dataset_name == "taxiD":
                 # Collect edge polylines (meters)
@@ -139,8 +183,20 @@ class SetDatasetController:
                 sample_data["items"] = self._sample_points_on_edges(polylines_m, spawn_count)
             elif self.dataset_name == "taxiD_Replay":
                 trajectories = self._load_replay_trajectories()
+                # Apply sample_size limit if specified
+                if self.sample_size is not None and self.sample_size < len(trajectories):
+                    trajectories = trajectories[:self.sample_size]
+                    self.logger.info(f"TaxiD replay: limiting to {self.sample_size} trajectories")
                 trajectories_px: Dict[str, List[Dict[str, float]]] = {}
                 items = []
+                
+                # Feature columns to copy if available
+                feature_cols = ["v", "a", "delta_v", "delta_heading", 
+                               "tod_sin", "tod_cos", "dow_sin", "dow_cos",
+                               "rush_hour", "stop_flag", "dw_time",
+                               # Optional graph-context features (present if replay export included them)
+                               "node_degree", "is_junction"]
+                
                 for idx, traj in enumerate(trajectories):
                     trip_id = str(traj.get("trip_id", idx))
                     pts = traj.get("points", [])
@@ -157,12 +213,20 @@ class SetDatasetController:
                         "y": yp,
                     })
                     # Store full trajectory in pixel space for later replay
+                    # Include features if they exist in the source data
                     seq_px: List[Dict[str, float]] = []
                     for pt in pts:
                         xmp = float(pt["x_m"])
                         ymp = float(pt["y_m"])
                         px, py = self._to_px(xmp, ymp, minx, maxy)
-                        seq_px.append({"ts": pt["ts"], "x": px, "y": py})
+                        point_data = {"ts": pt["ts"], "x": px, "y": py}
+                        
+                        # Copy features if available (from --include-features export)
+                        for feat in feature_cols:
+                            if feat in pt:
+                                point_data[feat] = float(pt[feat])
+                        
+                        seq_px.append(point_data)
                     trajectories_px[f"user_{user_id}"] = seq_px
                 sample_data["items"] = items
                 self.scheduler.set_trajectories_px(trajectories_px)

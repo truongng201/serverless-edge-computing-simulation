@@ -44,20 +44,38 @@ def evaluate_gru(
     graphml: str = None,
     place: str = None,
     bbox: tuple = None,
+    max_windows_per_trip: int = None,
+    window_stride: int = 1,
 ) -> dict:
     device = device or ("cuda" if torch.cuda.is_available() else "cpu")
+    print(f"[Eval] Loading meta: {os.path.join(data_dir, 'meta.json')}", flush=True)
     meta = pd.read_json(os.path.join(data_dir, 'meta.json'), typ='series').to_dict()
+    print(f"[Eval] Loading test set: {os.path.join(data_dir, 'test.pkl')}", flush=True)
     test_df = pd.read_pickle(os.path.join(data_dir, 'test.pkl'))
+    print(f"[Eval] Loaded test rows={len(test_df)} | trips={test_df['trip_id'].nunique() if 'trip_id' in test_df.columns else 'n/a'}", flush=True)
     feature_cols: List[str] = meta['feature_cols']
     if ckpt_path is None:
         ckpt_path = os.path.join(data_dir, 'gru_phase_curv.pt' if (mode == 'curv') else ('gru_phase_curv_step.pt' if mode == 'curv_step' else 'gru_phase_a.pt'))
+    print(f"[Eval] Loading checkpoint: {ckpt_path}", flush=True)
     ckpt = torch.load(ckpt_path, map_location=device)
     if lookback is None:
         lookback = int(ckpt.get('lookback', 20))
     if mode is None:
         mode = ckpt.get('mode', 'xy')
     if mode == 'curv_step':
-        return _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, place, bbox, data_dir)
+        return _evaluate_curv_step(
+            test_df,
+            feature_cols,
+            ckpt,
+            device,
+            lookback,
+            graphml,
+            place,
+            bbox,
+            data_dir,
+            max_windows_per_trip=max_windows_per_trip,
+            window_stride=window_stride,
+        )
     if mode == 'curv':
         # manual window loop to map Δs→XY
         model = GRUDisplacementRoad(input_size=len(feature_cols))
@@ -330,10 +348,23 @@ def evaluate_gru(
     print({k: (round(v, 3) if isinstance(v, float) else v) for k, v in res.items()})
     return res
 
-def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, place, bbox, data_dir):
+def _evaluate_curv_step(
+    test_df,
+    feature_cols,
+    ckpt,
+    device,
+    lookback,
+    graphml,
+    place,
+    bbox,
+    data_dir,
+    max_windows_per_trip: int = None,
+    window_stride: int = 1,
+):
     from .osm.loader import load_graph
     from .mapmatch.hmm import CandidateGenerator
     import numpy as np
+    import sys
     import torch
 
     # Infer hidden_size from checkpoint to match trained model
@@ -365,19 +396,50 @@ def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, 
     cand = None
     if use_graph:
         try:
+            print(f"[Eval] Loading graph for curv_step rollout...", flush=True)
             G = load_graph(graphml_path=graphml, place=place, bbox=bbox)
             cand = CandidateGenerator(G)
+            print(f"[Eval] Graph loaded for curv_step rollout | source={graphml or place or 'bbox'}", flush=True)
         except Exception:
             use_graph = False
+            print("[Eval] Graph load failed; falling back to polyline rollout.", flush=True)
 
-    for trip_id, g in df_sorted.groupby("trip_id"):
+    try:
+        from tqdm import tqdm  # type: ignore
+        is_tty = bool(getattr(sys.stderr, "isatty", lambda: False)())
+        n_trips = int(df_sorted["trip_id"].nunique())
+        trip_iter = tqdm(
+            df_sorted.groupby("trip_id"),
+            total=n_trips,
+            desc="[Eval] curv_step trips",
+            unit="trip",
+            leave=False,
+            mininterval=0.5,
+            disable=(not is_tty),
+        )
+    except Exception:
+        trip_iter = df_sorted.groupby("trip_id")
+        n_trips = None
+    processed_trips = 0
+    for trip_id, g in trip_iter:
         n = len(g)
         if n < (lookback or 20) + max(steps_all):
             continue
         base_idx = g.index.min()
+        windows_seen = 0
+        stride = int(max(1, window_stride or 1))
+        limit = None if max_windows_per_trip is None else int(max_windows_per_trip)
         for end in range(base_idx + (lookback or 20) - 1, base_idx + n):
             if end + max(steps_all) >= base_idx + n:
                 break
+            if stride > 1:
+                # Use a stable stride based on window index within the trip.
+                widx = end - (base_idx + (lookback or 20) - 1)
+                if (widx % stride) != 0:
+                    continue
+            if limit is not None and windows_seen >= limit:
+                break
+            windows_seen += 1
             x_seq = (
                 torch.tensor(
                     df_sorted.loc[end - (lookback or 20) + 1 : end, feature_cols].to_numpy(
@@ -476,6 +538,9 @@ def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, 
                 dx, dy = pred_xy_list[h - 1]
                 agg.extend([dx, dy])
             preds_xy.append(np.array(agg, dtype=np.float32))
+        processed_trips += 1
+        if n_trips is None and processed_trips % 200 == 0:
+            print(f"[Eval] curv_step processed trips={processed_trips} | windows={len(preds_xy)}", flush=True)
 
     if not preds_xy:
         return {
@@ -506,5 +571,3 @@ def _evaluate_curv_step(test_df, feature_cols, ckpt, device, lookback, graphml, 
         "h10": ph_hit200[3],
     }
     return res
-
-

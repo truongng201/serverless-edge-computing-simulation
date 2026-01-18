@@ -1,5 +1,6 @@
 import random
 import time
+import requests
 
 from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.helper_module.data_manager import DataManager
@@ -16,6 +17,7 @@ class GetAllUsersController:
         self.random_sample_size = self.scheduler.get_sample_size()
         self.simulation = self.scheduler.simulation
         self.response = []
+        self.execution_stats = None
        
     def _update_scheduler(self):
         self.scheduler.set_current_dataset(self.current_dataset)
@@ -46,7 +48,7 @@ class GetAllUsersController:
                 user_node.speed = item.get("speed", user_node.speed)
                 # Refresh propagation delay and total time with updated distance
                 dist_m = getattr(user_node.latency, 'distance', 0)
-                user_node.latency.propagation_delay = dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.propagation_delay = self.scheduler._calculate_propagation_delay(dist_m)
                 user_node.latency.total_turnaround_time = (
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, 'transmission_delay', 0)
@@ -110,7 +112,7 @@ class GetAllUsersController:
                 user_node = self.scheduler.user_nodes[user_id]
                 # Refresh propagation delay and total time with updated distance
                 dist_m = getattr(user_node.latency, 'distance', 0)
-                user_node.latency.propagation_delay = dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
+                user_node.latency.propagation_delay = self.scheduler._calculate_propagation_delay(dist_m)
                 user_node.latency.total_turnaround_time = (
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, 'transmission_delay', 0)
@@ -158,12 +160,11 @@ class GetAllUsersController:
         """
         Advance all TaxiD replay users by one step along their preloaded trajectories.
 
-        Trajectories are stored on scheduler.current_dataset as:
-          {
-            "name": "taxid_replay",
-            "trajectories_px": {user_id: [{"ts": ..., "x": float, "y": float}, ...]},
-            "step": int,
-          }
+        Trajectories are stored on scheduler as:
+          trajectories_px: {user_id: [{"ts": ..., "x": float, "y": float, ...}, ...]}
+          
+        If features (v, a, delta_v, etc.) are included in trajectory points,
+        they will be used directly instead of being recomputed.
         """
         if not self.simulation:
             return False
@@ -173,6 +174,7 @@ class GetAllUsersController:
         if not trajectories_px:
             print("No trajectories found for TaxiD replay.")
             return False
+        
         max_len = 0
         for user_id, seq in trajectories_px.items():
             if not seq:
@@ -181,19 +183,21 @@ class GetAllUsersController:
             max_len = max(max_len, len(seq))
             idx = min(step, len(seq) - 1)
             pt = seq[idx]
-            location = {"x": pt.get("x", 0.0), "y": pt.get("y", 0.0)}
+            
             if user_id in self.scheduler.user_nodes:
-                self.scheduler.update_user_node(user_id, location)
+                # Use update_user_node_with_features if features are available
+                # This automatically falls back to computing features if not present
+                self.scheduler.update_user_node_with_features(user_id, pt)
+                
                 user_node = self.scheduler.user_nodes[user_id]
                 dist_m = getattr(user_node.latency, "distance", 0.0)
-                user_node.latency.propagation_delay = (
-                    dist_m / Config.DEFAULT_PROPAGATION_SPEED_IN_METERS * 1000
-                )
+                user_node.latency.propagation_delay = self.scheduler._calculate_propagation_delay(dist_m)
                 user_node.latency.total_turnaround_time = (
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, "transmission_delay", 0.0)
                     + getattr(user_node.latency, "computation_delay", 0.0)
                 )
+        
         if max_len == 0:
             return False
         self.current_step_id = min(step + 1, max_len - 1) 
@@ -211,7 +215,14 @@ class GetAllUsersController:
             self.scheduler.node_assignment()
         elif dataset_name == "taxiD_Replay":
             self._update_taxid_replay_sample()
+            # Keep scheduler step in sync so predictive planning uses the correct timestep.
+            self.scheduler.set_current_step_id(self.current_step_id)
             self.scheduler.node_assignment()
+        
+        # Execute functions at this timestep if simulation is active and users_agent is available
+        if self.simulation and self.scheduler.user_nodes and self.current_step_id % 5 == 0:
+            self._execute_function()
+        
         for user_id, user_node in self.scheduler.user_nodes.items():
             assigned_edge = None
             assigned_central = None
@@ -232,6 +243,80 @@ class GetAllUsersController:
                 "last_executed_period": time.time() - user_node.last_executed,
                 "latency": user_node.latency
             })
+            
+    def _execute_function(self):
+        # NOTE: In large experiments, real /execute calls can dominate runtime.
+        # `EXECUTION_MODE=simulated` avoids network/Docker and assigns computation_delay analytically.
+        if getattr(Config, "EXECUTION_MODE", "real") == "simulated":
+            step_id = self.current_step_id or 0
+            for _, user_node in self.scheduler.user_nodes.items():
+                assigned_node = user_node.assigned_node_id
+                if not assigned_node:
+                    continue
+                is_edge = assigned_node != "central_node"
+
+                warm_ms = Config.SIM_EXEC_WARM_MS_EDGE if is_edge else Config.SIM_EXEC_WARM_MS_CENTRAL
+                cold_penalty_ms = (
+                    Config.SIM_EXEC_COLD_PENALTY_MS_EDGE if is_edge else Config.SIM_EXEC_COLD_PENALTY_MS_CENTRAL
+                )
+
+                # Consider node warm if:
+                # - user executed on the same node previously, OR
+                # - predictive prewarm-only has planned this node for the current step
+                warm = user_node.last_executed_node_id == assigned_node
+                if getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
+                    if user_node.planned_node_id == assigned_node and user_node.planned_step_id == step_id:
+                        warm = True
+
+                user_node.latency.computation_delay = warm_ms if warm else (warm_ms + cold_penalty_ms)
+                user_node.latency.container_status = "warm" if warm else "cold"
+                user_node.last_executed = time.time()
+                user_node.last_executed_node_id = assigned_node
+                user_node.last_executed_step_id = step_id
+            return
+
+        # Real execution (Docker-backed) via HTTP
+        for _, user_node in self.scheduler.user_nodes.items():
+            assigned_node = user_node.assigned_node_id
+            if not assigned_node:
+                continue
+            central_node = self.scheduler.central_node
+            if central_node["node_id"] == assigned_node:
+                try:
+                    url = f"http://{central_node['endpoint']}/api/v1/central/execute"
+                    result = requests.Session().post(
+                        url,
+                        json={"user_id": user_node.user_id},
+                        timeout=10
+                    )
+                    
+                    if result.status_code == 200:
+                        data = result.json().get("data", {})
+                        user_node.latency.computation_delay = data.get("execution_time", 0.0) * 1000
+                        user_node.latency.container_status = data.get("container_status", "unknown")
+                        user_node.last_executed = time.time()
+                        
+                except Exception:
+                    continue
+            
+            edge_node = self.scheduler.edge_nodes.get(assigned_node)
+            if edge_node:
+                try:
+                    url = f"http://{edge_node.endpoint}/api/v1/edge/execute"
+                    
+                    result = requests.Session().post(
+                        url,
+                        json={"user_id": user_node.user_id},
+                        timeout=10
+                    )
+                    
+                    if result.status_code == 200:
+                        data = result.json()
+                        user_node.latency.computation_delay = data.get("execution_time", 0.0) * 1000
+                        user_node.latency.container_status = data.get("container_status", "unknown")
+                        user_node.last_executed = time.time()
+                except Exception:
+                    continue
 
 
     def execute(self):
