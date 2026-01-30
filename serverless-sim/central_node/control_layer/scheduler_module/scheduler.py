@@ -3,7 +3,6 @@ import time
 import random
 from typing import Dict, List, Optional, Any, Tuple
 from enum import Enum
-import cvxpy as cp
 import numpy as np
 import math
 from datetime import datetime
@@ -26,8 +25,10 @@ LARGE_CAP = 1e12
 
 class AssignmentAlgorithm(Enum):
     GREEDY = "greedy"
-    CVX = "convex optimization"
     PREDICTIVE = "predictive"
+    RANDOM = "random"
+    ROUND_ROBIN = "round_robin"
+    NEAREST = "nearest"
 
 class Scheduler:
     def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
@@ -41,6 +42,7 @@ class Scheduler:
         }
         self.user_nodes: Dict[str, UserNodeInfo] = {}
         self.logger = logging.getLogger(__name__)
+        self._round_robin_index = 0  # For round robin assignment tracking
         
         self.simulation = False
         self.assignment_matrix = {}
@@ -421,11 +423,14 @@ class Scheduler:
     def node_assignment(self) -> dict:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             return self._assign_users_greedy()
-        elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
-            self._convex_optimization_assignment_all_users()
-            return self.assignment_matrix
         elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
             return self._predictive_assignment()
+        elif self.assignment_algorithm == AssignmentAlgorithm.RANDOM:
+            return self._assign_users_random()
+        elif self.assignment_algorithm == AssignmentAlgorithm.ROUND_ROBIN:
+            return self._assign_users_round_robin()
+        elif self.assignment_algorithm == AssignmentAlgorithm.NEAREST:
+            return self._assign_users_nearest()
         else:
             self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
             return self.assignment_matrix
@@ -445,6 +450,157 @@ class Scheduler:
             user_node.latency.total_turnaround_time = total_turnaround_time
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         return self.assignment_matrix
+
+    def _assign_users_random(self) -> dict:
+        """Random baseline assignment: randomly assign each user to an available edge node.
+        
+        This serves as a baseline for comparison against greedy and predictive algorithms.
+        It randomly selects an edge node (with resource constraints) for each user,
+        demonstrating the value of intelligent assignment strategies.
+        """
+        self.assignment_matrix = {}
+        edge_node_ids = list(self.edge_nodes.keys())
+        
+        for user_id, user_node in self.user_nodes.items():
+            assigned_node_id, assigned_node_distance = self._random_assignment(user_node, edge_node_ids)
+            user_node.assigned_node_id = assigned_node_id
+            user_node.latency.distance = assigned_node_distance
+            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
+            total_turnaround_time = (
+                user_node.latency.propagation_delay
+                + user_node.latency.transmission_delay
+                + user_node.latency.computation_delay
+            )
+            user_node.latency.total_turnaround_time = total_turnaround_time
+            self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+        return self.assignment_matrix
+
+    def _random_assignment(self, user_node: UserNodeInfo, edge_node_ids: List[str]) -> Tuple[str, float]:
+        """Randomly assign user to an edge node with resource constraints.
+        
+        Randomly selects from available edge nodes that can handle the user's resource demands.
+        Falls back to central node if no edge nodes are available or have sufficient resources.
+        
+        Args:
+            user_node: The user node to assign
+            edge_node_ids: List of available edge node IDs
+            
+        Returns:
+            Tuple of (assigned_node_id, distance_to_node)
+        """
+        if not edge_node_ids:
+            # No edge nodes available, use central node
+            distance = self._calculate_distance(user_node.location, self.central_node["location"])
+            return self.central_node["node_id"], distance
+        
+        # Filter edge nodes that satisfy resource constraints
+        available_nodes = [
+            node_id for node_id in edge_node_ids
+            if self._check_resource_constraints(user_node, node_id)
+        ]
+        
+        if not available_nodes:
+            # No edge nodes with sufficient resources, use central node
+            distance = self._calculate_distance(user_node.location, self.central_node["location"])
+            return self.central_node["node_id"], distance
+        
+        # Randomly select from available edge nodes
+        selected_node_id = random.choice(available_nodes)
+        selected_node = self.edge_nodes[selected_node_id]
+        distance = self._calculate_distance(user_node.location, selected_node.location)
+        
+        return selected_node_id, distance
+
+    def _assign_users_round_robin(self) -> dict:
+        """Round Robin baseline: cyclically assign users to edge nodes.
+        
+        Distributes users evenly across edge nodes in a rotating fashion,
+        ignoring distance/latency considerations. Only respects resource constraints.
+        """
+        self.assignment_matrix = {}
+        edge_node_ids = list(self.edge_nodes.keys())
+        
+        for user_id, user_node in self.user_nodes.items():
+            assigned_node_id, assigned_node_distance = self._round_robin_assignment(user_node, edge_node_ids)
+            user_node.assigned_node_id = assigned_node_id
+            user_node.latency.distance = assigned_node_distance
+            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
+            total_turnaround_time = (
+                user_node.latency.propagation_delay
+                + user_node.latency.transmission_delay
+                + user_node.latency.computation_delay
+            )
+            user_node.latency.total_turnaround_time = total_turnaround_time
+            self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+        return self.assignment_matrix
+
+    def _round_robin_assignment(self, user_node: UserNodeInfo, edge_node_ids: List[str]) -> Tuple[str, float]:
+        """Assign user using round-robin selection with resource constraints.
+        
+        Cycles through edge nodes in order, skipping nodes that don't have
+        sufficient resources. Falls back to central node if no suitable edge found.
+        """
+        if not edge_node_ids:
+            distance = self._calculate_distance(user_node.location, self.central_node["location"])
+            return self.central_node["node_id"], distance
+        
+        # Try each edge node starting from current index
+        attempts = 0
+        while attempts < len(edge_node_ids):
+            node_id = edge_node_ids[self._round_robin_index % len(edge_node_ids)]
+            self._round_robin_index += 1
+            attempts += 1
+            
+            if self._check_resource_constraints(user_node, node_id):
+                node = self.edge_nodes[node_id]
+                distance = self._calculate_distance(user_node.location, node.location)
+                return node_id, distance
+        
+        # No suitable edge node found, use central node
+        distance = self._calculate_distance(user_node.location, self.central_node["location"])
+        return self.central_node["node_id"], distance
+
+    def _assign_users_nearest(self) -> dict:
+        """Nearest Node baseline: assign each user to the geographically closest edge node.
+        
+        Purely distance-based assignment without considering node load or health status.
+        Only respects resource constraints. This is the primary baseline for comparison
+        with predictive scheduling as both are location-aware.
+        """
+        self.assignment_matrix = {}
+        
+        for user_id, user_node in self.user_nodes.items():
+            assigned_node_id, assigned_node_distance = self._nearest_assignment(user_node)
+            user_node.assigned_node_id = assigned_node_id
+            user_node.latency.distance = assigned_node_distance
+            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
+            total_turnaround_time = (
+                user_node.latency.propagation_delay
+                + user_node.latency.transmission_delay
+                + user_node.latency.computation_delay
+            )
+            user_node.latency.total_turnaround_time = total_turnaround_time
+            self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+        return self.assignment_matrix
+
+    def _nearest_assignment(self, user_node: UserNodeInfo) -> Tuple[str, float]:
+        """Assign user to the nearest edge node with sufficient resources.
+        
+        Finds the closest edge node by Euclidean distance that can handle
+        the user's resource demands. Falls back to central node if none available.
+        """
+        best_node = self.central_node["node_id"]
+        min_distance = self._calculate_distance(user_node.location, self.central_node["location"])
+        
+        for node_id, node in self.edge_nodes.items():
+            if not self._check_resource_constraints(user_node, node_id):
+                continue
+            distance = self._calculate_distance(user_node.location, node.location)
+            if distance < min_distance:
+                min_distance = distance
+                best_node = node_id
+        
+        return best_node, min_distance
 
     def _predictive_assignment(self) -> dict:
         if getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
@@ -812,159 +968,3 @@ class Scheduler:
 
     def calculate_total_turnaround_time(self) -> float:
         return float(self.calculate_turnaround_time_breakdown()["total_turnaround_time"])
-
-
-    def _convex_optimization_assignment_all_users(self):
-        if not self.user_nodes:
-            return
-            
-        users = list(self.user_nodes.keys())
-        # Include both edge nodes and central node
-        edge_cloudlets = list(self.edge_nodes.keys())
-        cloudlets = edge_cloudlets + ["central_node"]
-        
-        n_users = len(users)
-        n_cloudlets = len(cloudlets)
-        if n_users == 0 or n_cloudlets == 0:
-            return
-
-        # Variables: relaxed continuous assignment
-        a = cp.Variable((n_users, n_cloudlets))
-        T = np.zeros((n_users, n_cloudlets))
-        memory_demand = np.zeros(n_users)
-        
-        # Calculate turnaround times and memory demands
-        for i, user_id in enumerate(users):
-            user_node = self.user_nodes[user_id]
-            user_loc = user_node.location
-            memory_demand[i] = user_node.memory_demand
-            
-            for j, cloudlet_id in enumerate(cloudlets):
-                if cloudlet_id == "central_node":
-                    distance = self._calculate_distance(user_loc, self.central_node["location"])
-                else:
-                    distance = self._calculate_distance(user_loc, self.edge_nodes[cloudlet_id].location)
-
-                # For CVX optimization, use deterministic propagation delay (no jitter)
-                # to ensure consistent optimization results
-                propagation_delay = self._calculate_propagation_delay_deterministic(distance)
-                computation_delay = getattr(user_node.latency, "computation_delay", 0.0)
-                transmission_delay = getattr(user_node.latency, "transmission_delay", 0.0)
-                T[i, j] = propagation_delay + transmission_delay + computation_delay
-
-        # Normalize turnaround times to improve numerical stability
-        T_max = np.max(T)
-        if T_max > 0:
-            T /= T_max
-
-        # Set memory capacities
-        memory_capacity = np.zeros(n_cloudlets)
-        for j, cloudlet_id in enumerate(cloudlets):
-            if cloudlet_id == "central_node":
-                # Central node has unlimited capacity
-                memory_capacity[j] = LARGE_CAP
-            else:
-                # Edge node capacity calculation
-                edge_node = self.edge_nodes[cloudlet_id]
-                used_memory = (edge_node.metrics_info.memory_usage / 100.0) * edge_node.metrics_info.memory_total
-                available_memory = max(0, edge_node.metrics_info.memory_total - used_memory)
-                memory_capacity[j] = available_memory
-
-        # Objective: minimize total weighted turnaround time
-        # Add penalty for using central node to prefer edge nodes when possible
-        penalty_weight = np.ones((n_users, n_cloudlets))
-        central_node_idx = cloudlets.index("central_node")
-        penalty_weight[:, central_node_idx] = 1.2  # Slight penalty for central node usage
-        
-        weighted_T = np.multiply(T, penalty_weight)
-        objective = cp.Minimize(cp.sum(cp.multiply(weighted_T, a)))
-
-        constraints = []
-
-        # Each user must be assigned to exactly one cloudlet
-        for i in range(n_users):
-            constraints.append(cp.sum(a[i, :]) == 1)
-
-        # Memory capacity constraints for all cloudlets
-        for j in range(n_cloudlets):
-            constraints.append(cp.sum(cp.multiply(memory_demand, a[:, j])) <= memory_capacity[j])
-
-        # Assignment variables must be between 0 and 1
-        constraints += [a >= 0, a <= 1]
-
-        problem = cp.Problem(objective, constraints)
-
-        try:
-            # Try multiple solvers for better success rate
-            solvers_to_try = [cp.ECOS, cp.SCS, cp.CLARABEL] if hasattr(cp, 'CLARABEL') else [cp.ECOS, cp.SCS]
-            
-            solved = False
-            for solver in solvers_to_try:
-                try:
-                    if solver == cp.SCS:
-                        problem.solve(solver=solver, verbose=False, max_iters=5000, eps=1e-4)
-                    else:
-                        problem.solve(solver=solver, verbose=False)
-                    
-                    if problem.status in [cp.OPTIMAL, cp.OPTIMAL_INACCURATE]:
-                        solved = True
-                        break
-                except:
-                    continue
-            
-            print(f"[CVX] Status: {problem.status}, Objective: {problem.value}")
-
-            if solved and a.value is not None:
-                assign_vals = a.value
-                
-                # Assign users to cloudlets based on optimization result
-                for i, user_id in enumerate(users):
-                    # Find the cloudlet with highest assignment probability
-                    assigned_idx = int(np.argmax(assign_vals[i, :]))
-                    assigned_cloudlet = cloudlets[assigned_idx]
-                    
-                    # Verify the assignment is valid (resource constraints)
-                    user_node = self.user_nodes[user_id]
-                    if not self._check_resource_constraints(user_node, assigned_cloudlet):
-                        # If assignment violates constraints, fall back to central node
-                        assigned_cloudlet = "central_node"
-                        assigned_idx = central_node_idx
-                    
-                    # Calculate distance and latency
-                    if assigned_cloudlet == "central_node":
-                        distance = self._calculate_distance(user_node.location, self.central_node["location"])
-                    else:
-                        distance = self._calculate_distance(user_node.location, self.edge_nodes[assigned_cloudlet].location)
-
-                    # Update user node assignment and latency information
-                    user_node.assigned_node_id = assigned_cloudlet
-                    user_node.latency.distance = distance
-                    user_node.latency.propagation_delay = self._calculate_propagation_delay(distance)
-                    total_turnaround_time = (
-                        user_node.latency.propagation_delay +
-                        getattr(user_node.latency, "transmission_delay", 0.0) +
-                        getattr(user_node.latency, "computation_delay", 0.0)
-                    )
-                    user_node.latency.total_turnaround_time = total_turnaround_time
-                    self.assignment_matrix[user_id] = (assigned_cloudlet, distance)
-                
-                print(f"[CVX] Optimization successful, total normalized cost: {problem.value:.4f}")
-
-            else:
-                raise Exception(f"CVX failed with status {problem.status}")
-
-        except Exception as e:
-            self.logger.error(f"Error in CVX optimization: {e}. Falling back to greedy assignment.")
-            # Fallback to greedy assignment
-            for user_id, user_node in self.user_nodes.items():
-                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
-                user_node.assigned_node_id = assigned_node_id
-                user_node.latency.distance = assigned_node_distance
-                user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
-                total_turnaround_time = (
-                    user_node.latency.propagation_delay +
-                    getattr(user_node.latency, "transmission_delay", 0.0) +
-                    getattr(user_node.latency, "computation_delay", 0.0)
-                )
-                user_node.latency.total_turnaround_time = total_turnaround_time
-                self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)

@@ -543,13 +543,13 @@ class ExperimentRunner:
             print(f"Saved duration plot to {duration_path}")
         
     
-    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 100):
+    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 300):
         if not user_ranges:
-            user_ranges = [5000]  # 100 users
+            user_ranges = [100, 200, 500, 1000, 2000, 5000]  # 100 users
         if not edge_ranges:
-            edge_ranges = [100] 
+            edge_ranges = [50] 
         if not algorithms:
-            algorithms = ["predictive", "greedy"]
+            algorithms = ["predictive", "greedy", "nearest", "random", "round_robin"]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():
