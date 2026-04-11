@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -v \"^d.*\\\\.$\")",
+      "Bash(ls -la /c/Users/Surface1/Documents/Serverless-edge-computing-simulation/serverless-sim/*.sh)",
+      "Bash(xargs wc:*)",
+      "Bash(where python:*)",
+      "Bash(python -c \"import sys; print\\(sys.executable\\)\")",
+      "Read(//c/Users/Surface1/AppData/Local/Programs/Python//**)",
+      "Read(//c/Users/Surface1/miniconda3/**)",
+      "Read(//c/Users/Surface1/anaconda3/envs//**)",
+      "Read(//c/Users/Surface1/**)"
+    ]
+  }
+}
