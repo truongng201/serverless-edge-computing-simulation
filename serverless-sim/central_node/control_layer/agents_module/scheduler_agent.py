@@ -51,6 +51,12 @@ class SchedulerAgent:
         
     def _cleanup_dead_nodes(self):
         """Remove nodes that fail health checks"""
+        from config import Config
+        if Config.EXECUTION_MODE == "simulated":
+            # In simulated mode, edge nodes are virtual (no real HTTP endpoints).
+            # Skip health checks entirely so virtual nodes are never evicted.
+            return
+
         start_time = time.time()
         edge_nodes_snapshot = dict(self.scheduler.edge_nodes)
         

@@ -384,3 +384,30 @@ $env:PREDICTIVE_PREWARM_ONLY="1"
 $env:PREDICTIVE_TARGET_HORIZON_MIN="5"
 $env:PREDICTIVE_PREWARM_LEAD_STEPS="5"
 $env:PREDICTIVE_EXECUTE_INTERVAL_STEPS="5"
+
+## Results Comparison
+
+Lower `ADE` / `FDE` is better. Higher `Hit@100/200/400` is better.
+
+| Run | Data / Setup | Mode | ADE | FDE | Hit@100 | Hit@200 | Hit@400 | h1 err | h3 err | h5 err | h10 err |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| Baseline A | `phase_b` with `50` taxis, default map-matching | `curv` | 992.218 | 1850.949 | 0.270 | 0.321 | 0.351 | 387.570 | 695.675 | 1034.679 | 1850.949 |
+| Baseline B | `phase_b` with `50` taxis, default map-matching | `curv_step` | 991.774 | 1843.304 | 0.280 | 0.331 | 0.359 | 389.171 | 693.847 | 1040.774 | 1843.304 |
+| Baseline C | `phase_b_sp` with `50` taxis, shortest-path HMM | `curv_step` | 978.832 | 1827.217 | 0.293 | 0.340 | 0.364 | 384.533 | 679.691 | 1023.887 | 1827.217 |
+| Scaled run | `phase_b_5k_fast`, `5000` taxis, `hidden_size=512`, `batch_size=256` | `curv_step` | 704.579 | 1326.888 | 0.442 | 0.509 | 0.563 | 244.227 | 496.445 | 750.757 | 1326.888 |
+| Best run | likely `phase_b_7k_fast` from surrounding log, `7000` taxis | not shown in snippet | 201.662 | 417.745 | 0.709 | 0.748 | 0.786 | 27.662 | 120.458 | 240.781 | 417.745 |
+
+| Run | h1 Hit@200 | h3 Hit@200 | h5 Hit@200 | h10 Hit@200 |
+| --- | ---: | ---: | ---: | ---: |
+| Baseline A | 0.525 | 0.399 | 0.360 | 0.321 |
+| Baseline B | 0.524 | 0.403 | 0.365 | 0.331 |
+| Baseline C | 0.528 | 0.411 | 0.373 | 0.340 |
+| Scaled run | 0.689 | 0.567 | 0.536 | 0.509 |
+| Best run | 0.962 | 0.818 | 0.703 | 0.748 |
+
+Quick read:
+
+- `curv_step` is slightly better than `curv` on the same `phase_b` dataset, but the gain is small.
+- Adding shortest-path map-matching (`phase_b_sp`) helps a bit more, but still only marginally at the `50`-taxi scale.
+- The biggest improvement comes from scaling the dataset and model capacity (`5k_fast` and the final large run).
+- The final metric block is dramatically better than all earlier runs, but the exact train/eval command is not included immediately above it, so its label is inferred from the nearby `phase_b_7k_fast` log.
