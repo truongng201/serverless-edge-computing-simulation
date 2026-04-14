@@ -16,6 +16,20 @@ except ImportError:
     TDrivePredictorAdapter = None  # type: ignore
     get_mobility_prediction = None
 
+try:
+    from shared.resource_layer.energy_model import EnergyModel, NodeType as EnergyNodeType, get_energy_model
+except ImportError as e:
+    logging.warning(f"Failed to import energy model: {e}")
+    EnergyModel = None  # type: ignore
+    EnergyNodeType = None  # type: ignore
+    get_energy_model = None  # type: ignore
+
+try:
+    from shared.resource_layer.power_monitor import get_power_monitor, PowerMonitor
+except ImportError as e:
+    logging.warning(f"Failed to import power monitor: {e}")
+    get_power_monitor = None  # type: ignore
+    PowerMonitor = None  # type: ignore
 
 from config import Config
 
@@ -968,3 +982,126 @@ class Scheduler:
 
     def calculate_total_turnaround_time(self) -> float:
         return float(self.calculate_turnaround_time_breakdown()["total_turnaround_time"])
+
+    def calculate_energy_consumption(self, timestep_duration_s: float = 1.0, use_rapl: Optional[bool] = None) -> Dict[str, float]:
+        """
+        Calculate energy consumption for the current simulation state.
+        
+        Uses RAPL (Running Average Power Limit) for real power measurements when available,
+        otherwise falls back to the estimated energy model.
+        
+        Energy formula:
+            E_total = E_static + E_dynamic + E_network + E_cold_start
+        
+        Where:
+            - E_static:     Idle/baseline power consumption of nodes
+            - E_dynamic:    Workload-dependent compute power (CPU utilization based)
+            - E_network:    Energy due to data transfer/offloading between nodes
+            - E_cold_start: Container cold start overhead energy
+        
+        Args:
+            timestep_duration_s: Duration of the timestep in seconds
+            use_rapl: If True, use real RAPL measurements; if False, use estimation.
+                     If None, uses Config.USE_RAPL setting.
+            
+        Returns:
+            Dictionary with energy breakdown including source ('rapl' or 'estimate')
+        """
+        # Use config setting if not explicitly specified
+        if use_rapl is None:
+            use_rapl = getattr(Config, 'USE_RAPL', True)
+        
+        # Get turnaround breakdown for cold/warm counts
+        breakdown = self.calculate_turnaround_time_breakdown()
+        cold_count = int(breakdown.get("cold_count", 0))
+        warm_count = int(breakdown.get("warm_count", 0))
+        unknown_count = int(breakdown.get("unknown_count", 0))
+        
+        # Get node and user counts
+        num_edge_nodes = len(self.edge_nodes) if self.edge_nodes else 1
+        num_users = len(self.user_nodes) if self.user_nodes else 0
+        
+        # Calculate average CPU utilization across edge nodes
+        avg_cpu_util = 0.0
+        if self.edge_nodes:
+            cpu_utils = []
+            for node in self.edge_nodes.values():
+                if node.metrics_info:
+                    cpu_utils.append(node.metrics_info.cpu_usage)
+            if cpu_utils:
+                avg_cpu_util = sum(cpu_utils) / len(cpu_utils)
+        
+        # Get average data size and bandwidth from user nodes
+        avg_data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
+        avg_bandwidth = Config.DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND * 1000  # Convert to bytes/s
+        
+        if self.user_nodes:
+            data_sizes = [u.data_size_demand for u in self.user_nodes.values()]
+            bandwidths = [u.bandwidth_demand for u in self.user_nodes.values()]
+            if data_sizes:
+                avg_data_size = sum(data_sizes) / len(data_sizes)
+            if bandwidths:
+                avg_bandwidth = (sum(bandwidths) / len(bandwidths)) * 1000
+        
+        # Try RAPL to get real power-per-node baseline
+        rapl_power_per_node = None
+        if use_rapl and get_power_monitor is not None:
+            try:
+                power_monitor = get_power_monitor()
+                if power_monitor.use_rapl:
+                    power_sample = power_monitor.get_current_power(sample_duration_s=0.1)
+                    if power_sample and power_sample.get('source') == 'rapl':
+                        # Use RAPL as a baseline for single-node power
+                        # This represents real hardware power characteristics
+                        rapl_power_per_node = power_sample['power_watts']
+            except Exception as e:
+                self.logger.warning(f"RAPL measurement failed: {e}")
+        
+        # Use estimation model (with optional RAPL power calibration)
+        if get_energy_model is None or EnergyModel is None:
+            self.logger.warning("Energy model not available")
+            return {
+                "static_energy_j": 0.0,
+                "dynamic_energy_j": 0.0,
+                "network_energy_j": 0.0,
+                "cold_start_energy_j": 0.0,
+                "total_energy_j": 0.0,
+                "total_energy_wh": 0.0,
+                "cold_start_count": 0,
+                "warm_count": 0,
+                "average_power_w": 0.0,
+                "source": "unavailable"
+            }
+        
+        energy_model = get_energy_model()
+        
+        # If RAPL gave us a power reading, use it to calibrate the model's power estimates
+        # This makes the static/dynamic power based on real measurements
+        if rapl_power_per_node is not None:
+            # Override model's power profile with RAPL measurement
+            # Assume RAPL measures idle+dynamic power at current CPU utilization
+            # Scale by number of nodes (RAPL measures this single machine)
+            energy_model.edge_power_profile.idle_power_w = rapl_power_per_node * 0.35
+            energy_model.edge_power_profile.max_power_w = rapl_power_per_node
+        
+        # Calculate energy using the energy model (properly scales with nodes/users)
+        energy_metrics = energy_model.estimate_timestep_energy(
+            num_edge_nodes=num_edge_nodes,
+            num_users=num_users,
+            avg_edge_cpu_util=avg_cpu_util,
+            avg_data_size_bytes=avg_data_size,
+            avg_bandwidth_bytes_per_s=avg_bandwidth,
+            cold_start_count=cold_count,
+            warm_count=warm_count + unknown_count,  # Treat unknown as warm
+            timestep_duration_s=timestep_duration_s
+        )
+        
+        # Mark source based on whether RAPL was used for calibration
+        if rapl_power_per_node is not None:
+            energy_metrics["source"] = "rapl_calibrated"
+            energy_metrics["rapl_power_w"] = round(rapl_power_per_node, 2)
+        else:
+            energy_metrics["source"] = "estimate"
+        
+        return energy_metrics
+

@@ -101,6 +101,11 @@ class Config:
     # Edge node deployment configuration
     EXPECTED_TOTAL_EDGE_NODES = int(os.getenv("EXPECTED_EDGE_NODES", "10"))
     
+    # Energy monitoring configuration
+    # USE_RAPL: If True, use Intel RAPL for real power measurements; if False, use estimation
+    # Requires: sudo chmod a+r /sys/class/powercap/intel-rapl:*/energy_uj
+    USE_RAPL = os.getenv("USE_RAPL", "1").lower() in ("1", "true", "yes")
+    
     # Predictive scheduling parameters
     TDRIVE_ARTIFACT_DIR = os.getenv(
         "TDRIVE_ARTIFACT_DIR",
@@ -124,12 +129,12 @@ class Config:
     PREDICTIVE_WARM_BASE_PROB = 0.2  # base warm probability when metrics are missing
     # Which horizon (in minutes) to use when selecting the "best" edge from the
     # predictor output. For curv_step we currently expose horizons (1,3,5,10).
-    PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
+    # PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
 
     # Predictive "prewarm-only" mode:
     # - Plan a future node using the predictor, but keep serving on the current node until the planned step.
     # - Intended mainly for `EXECUTION_MODE=simulated`, where prewarm effects are modeled analytically.
-    PREDICTIVE_PREWARM_ONLY = os.getenv("PREDICTIVE_PREWARM_ONLY", "0").lower() in ("1", "true", "yes")
+    # PREDICTIVE_PREWARM_ONLY = os.getenv("PREDICTIVE_PREWARM_ONLY", "0").lower() in ("1", "true", "yes")
     # How many simulation steps ahead to schedule the switch (lead time).
     PREDICTIVE_PREWARM_LEAD_STEPS = int(os.getenv("PREDICTIVE_PREWARM_LEAD_STEPS", "5"))
     # How often to run planning (in simulation steps). Lower = more compute.
@@ -143,7 +148,10 @@ class Config:
     # ============================================================
     # `real`: call /execute on nodes (Docker-backed)
     # `simulated`: do not call /execute; instead assign computation_delay analytically
-    EXECUTION_MODE = os.getenv("EXECUTION_MODE", "real").lower()
+    # EXECUTION_MODE = os.getenv("EXECUTION_MODE", "real").lower()
+    EXECUTION_MODE = "simulated"
+    PREDICTIVE_PREWARM_ONLY = 1
+    PREDICTIVE_TARGET_HORIZON_MIN = 5
     # Defaults derived from local benchmarking (median warm + median cold-warm delta).
     SIM_EXEC_WARM_MS_CENTRAL = float(os.getenv("SIM_EXEC_WARM_MS_CENTRAL", "300"))
     SIM_EXEC_COLD_PENALTY_MS_CENTRAL = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_CENTRAL", "900"))

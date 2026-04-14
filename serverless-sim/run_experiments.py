@@ -175,6 +175,7 @@ class ExperimentRunner:
             if metrics_response.status_code == 200:
                 m = metrics_response.json().get('data', {}) or {}
                 # Keep total turnaround time for plotting, but also store warm/cold totals for analysis.
+                # Also include energy consumption metrics
                 metrics[timestep + 1] = {
                     "total_turnaround_time": float(m.get("total_turnaround_time", 0.0) or 0.0),
                     "total_turnaround_time_warm": float(m.get("total_turnaround_time_warm", 0.0) or 0.0),
@@ -183,6 +184,14 @@ class ExperimentRunner:
                     "warm_count": int(float(m.get("warm_count", 0) or 0)),
                     "cold_count": int(float(m.get("cold_count", 0) or 0)),
                     "unknown_count": int(float(m.get("unknown_count", 0) or 0)),
+                    # Energy consumption metrics
+                    "static_energy_j": float(m.get("static_energy_j", 0.0) or 0.0),
+                    "dynamic_energy_j": float(m.get("dynamic_energy_j", 0.0) or 0.0),
+                    "network_energy_j": float(m.get("network_energy_j", 0.0) or 0.0),
+                    "cold_start_energy_j": float(m.get("cold_start_energy_j", 0.0) or 0.0),
+                    "total_energy_j": float(m.get("total_energy_j", 0.0) or 0.0),
+                    "total_energy_wh": float(m.get("total_energy_wh", 0.0) or 0.0),
+                    "average_power_w": float(m.get("average_power_w", 0.0) or 0.0),
                 }
                 print(
                     f"Timestep {timestep + 1}: "
@@ -190,7 +199,9 @@ class ExperimentRunner:
                     f"Warm={metrics[timestep + 1]['total_turnaround_time_warm']:.1f} "
                     f"(n={metrics[timestep + 1]['warm_count']}) | "
                     f"Cold={metrics[timestep + 1]['total_turnaround_time_cold']:.1f} "
-                    f"(n={metrics[timestep + 1]['cold_count']})"
+                    f"(n={metrics[timestep + 1]['cold_count']}) | "
+                    f"Energy={metrics[timestep + 1]['total_energy_j']:.2f}J "
+                    f"(Power={metrics[timestep + 1]['average_power_w']:.1f}W)"
                 )
             else:
                 print(f"Failed to get metrics at timestep {timestep + 1}: {metrics_response.text}")
@@ -230,6 +241,16 @@ class ExperimentRunner:
         
         experiment_time = time.time() - experiment_start
         
+        # Calculate total energy consumption across all timesteps
+        total_energy_j = 0.0
+        total_cold_start_energy_j = 0.0
+        total_network_energy_j = 0.0
+        if metrics:
+            for ts_metrics in metrics.values():
+                total_energy_j += ts_metrics.get("total_energy_j", 0.0)
+                total_cold_start_energy_j += ts_metrics.get("cold_start_energy_j", 0.0)
+                total_network_energy_j += ts_metrics.get("network_energy_j", 0.0)
+        
         result = {
             "timestamp": datetime.now().isoformat(),
             "num_users": num_users,
@@ -238,10 +259,16 @@ class ExperimentRunner:
             "experiment_duration": experiment_duration,
             "total_experiment_time": experiment_time,
             "metrics": metrics,
+            "total_energy_j": total_energy_j,
+            "total_cold_start_energy_j": total_cold_start_energy_j,
+            "total_network_energy_j": total_network_energy_j,
             "success": True if metrics and len(metrics) > 0 else False
         }
         
         print(f"Experiment completed in {experiment_time:.2f} seconds")
+        print(f"  Total Energy: {total_energy_j:.2f}J ({total_energy_j/3600:.4f}Wh)")
+        print(f"  Cold Start Energy: {total_cold_start_energy_j:.2f}J")
+        print(f"  Network Energy: {total_network_energy_j:.2f}J")
         return result
     
     def save_results_to_csv(self, filename: str = None):
@@ -276,6 +303,14 @@ class ExperimentRunner:
             "warm_count",
             "cold_count",
             "unknown_count",
+            # Energy consumption metrics
+            "static_energy_j",
+            "dynamic_energy_j",
+            "network_energy_j",
+            "cold_start_energy_j",
+            "total_energy_j",
+            "total_energy_wh",
+            "average_power_w",
         ]
 
         try:
@@ -316,6 +351,14 @@ class ExperimentRunner:
                                 row["warm_count"] = v.get("warm_count", "")
                                 row["cold_count"] = v.get("cold_count", "")
                                 row["unknown_count"] = v.get("unknown_count", "")
+                                # Energy consumption metrics
+                                row["static_energy_j"] = v.get("static_energy_j", "")
+                                row["dynamic_energy_j"] = v.get("dynamic_energy_j", "")
+                                row["network_energy_j"] = v.get("network_energy_j", "")
+                                row["cold_start_energy_j"] = v.get("cold_start_energy_j", "")
+                                row["total_energy_j"] = v.get("total_energy_j", "")
+                                row["total_energy_wh"] = v.get("total_energy_wh", "")
+                                row["average_power_w"] = v.get("average_power_w", "")
                             else:
                                 # Backward-compatible: older runs stored just a float total_turnaround_time
                                 row["total_turnaround_time"] = v
@@ -368,188 +411,57 @@ class ExperimentRunner:
                 data[combo][alg] = OrderedDict(sorted(data[combo][alg].items(), key=lambda kv: kv[0]))
         return data
     
-    def plot_comparison(self, csv_filename: str = None, save_path: str = None, show: bool = True):
-        """Plot algorithm comparison in two separate figures with better zoom"""
-        if csv_filename is None:
-            import glob
-            csv_files = glob.glob("experiment_results_*.csv")
-            if not csv_files:
-                print("No CSV files found to plot")
-                return
-            csv_filename = max(csv_files, key=os.path.getctime)
-            print(f"Using most recent CSV: {csv_filename}")
-
-        data = self.load_results_from_csv(csv_filename)
-        if not data:
-            print("No data to plot")
-            return
-
-        # Load experiment times from CSV
-        exp_times = {}  # (users, edges, algorithm) -> total_experiment_time
+    def load_energy_results_from_csv(self, filename: str):
+        """Load energy consumption data from CSV.
+        
+        Returns:
+            data[(num_users,num_edges)][algorithm] = OrderedDict[timestep] = {energy_metrics}
+        """
+        data = defaultdict(lambda: defaultdict(OrderedDict))
         try:
-            with open(csv_filename, newline='') as f:
+            with open(filename, newline='') as f:
                 reader = csv.DictReader(f)
                 for r in reader:
                     try:
-                        users = int(r.get("num_users", 0))
-                        edges = int(r.get("num_edges", 0))
+                        num_users = int(r.get("num_users") or 0)
+                        num_edges = int(r.get("num_edges") or 0)
                         alg = r.get("algorithm", "").strip()
-                        exp_time = float(r.get("total_experiment_time", 0))
-                        exp_times[(users, edges, alg)] = exp_time
-                    except:
+                        t = r.get("timestep", "")
+                        if t == "":
+                            continue
+                        timestep = int(t)
+                        
+                        # Extract energy metrics
+                        energy_metrics = {
+                            "static_energy_j": float(r.get("static_energy_j", 0) or 0),
+                            "dynamic_energy_j": float(r.get("dynamic_energy_j", 0) or 0),
+                            "network_energy_j": float(r.get("network_energy_j", 0) or 0),
+                            "cold_start_energy_j": float(r.get("cold_start_energy_j", 0) or 0),
+                            "total_energy_j": float(r.get("total_energy_j", 0) or 0),
+                            "total_energy_wh": float(r.get("total_energy_wh", 0) or 0),
+                            "average_power_w": float(r.get("average_power_w", 0) or 0),
+                        }
+                    except Exception:
                         continue
-        except:
-            pass
-
-        combos = sorted(data.keys())
-        n = len(combos)
-        cols = min(4, n)  # More columns for better layout
-        rows = math.ceil(n / cols)
-
-        # ===== FIGURE 1: TURNAROUND TIMES =====
-        plt.style.use("seaborn-v0_8-darkgrid")
-        fig1, axes1 = plt.subplots(rows, cols, figsize=(5*cols, 4*rows), squeeze=False)
-
-        for idx, combo in enumerate(combos):
-            r = idx // cols
-            c = idx % cols
-            ax = axes1[r][c]
-            
-            algs = data[combo]
-            if not algs:
-                ax.set_visible(False)
-                continue
-                
-            all_timesteps = set()
-            for alg in algs:
-                all_timesteps.update(algs[alg].keys())
-            if not all_timesteps:
-                ax.set_visible(False)
-                continue
-            all_timesteps = sorted(all_timesteps)
-            
-            # Get all values to determine proper zoom range
-            all_values = []
-            for alg, od in algs.items():
-                all_values.extend(od.values())
-            if not all_values:
-                continue
-                
-            min_val = min(all_values)
-            max_val = max(all_values)
-            
-            # Plot with thicker lines and larger markers
-            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
-            for i, (alg, od) in enumerate(algs.items()):
-                xs = list(od.keys())
-                ys = list(od.values())
-                if not xs:
-                    continue
-                ax.plot(xs, ys, marker='o', linewidth=3, markersize=8, 
-                       label=alg, color=colors[i % len(colors)])
-
-            ax.set_title(f"Users={combo[0]}, Edges={combo[1]}", fontsize=14, fontweight='bold')
-            ax.set_xlabel("Timestep", fontsize=12)
-            ax.set_ylabel("Total Turnaround Time", fontsize=12)
-            ax.set_xticks(all_timesteps)
-            
-            # Better zoom: focus on the actual data range
-            if max_val > min_val:
-                range_val = max_val - min_val
-                margin = max(range_val * 0.05, abs(min_val) * 0.0001)  # At least 0.01% margin
-                ax.set_ylim(min_val - margin, max_val + margin)
-            
-            # Format y-axis with more precision
-            if min_val > 100:
-                from matplotlib.ticker import FuncFormatter
-                def format_func(x, p):
-                    return f'{x:.3f}'
-                ax.yaxis.set_major_formatter(FuncFormatter(format_func))
-            
-            ax.grid(True, alpha=0.4)
-            ax.legend(fontsize=11, loc='best')
-            ax.tick_params(axis='both', which='major', labelsize=10)
-
-        # Hide unused subplots
-        for idx in range(len(combos), rows * cols):
-            r = idx // cols
-            c = idx % cols
-            axes1[r][c].set_visible(False)
-
-        fig1.suptitle("Algorithm Performance: Total Turnaround Time Comparison", 
-                     fontsize=18, fontweight='bold')
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-        # ===== FIGURE 2: EXPERIMENT DURATION =====
-        fig2, axes2 = plt.subplots(rows, cols, figsize=(5*cols, 4*rows), squeeze=False)
-
-        for idx, combo in enumerate(combos):
-            r = idx // cols
-            c = idx % cols  
-            ax = axes2[r][c]
-            
-            # Get experiment times for this combo
-            exp_data = []
-            exp_labels = []
-            exp_colors = []
-            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
-            
-            for i, alg in enumerate(sorted(data[combo].keys()) if combo in data else []):
-                key = (combo[0], combo[1], alg)
-                if key in exp_times:
-                    exp_data.append(exp_times[key])
-                    exp_labels.append(alg)
-                    exp_colors.append(colors[i % len(colors)])
-            
-            if exp_data:
-                bars = ax.bar(exp_labels, exp_data, alpha=0.8, color=exp_colors, width=0.6)
-                ax.set_title(f"Users={combo[0]}, Edges={combo[1]}", fontsize=14, fontweight='bold')
-                ax.set_ylabel("Experiment Time (seconds)", fontsize=12)
-                ax.tick_params(axis='x', rotation=0, labelsize=11)
-                ax.tick_params(axis='y', labelsize=10)
-                
-                # Add value labels on bars with better formatting
-                for bar, val in zip(bars, exp_data):
-                    height = bar.get_height()
-                    ax.text(bar.get_x() + bar.get_width()/2., height + height*0.02,
-                          f'{val:.1f}s', ha='center', va='bottom', fontsize=11, fontweight='bold')
-                
-                # Set y-limit with some margin
-                max_time = max(exp_data)
-                ax.set_ylim(0, max_time * 1.15)
-                ax.grid(True, alpha=0.3, axis='y')
-            else:
-                ax.set_visible(False)
-
-        # Hide unused subplots  
-        for idx in range(len(combos), rows * cols):
-            r = idx // cols
-            c = idx % cols
-            axes2[r][c].set_visible(False)
-
-        fig2.suptitle("Algorithm Performance: Experiment Duration Comparison", 
-                     fontsize=18, fontweight='bold')
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-        # Save both figures
-        if save_path:
-            base_name = save_path.replace('.png', '')
-            turnaround_path = f"{base_name}_turnaround.png"
-            duration_path = f"{base_name}_duration.png"
-            
-            fig1.savefig(turnaround_path, dpi=300, bbox_inches='tight')
-            fig2.savefig(duration_path, dpi=300, bbox_inches='tight')
-            print(f"Saved turnaround plot to {turnaround_path}")
-            print(f"Saved duration plot to {duration_path}")
+                    combo = (num_users, num_edges)
+                    data[combo][alg][timestep] = energy_metrics
+        except Exception as e:
+            print(f"Failed to load energy data from CSV {filename}: {e}")
+            return {}
         
+        # ensure ordered timesteps
+        for combo in list(data.keys()):
+            for alg in list(data[combo].keys()):
+                data[combo][alg] = OrderedDict(sorted(data[combo][alg].items(), key=lambda kv: kv[0]))
+        return data
     
-    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 300):
+    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 100):
         if not user_ranges:
-            user_ranges = [100, 200, 500, 1000, 2000, 5000]  # 100 users
+            user_ranges = [100, 500, 1000, 5000]  # 100 users
         if not edge_ranges:
-            edge_ranges = [50] 
+            edge_ranges = [10]
         if not algorithms:
-            algorithms = ["predictive", "greedy", "nearest", "random", "round_robin"]
+            algorithms = ["predictive", "round_robin", "random", "greedy"]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():
@@ -598,10 +510,7 @@ class ExperimentRunner:
                 print("Simulation reset successfully")
             self.cleanup_processes()
         total_time = time.time() - start_time
-        csv_filename = self.save_results_to_csv()
-        if csv_filename:
-            print("Generating plots...")
-            self.plot_comparison(csv_filename, save_path=f"experiment_comparison_{user_ranges[0]}.png")
+        self.save_results_to_csv()
         print(f"\nAll experiments completed in {total_time:.2f} seconds")
         successful = sum(1 for r in self.results if r.get('success', False))
         print(f"Experiment Summary: {successful}/{total_experiments} successful")
