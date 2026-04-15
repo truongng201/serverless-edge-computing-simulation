@@ -8,7 +8,7 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 
 from .dataset import SequenceHorizonDataset, SequenceHorizonCurvDataset, SequenceStepCurvDataset
-from .model import GRUDisplacement, GRUDisplacementRoad, GRUStepDecoderRoad
+from .model import GRUDisplacement, GRUDisplacementRoad, GRUStepDecoderRoad, GRUStepDecoderRoadAttn
 from .metrics import compute_errors_m, hit_at_r
 
 
@@ -54,7 +54,9 @@ def train_gru(
         return v in ("1", "true", "yes", "y")
 
     use_weighted_curv_step_loss = _env_flag("TDRIVE_CURVSTEP_WEIGHTED_LOSS")
+    use_peaked_h5_loss = _env_flag("TDRIVE_CURVSTEP_PEAKED_H5")
     use_high_ss_prob = _env_flag("TDRIVE_CURVSTEP_HIGH_SS")
+    use_attn_decoder = _env_flag("TDRIVE_CURVSTEP_ATTN")
     # build datasets
     if mode == 'curv':
         ds_train = SequenceHorizonCurvDataset(train_df, feature_cols, lookback=lookback)
@@ -77,7 +79,8 @@ def train_gru(
     if mode == 'curv':
         model = GRUDisplacementRoad(input_size=len(feature_cols), hidden_size=max(hidden_size, 256), num_layers=num_layers, dropout=dropout).to(device)
     elif mode == 'curv_step':
-        model = GRUStepDecoderRoad(input_size=len(feature_cols), hidden_size=max(hidden_size, 256), num_layers=num_layers, dropout=dropout, max_steps=10).to(device)
+        _cls = GRUStepDecoderRoadAttn if use_attn_decoder else GRUStepDecoderRoad
+        model = _cls(input_size=len(feature_cols), hidden_size=max(hidden_size, 256), num_layers=num_layers, dropout=dropout, max_steps=10).to(device)
     else:
         model = GRUDisplacement(input_size=len(feature_cols), hidden_size=hidden_size, num_layers=num_layers, dropout=dropout).to(device)
     opt = torch.optim.Adam(model.parameters(), lr=lr)
@@ -87,7 +90,13 @@ def train_gru(
     if mode == 'curv':
         horizon_weights = torch.tensor([1.0, 0.5, 0.5, 1.0], dtype=torch.float32, device=device)
     elif mode == 'curv_step':
-        if use_weighted_curv_step_loss:
+        if use_peaked_h5_loss:
+            horizon_weights = torch.tensor(
+                [0.3, 0.5, 0.8, 1.2, 1.6, 1.2, 0.8, 0.5, 0.3, 0.2],
+                dtype=torch.float32,
+                device=device,
+            )
+        elif use_weighted_curv_step_loss:
             horizon_weights = torch.tensor(
                 [1.0, 1.0, 1.0, 1.0, 0.8, 0.8, 0.8, 0.8, 0.7, 0.7],
                 dtype=torch.float32,
@@ -99,8 +108,29 @@ def train_gru(
         horizon_weights = torch.tensor([1.0, 1.0, 0.5, 0.5, 0.5, 0.5, 1.0, 1.0], dtype=torch.float32, device=device)
     loss_fn = nn.SmoothL1Loss(reduction='none')
     best_val = float('inf')
-    ckpt_name = 'gru_phase_curv.pt' if mode == 'curv' else ('gru_phase_curv_step.pt' if mode == 'curv_step' else 'gru_phase_a.pt')
+    if mode == 'curv':
+        ckpt_name = 'gru_phase_curv.pt'
+    elif mode == 'curv_step':
+        ckpt_name = 'gru_phase_curv_step_attn.pt' if use_attn_decoder else 'gru_phase_curv_step.pt'
+    else:
+        ckpt_name = 'gru_phase_a.pt'
     ckpt_path = os.path.join(data_dir, ckpt_name)
+    # Record architecture into meta.json so inference can route to the correct class.
+    try:
+        meta_path = os.path.join(data_dir, 'meta.json')
+        if os.path.exists(meta_path):
+            import json as _json
+            with open(meta_path, 'r') as _mf:
+                _meta = _json.load(_mf)
+            arch_tag = 'gru_step_attn' if (mode == 'curv_step' and use_attn_decoder) else (
+                'gru_step' if mode == 'curv_step' else ('gru_curv' if mode == 'curv' else 'gru_xy')
+            )
+            if _meta.get('arch') != arch_tag:
+                _meta['arch'] = arch_tag
+                with open(meta_path, 'w') as _mf:
+                    _json.dump(_meta, _mf)
+    except Exception as _e:
+        print(f"[Train] warn: could not update meta.json arch field: {_e}", flush=True)
     no_improve = 0
     for epoch in range(1, epochs + 1):
         model.train()

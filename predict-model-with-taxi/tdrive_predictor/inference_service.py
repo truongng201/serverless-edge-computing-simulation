@@ -33,6 +33,7 @@ from .model import (
     GRUDisplacement,
     GRUDisplacementRoad,
     GRUStepDecoderRoad,
+    GRUStepDecoderRoadAttn,
 )
 from .road_rollout import rollout_curv_step_on_graph
 from .osm.loader import load_graph
@@ -61,9 +62,10 @@ class PredictorBundle:
         return self
 
 
-def _build_model(mode: str, input_size: int, hidden_size: int) -> torch.nn.Module:
+def _build_model(mode: str, input_size: int, hidden_size: int, arch: Optional[str] = None) -> torch.nn.Module:
     if mode == "curv_step":
-        return GRUStepDecoderRoad(
+        cls = GRUStepDecoderRoadAttn if arch == "gru_step_attn" else GRUStepDecoderRoad
+        return cls(
             input_size=input_size,
             hidden_size=hidden_size,
             num_layers=1,
@@ -97,17 +99,29 @@ def load_predictor_bundle(
     feature_cols: List[str] = list(meta["feature_cols"])
     lookback = int(meta.get("lookback_default", meta.get("lookback", 20)))
     mode = meta.get("mode", "curv_step")
-    ckpt_file = ckpt_name or (
-        "gru_phase_curv_step.pt"
-        if mode == "curv_step"
-        else ("gru_phase_curv.pt" if mode == "curv" else "gru_phase_a.pt")
-    )
+    arch = meta.get("arch")
+    # Default checkpoint filename depends on architecture for curv_step.
+    if ckpt_name is None:
+        if mode == "curv_step":
+            default_ckpt = "gru_phase_curv_step_attn.pt" if arch == "gru_step_attn" else "gru_phase_curv_step.pt"
+        elif mode == "curv":
+            default_ckpt = "gru_phase_curv.pt"
+        else:
+            default_ckpt = "gru_phase_a.pt"
+        ckpt_file = default_ckpt
+    else:
+        ckpt_file = ckpt_name
     ckpt_path = artifact_path / ckpt_file
     if not ckpt_path.exists():
         raise FileNotFoundError(f"Checkpoint not found: {ckpt_path}")
     ckpt = torch.load(ckpt_path, map_location="cpu")
     hidden_size = int(ckpt.get("hidden_size", 256 if mode != "xy" else 128))
-    model = _build_model(mode, len(feature_cols), hidden_size)
+    # Fallback: sniff state_dict for attention projections if meta.arch missing.
+    if mode == "curv_step" and arch is None:
+        state = ckpt.get("model_state", {})
+        if any(k.startswith("W_attn.") or k.startswith("V_attn.") for k in state.keys()):
+            arch = "gru_step_attn"
+    model = _build_model(mode, len(feature_cols), hidden_size, arch=arch)
     model.load_state_dict(ckpt["model_state"])
     model.eval()
     scaler = pd.read_pickle(artifact_path / "scaler.pkl")
