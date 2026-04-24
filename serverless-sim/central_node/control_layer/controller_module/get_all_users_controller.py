@@ -53,6 +53,7 @@ class GetAllUsersController:
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, 'transmission_delay', 0)
                     + getattr(user_node.latency, 'computation_delay', 0)
+                    + float(getattr(user_node, "migration_cost", 0.0) or 0.0)
                 )
             else:
                 location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
@@ -117,6 +118,7 @@ class GetAllUsersController:
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, 'transmission_delay', 0)
                     + getattr(user_node.latency, 'computation_delay', 0)
+                    + float(getattr(user_node, "migration_cost", 0.0) or 0.0)
                 )
             else:
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
@@ -196,6 +198,7 @@ class GetAllUsersController:
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, "transmission_delay", 0.0)
                     + getattr(user_node.latency, "computation_delay", 0.0)
+                    + float(getattr(user_node, "migration_cost", 0.0) or 0.0)
                 )
         
         if max_len == 0:
@@ -231,7 +234,12 @@ class GetAllUsersController:
                 assigned_central = "central_node"
             elif user_node.assigned_node_id in self.scheduler.edge_nodes:
                 assigned_edge = user_node.assigned_node_id
-            user_node.latency.total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+            user_node.latency.total_turnaround_time = (
+                user_node.latency.propagation_delay
+                + user_node.latency.transmission_delay
+                + user_node.latency.computation_delay
+                + float(getattr(user_node, "migration_cost", 0.0) or 0.0)
+            )
             self.response.append({
                 "user_id": user_id,
                 "location": user_node.location,

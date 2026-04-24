@@ -408,18 +408,22 @@ class Scheduler:
         return (dx ** 2 + dy ** 2) ** 0.5
     
     def _calculate_propagation_delay_deterministic(self, distance_meters: float) -> float:
-        """Calculate deterministic network propagation delay.
-        
-        Used for optimization algorithms (CVX) that need consistent values.
-        
-        Returns:
-            Propagation delay in milliseconds
+        """Calculate deterministic 4G propagation delay in milliseconds.
+
+        propagation_ms = RAN + fiber(distance) + hops(distance)
+
+        where hops(distance) models urban backhaul aggregation routers:
+        each AGG_SPACING_KM of distance crosses one more aggregation hop
+        costing PER_HOP_LATENCY_MS. This makes distance a real signal
+        (~22 ms spread between 1 and 69 km) without unphysical per-km
+        coefficients.
         """
         distance_km = distance_meters / 1000.0
-        base_latency = Config.NETWORK_BASE_LATENCY_MS
-        distance_latency = distance_km * Config.NETWORK_PER_KM_LATENCY_MS
-        
-        return max(0.0, base_latency + distance_latency)
+        ran = Config.NETWORK_RAN_LATENCY_MS
+        fiber = distance_km * Config.NETWORK_FIBER_PER_KM_LATENCY_MS
+        num_hops = math.ceil(distance_km / Config.NETWORK_AGG_SPACING_KM) if distance_km > 0 else 0
+        hops = num_hops * Config.NETWORK_PER_HOP_LATENCY_MS
+        return max(0.0, ran + fiber + hops)
     
     def _calculate_propagation_delay(self, distance_meters: float) -> float:
         """Calculate realistic network propagation delay in milliseconds.
@@ -452,16 +456,8 @@ class Scheduler:
     def _assign_users_greedy(self) -> dict:
         self.assignment_matrix = {}
         for user_id, user_node in self.user_nodes.items():
-            assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
-            user_node.assigned_node_id = assigned_node_id
-            user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
-            total_turnaround_time = (
-                user_node.latency.propagation_delay
-                + user_node.latency.transmission_delay
-                + user_node.latency.computation_delay
-            )
-            user_node.latency.total_turnaround_time = total_turnaround_time
+            candidate, _ = self._greedy_assignment(user_node.location)
+            assigned_node_id, assigned_node_distance = self._apply_assignment_latency(user_node, candidate)
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         return self.assignment_matrix
 
@@ -474,18 +470,10 @@ class Scheduler:
         """
         self.assignment_matrix = {}
         edge_node_ids = list(self.edge_nodes.keys())
-        
+
         for user_id, user_node in self.user_nodes.items():
-            assigned_node_id, assigned_node_distance = self._random_assignment(user_node, edge_node_ids)
-            user_node.assigned_node_id = assigned_node_id
-            user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
-            total_turnaround_time = (
-                user_node.latency.propagation_delay
-                + user_node.latency.transmission_delay
-                + user_node.latency.computation_delay
-            )
-            user_node.latency.total_turnaround_time = total_turnaround_time
+            candidate, _ = self._random_assignment(user_node, edge_node_ids)
+            assigned_node_id, assigned_node_distance = self._apply_assignment_latency(user_node, candidate)
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         return self.assignment_matrix
 
@@ -527,24 +515,27 @@ class Scheduler:
 
     def _assign_users_round_robin(self) -> dict:
         """Round Robin baseline: cyclically assign users to edge nodes.
-        
-        Distributes users evenly across edge nodes in a rotating fashion,
+
+        Distributes requests evenly across edge nodes in a rotating fashion,
         ignoring distance/latency considerations. Only respects resource constraints.
+
+        Classical load-balancer RR is stateless: each arriving request goes to
+        the next server. To avoid a batch-alignment artifact where user arrival
+        order is identical every timestep (which makes user_i always land on
+        edge_(i mod N) when N_users is divisible by N_edges), we shuffle the
+        user iteration order with a step-seeded RNG. The shuffle is
+        deterministic per step so runs remain reproducible.
         """
         self.assignment_matrix = {}
-        edge_node_ids = list(self.edge_nodes.keys())
-        
-        for user_id, user_node in self.user_nodes.items():
-            assigned_node_id, assigned_node_distance = self._round_robin_assignment(user_node, edge_node_ids)
-            user_node.assigned_node_id = assigned_node_id
-            user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
-            total_turnaround_time = (
-                user_node.latency.propagation_delay
-                + user_node.latency.transmission_delay
-                + user_node.latency.computation_delay
-            )
-            user_node.latency.total_turnaround_time = total_turnaround_time
+        edge_node_ids = sorted(self.edge_nodes.keys())
+
+        current_step = self.get_current_step_id() or 0
+        user_items = list(self.user_nodes.items())
+        random.Random(current_step).shuffle(user_items)
+
+        for user_id, user_node in user_items:
+            candidate, _ = self._round_robin_assignment(user_node, edge_node_ids)
+            assigned_node_id, assigned_node_distance = self._apply_assignment_latency(user_node, candidate)
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         return self.assignment_matrix
 
@@ -582,18 +573,10 @@ class Scheduler:
         with predictive scheduling as both are location-aware.
         """
         self.assignment_matrix = {}
-        
+
         for user_id, user_node in self.user_nodes.items():
-            assigned_node_id, assigned_node_distance = self._nearest_assignment(user_node)
-            user_node.assigned_node_id = assigned_node_id
-            user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
-            total_turnaround_time = (
-                user_node.latency.propagation_delay
-                + user_node.latency.transmission_delay
-                + user_node.latency.computation_delay
-            )
-            user_node.latency.total_turnaround_time = total_turnaround_time
+            candidate, _ = self._nearest_assignment(user_node)
+            assigned_node_id, assigned_node_distance = self._apply_assignment_latency(user_node, candidate)
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         return self.assignment_matrix
 
@@ -685,7 +668,7 @@ class Scheduler:
         for user_id, user_node in self.user_nodes.items():
             probs = prob_map.get(user_id)
             if probs is None:
-                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+                candidate, _ = self._greedy_assignment(user_node.location)
                 greedy_fallback_assignments += 1
             else:
                 predictive_assignments += 1
@@ -701,28 +684,15 @@ class Scheduler:
                     else:
                         horizon_idx = min(max(int(desired_h) - 1, 0), probs.shape[1] - 1)
                 order = np.argsort(probs[:, horizon_idx])[::-1]
-                assigned_node_id = None
+                candidate = None
                 for idx in order:
                     node_id = cloudlet_records[idx]["id"]
                     if self._check_resource_constraints(user_node, node_id):
-                        assigned_node_id = node_id
+                        candidate = node_id
                         break
-                if assigned_node_id is None:
-                    assigned_node_id = "central_node"
-                if assigned_node_id == "central_node":
-                    location = self.central_node["location"]
-                else:
-                    location = self.edge_nodes[assigned_node_id].location
-                assigned_node_distance = self._calculate_distance(user_node.location, location)
-            user_node.assigned_node_id = assigned_node_id
-            user_node.latency.distance = assigned_node_distance
-            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
-            total_turnaround_time = (
-                user_node.latency.propagation_delay
-                + user_node.latency.transmission_delay
-                + user_node.latency.computation_delay
-            )
-            user_node.latency.total_turnaround_time = total_turnaround_time
+                if candidate is None:
+                    candidate = "central_node"
+            assigned_node_id, assigned_node_distance = self._apply_assignment_latency(user_node, candidate)
             self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         
         # Log final assignment summary
@@ -735,18 +705,35 @@ class Scheduler:
         return self.assignment_matrix
 
     def _apply_assignment_latency(self, user_node: UserNodeInfo, assigned_node_id: str) -> Tuple[str, float]:
+        # Detect handoff BEFORE overwriting assigned_node_id
+        prev_assigned = user_node.assigned_node_id
+        handoff = prev_assigned is not None and prev_assigned != assigned_node_id
+
         if assigned_node_id == "central_node":
             location = self.central_node["location"]
         else:
             location = self.edge_nodes[assigned_node_id].location
         assigned_node_distance = self._calculate_distance(user_node.location, location)
+
+        user_node.previous_node_id = prev_assigned
         user_node.assigned_node_id = assigned_node_id
         user_node.latency.distance = assigned_node_distance
         user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
+
+        # Context switch cost: when a user is handed off to a different edge, its
+        # session/DT state must be transferred. Modeled as state_size / bandwidth
+        # (one-time, on the handoff step only). For serverless DT services this is
+        # non-trivial and should be counted on top of any cold-start penalty.
+        if handoff and user_node.bandwidth_demand and user_node.bandwidth_demand > 0:
+            user_node.migration_cost = float(user_node.data_size_demand) / float(user_node.bandwidth_demand)
+        else:
+            user_node.migration_cost = 0.0
+
         user_node.latency.total_turnaround_time = (
             user_node.latency.propagation_delay
             + user_node.latency.transmission_delay
             + user_node.latency.computation_delay
+            + user_node.migration_cost
         )
         return assigned_node_id, assigned_node_distance
 
@@ -956,7 +943,8 @@ class Scheduler:
             propagation_delay = self._calculate_propagation_delay(distance)
             transmission_delay = user_node.data_size_demand / user_node.bandwidth_demand
             computation_delay = getattr(getattr(user_node, "latency", None), "computation_delay", 0.0) or 0.0
-            turnaround_time = propagation_delay + transmission_delay + computation_delay
+            migration_cost = float(getattr(user_node, "migration_cost", 0.0) or 0.0)
+            turnaround_time = propagation_delay + transmission_delay + computation_delay + migration_cost
             total += turnaround_time
 
             status = str(getattr(getattr(user_node, "latency", None), "container_status", "unknown") or "unknown")

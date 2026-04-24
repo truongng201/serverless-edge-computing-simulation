@@ -64,8 +64,6 @@ class Config:
     
     # User Configuration
     DEFAULT_EXECUTION_TIME_INTERVAL = 10 # seconds: every 5 seconds all user in simulation call it assigned node
-    DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES = (1024, 10240)  # 1 KB to 10 KB
-    DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (10000, 50000)  # 10-50 KB/ms = 80-400 Mbps
     DEFAULT_DATA_SIZE_IN_BYTES = 512 * 1024  # 512 KB (typical serverless payload)
     
     # Bandwidth settings per network type (B/ms)
@@ -81,11 +79,22 @@ class Config:
     DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s) - DEPRECATED, use NETWORK_*_LATENCY_MS below
     DEFAULT_PIXEL_TO_METERS = 10 # 1 pixel = 10 m
     
-    # Network propagation delay model (4G)
-    # Propagation delay (ms) = base + per_km * distance_km
-    # Note: jitter is intentionally removed for this configuration.
-    NETWORK_BASE_LATENCY_MS = 48.0
-    NETWORK_PER_KM_LATENCY_MS = 0.01
+    # Network propagation delay model (4G, deterministic)
+    # propagation_ms = RAN + FIBER_PER_KM * distance_km
+    #                + ceil(distance_km / AGG_SPACING_KM) * PER_HOP_LATENCY
+    #
+    # - RAN_LATENCY_MS (15): 4G LTE one-way radio access latency
+    #   (3GPP TR 36.912; Ericsson/Nokia LTE latency reports, ~10-20 ms).
+    # - FIBER_PER_KM_LATENCY_MS (0.005): fiber propagation at ~2e8 m/s
+    #   (speed of light in glass, one-way).
+    # - AGG_SPACING_KM (3.0) and PER_HOP_LATENCY_MS (1.0): urban backhaul
+    #   aggregation routers roughly every ~2-5 km, each adding ~0.5-2 ms
+    #   of queueing+forwarding. Gives ~22 ms spread between 1 km and 69 km,
+    #   so location-aware policies have a measurable signal over random.
+    NETWORK_RAN_LATENCY_MS = 15.0
+    NETWORK_FIBER_PER_KM_LATENCY_MS = 0.005
+    NETWORK_AGG_SPACING_KM = 3.0
+    NETWORK_PER_HOP_LATENCY_MS = 1.0
 
     # User cleanup
     # If a user hasn't been updated for this many seconds, remove it

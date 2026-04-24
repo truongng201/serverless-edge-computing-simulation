@@ -7,7 +7,7 @@ import torch
 from torch.utils.data import DataLoader
 
 from .dataset import SequenceHorizonDataset
-from .model import GRUDisplacement, GRUDisplacementRoad, GRUStepDecoderRoad
+from .model import GRUDisplacement, GRUDisplacementRoad, GRUStepDecoderRoad, GRUStepDecoderRoadAttn
 from .osm.loader import load_graph
 from .mapmatch.hmm import CandidateGenerator
 from .metrics import compute_errors_m, hit_at_r, per_horizon_errors_m, per_horizon_hit_at_r
@@ -55,7 +55,22 @@ def evaluate_gru(
     print(f"[Eval] Loaded test rows={len(test_df)} | trips={test_df['trip_id'].nunique() if 'trip_id' in test_df.columns else 'n/a'}", flush=True)
     feature_cols: List[str] = meta['feature_cols']
     if ckpt_path is None:
-        ckpt_path = os.path.join(data_dir, 'gru_phase_curv.pt' if (mode == 'curv') else ('gru_phase_curv_step.pt' if mode == 'curv_step' else 'gru_phase_a.pt'))
+        if mode == 'curv':
+            ckpt_path = os.path.join(data_dir, 'gru_phase_curv.pt')
+        elif mode == 'curv_step':
+            attn_path = os.path.join(data_dir, 'gru_phase_curv_step_attn.pt')
+            plain_path = os.path.join(data_dir, 'gru_phase_curv_step.pt')
+            prefer_attn = (str(meta.get('arch', '')) == 'gru_step_attn') or os.environ.get('TDRIVE_CURVSTEP_ATTN', '').strip().lower() in ('1','true','yes','on')
+            if prefer_attn and os.path.exists(attn_path):
+                ckpt_path = attn_path
+            elif os.path.exists(plain_path):
+                ckpt_path = plain_path
+            elif os.path.exists(attn_path):
+                ckpt_path = attn_path
+            else:
+                ckpt_path = plain_path
+        else:
+            ckpt_path = os.path.join(data_dir, 'gru_phase_a.pt')
     print(f"[Eval] Loading checkpoint: {ckpt_path}", flush=True)
     ckpt = torch.load(ckpt_path, map_location=device)
     if lookback is None:
@@ -380,7 +395,11 @@ def _evaluate_curv_step(
                 hs = int(w2.shape[0] // 3)
     except Exception:
         hs = None
-    model = GRUStepDecoderRoad(input_size=len(feature_cols), hidden_size=(hs or 256))
+    sd = ckpt["model_state"]
+    is_attn = ("W_attn.weight" in sd) or (str(ckpt.get("arch", "")) == "gru_step_attn")
+    cls = GRUStepDecoderRoadAttn if is_attn else GRUStepDecoderRoad
+    print(f"[Eval] Decoder class: {cls.__name__} | hidden_size={hs or 256}", flush=True)
+    model = cls(input_size=len(feature_cols), hidden_size=(hs or 256))
     model.load_state_dict(ckpt["model_state"])
     model.to(device)
     model.eval()
