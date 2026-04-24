@@ -53,7 +53,7 @@ class ExperimentRunner:
         print("Waiting for central node to be ready...")
         for _ in range(timeout):
             try:
-                response = requests.get(f"{self.api_base}/health", timeout=5)
+                response = requests.get(f"{self.api_base}/health", timeout=600)
                 if response.status_code == 200:
                     print("Central node is ready!")
                     return True
@@ -118,12 +118,12 @@ class ExperimentRunner:
             response = requests.post(
                 f"{self.api_base}/assignment_algorithm",
                 json={"algorithm": algorithm},
-                timeout=10
+                timeout=600
             )
             
             if response.status_code == 200:
                 print(f"Successfully set algorithm to {algorithm}")
-                response = requests.get(f"{self.api_base}/assignment_algorithm", timeout=10)
+                response = requests.get(f"{self.api_base}/assignment_algorithm", timeout=600)
                 if response.status_code == 200:
                     current_algorithm = response.json().get('data', {}).get('algorithm', '')
                     if current_algorithm == algorithm:
@@ -145,7 +145,7 @@ class ExperimentRunner:
         try:
             print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
             payload = {"dataset_name": dataset_name, "sample_size": num_users}
-            response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=50)
+            response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=600)
             if response.status_code == 200:
                 return True
             else:
@@ -457,9 +457,9 @@ class ExperimentRunner:
     
     def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 100):
         if not user_ranges:
-            user_ranges = [100, 500, 1000, 5000]  # 100 users
+            user_ranges = [500]  # 100 users
         if not edge_ranges:
-            edge_ranges = [10]
+            edge_ranges = [200]
         if not algorithms:
             algorithms = ["predictive", "round_robin", "random", "greedy"]
         signal.signal(signal.SIGINT, self.signal_handler)
