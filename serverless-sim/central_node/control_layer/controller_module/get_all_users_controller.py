@@ -213,12 +213,15 @@ class GetAllUsersController:
 
         if dataset_name == "dact":
             self._update_dact_sample()
+            self.scheduler.set_current_step_id(self.current_step_id)
         elif dataset_name == "random_generated":
             self._update_random_generated_sample()
+            self.scheduler.set_current_step_id(self.current_step_id)
             self.scheduler.node_assignment()
         elif dataset_name == "taxiD_Replay":
             self._update_taxid_replay_sample()
-            # Keep scheduler step in sync so predictive planning uses the correct timestep.
+            # Keep scheduler step in sync so predictive planning and RR shuffle
+            # use the correct timestep.
             self.scheduler.set_current_step_id(self.current_step_id)
             self.scheduler.node_assignment()
         
