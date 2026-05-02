@@ -25,9 +25,18 @@ class Config:
     # When enabled, each user will consistently invoke the same logical function name derived
     # from user_id (instead of a random name per call). This makes warm/cold behavior more
     # meaningful for mobility experiments and enables intentional prewarming.
-    STICKY_FUNCTION_PER_USER = os.getenv("STICKY_FUNCTION_PER_USER", "0").lower() in ("1", "true", "yes")
-    # Optional: reduce number of distinct functions by hashing user_id into K buckets (0=disabled).
-    FUNCTION_NAME_BUCKETS = int(os.getenv("FUNCTION_NAME_BUCKETS", "0"))
+    STICKY_FUNCTION_PER_USER = os.getenv("STICKY_FUNCTION_PER_USER", "1").lower() in ("1", "true", "yes")
+    # Number of distinct logical functions in the catalogue; users are hashed into buckets.
+    # Defaulting to 32 makes container reuse meaningful (many users sharing each function).
+    FUNCTION_NAME_BUCKETS = int(os.getenv("FUNCTION_NAME_BUCKETS", "32"))
+
+    # Warm-pool capacity per edge node (max distinct functions kept warm at once).
+    # When exceeded, LRU function entries are evicted (next invocation = cold start).
+    MAX_WARM_PER_NODE = int(os.getenv("MAX_WARM_PER_NODE", "16"))
+    # Central node has higher but still finite concurrency budget.
+    CENTRAL_MAX_CONCURRENT = int(os.getenv("CENTRAL_MAX_CONCURRENT", "256"))
+    # Max concurrent users that can be assigned to a single edge node per timestep.
+    MAX_CONCURRENT_PER_EDGE = int(os.getenv("MAX_CONCURRENT_PER_EDGE", "64"))
     
     
     # Cleanup
@@ -166,6 +175,10 @@ class Config:
     SIM_EXEC_COLD_PENALTY_MS_CENTRAL = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_CENTRAL", "900"))
     SIM_EXEC_WARM_MS_EDGE = float(os.getenv("SIM_EXEC_WARM_MS_EDGE", "300"))
     SIM_EXEC_COLD_PENALTY_MS_EDGE = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_EDGE", "1050"))
+
+    # Fraction of host idle power attributed to the serverless runtime overhead.
+    # 0.1 (default) = bill 10% of idle power; 1.0 = bill the full host idle.
+    STATIC_OVERHEAD_FRACTION = float(os.getenv("STATIC_OVERHEAD_FRACTION", "0.1"))
     
     # User Movement Configuration
     USER_MIN_SPEED = 1  # m/s - minimum user movement speed (walking speed)

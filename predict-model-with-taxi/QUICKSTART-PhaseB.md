@@ -411,3 +411,22 @@ Quick read:
 - Adding shortest-path map-matching (`phase_b_sp`) helps a bit more, but still only marginally at the `50`-taxi scale.
 - The biggest improvement comes from scaling the dataset and model capacity (`5k_fast` and the final large run).
 - The final metric block is dramatically better than all earlier runs, but the exact train/eval command is not included immediately above it, so its label is inferred from the nearby `phase_b_7k_fast` log.
+
+
+Phân tích model mới: GRUStepDecoderRoadAttn (curv_step + Attention)
+Setup của run mới
+Data: phase_b_7k_fast_attn_peaked — 7000 taxis, 20,069 trips, 1,973,089 test rows
+Model: GRUStepDecoderRoadAttn (decoder có attention), hidden_size=512
+Flag: TDRIVE_CURVSTEP_ATTN=1, --mode curv_step, --lookback 20
+Checkpoint: gru_phase_curv_step_attn.pt
+So sánh với bảng đã có trong QUICKSTART-PhaseB.md
+Run	ADE	FDE	Hit@100	Hit@200	Hit@400	h1 err	h10 err
+Baseline A (curv, 50 taxi)	992.22	1850.95	0.270	0.321	0.351	387.57	1850.95
+Baseline B (curv_step, 50 taxi)	991.77	1843.30	0.280	0.331	0.359	389.17	1843.30
+Baseline C (curv_step + SP-HMM)	978.83	1827.22	0.293	0.340	0.364	384.53	1827.22
+Scaled (5k taxi, h=512)	704.58	1326.89	0.442	0.509	0.563	244.23	1326.89
+Best (7k_fast, no attn)	201.66	417.74	0.709	0.748	0.786	27.66	417.74
+NEW (7k_fast + Attn)	203.14	420.59	0.706	0.746	0.784	28.46	420.59
+Run	h1 Hit@200	h3 Hit@200	h5 Hit@200	h10 Hit@200
+Best (7k, no attn)	0.962	0.818	0.703	0.748
+NEW (7k + Attn)	0.962	0.816	0.703	0.746

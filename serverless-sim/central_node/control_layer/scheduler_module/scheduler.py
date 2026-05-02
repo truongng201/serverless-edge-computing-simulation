@@ -25,6 +25,16 @@ except ImportError as e:
     get_energy_model = None  # type: ignore
 
 try:
+    # Import the submodule directly to avoid dragging in psutil-dependent modules
+    # (power_monitor, energy_model) when only the warm pool is needed.
+    import importlib
+    _wp_mod = importlib.import_module("shared.resource_layer.warm_pool")
+    WarmPoolManager = _wp_mod.WarmPoolManager
+except Exception as e:
+    logging.warning(f"Failed to import warm pool manager: {e}")
+    WarmPoolManager = None  # type: ignore
+
+try:
     from shared.resource_layer.power_monitor import get_power_monitor, PowerMonitor
 except ImportError as e:
     logging.warning(f"Failed to import power monitor: {e}")
@@ -66,6 +76,13 @@ class Scheduler:
             "current_step_id": None,
             "trajectories_px": {}
         }
+
+        self.warm_pool = WarmPoolManager() if WarmPoolManager else None
+        # Per-node concurrent assignment counter (reset each timestep before assignment).
+        self._assigned_concurrency: Dict[str, int] = {}
+        # Per-timestep counters surfaced to metrics.
+        self.timestep_rejections = 0
+        self.timestep_evictions = 0
 
         self.history_max_points = getattr(Config, "TDRIVE_HISTORY_LENGTH", 20)
         self.predictor_adapter = None
@@ -439,6 +456,9 @@ class Scheduler:
         return self._calculate_propagation_delay_deterministic(distance_meters)
     
     def node_assignment(self) -> dict:
+        # Per-timestep capacity counters must be reset before reassignment so that
+        # the per-edge concurrency budget is enforced from a clean slate.
+        self._reset_timestep_counters()
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             return self._assign_users_greedy()
         elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
@@ -708,6 +728,7 @@ class Scheduler:
         # Detect handoff BEFORE overwriting assigned_node_id
         prev_assigned = user_node.assigned_node_id
         handoff = prev_assigned is not None and prev_assigned != assigned_node_id
+        self._account_assignment(assigned_node_id)
 
         if assigned_node_id == "central_node":
             location = self.central_node["location"]
@@ -855,6 +876,18 @@ class Scheduler:
             user_node.planned_node_id = planned
             user_node.planned_step_id = int(current_step) + int(lead_steps)
 
+            # ACTUAL prewarm: consume a warm-pool slot at the planned node now.
+            # If admission fails (no capacity), the prewarm is dropped and the
+            # user will incur a real cold start at switch time — predictive does
+            # not get a free pass.
+            if self.warm_pool is not None and planned != "central_node":
+                fn_id = self._function_id_for(user_node)
+                admitted = self.warm_pool.admit_cold(planned, fn_id)
+                if not admitted:
+                    self.timestep_rejections += 1
+                    user_node.planned_node_id = None
+                    user_node.planned_step_id = None
+
         self.logger.info(
             "Predictive(prewarm-only): planned at step=%s -> switch at step+%s",
             current_step,
@@ -863,19 +896,51 @@ class Scheduler:
 
         return self.assignment_matrix
 
+    def _function_id_for(self, user_node: UserNodeInfo) -> str:
+        if self.warm_pool is not None:
+            return self.warm_pool.function_id_for_user(str(user_node.user_id))
+        # Fallback if pool failed to import.
+        return f"fn_user_{user_node.user_id}"
+
     def _check_resource_constraints(self, user_node: UserNodeInfo, cloudlet_id: str) -> bool:
+        """Capacity check based on concurrent-user budget AND warm-pool capacity.
+
+        Central node has a higher but finite budget (CENTRAL_MAX_CONCURRENT).
+        Edge nodes are bounded by MAX_CONCURRENT_PER_EDGE for assigned users
+        AND by MAX_WARM_PER_NODE for the warm function pool.
+        """
         if cloudlet_id == "central_node":
-            return True  # Assume central node has unlimited capacity
-            
+            cap = int(getattr(Config, "CENTRAL_MAX_CONCURRENT", 256))
+            return self._assigned_concurrency.get(cloudlet_id, 0) < cap
+
         if cloudlet_id not in self.edge_nodes:
             return False
-        
+
+        # Concurrent user budget per edge.
+        edge_cap = int(getattr(Config, "MAX_CONCURRENT_PER_EDGE", 64))
+        if self._assigned_concurrency.get(cloudlet_id, 0) >= edge_cap:
+            return False
+
+        # Memory headroom (only applies if metrics are present and credible).
         cloudlet = self.edge_nodes[cloudlet_id]
-        if cloudlet.metrics_info.cpu_usage < Config.EDGE_NODE_UNHEALTHY_CPU_THRESHOLD:
-            x = (cloudlet.metrics_info.memory_usage * cloudlet.metrics_info.memory_total / 100 + user_node.memory_demand) / cloudlet.metrics_info.memory_total * 100
-            if x < Config.EDGE_NODE_UNHEALTHY_MEMORY_THRESHOLD:
-                return True
-        return False  
+        try:
+            if cloudlet.metrics_info and cloudlet.metrics_info.memory_total > 0:
+                used_mem = cloudlet.metrics_info.memory_usage * cloudlet.metrics_info.memory_total / 100.0
+                projected = (used_mem + user_node.memory_demand) / cloudlet.metrics_info.memory_total * 100.0
+                if projected >= Config.EDGE_NODE_UNHEALTHY_MEMORY_THRESHOLD:
+                    return False
+        except Exception:
+            pass
+
+        return True
+
+    def _reset_timestep_counters(self) -> None:
+        self._assigned_concurrency = {}
+        self.timestep_rejections = 0
+        self.timestep_evictions = 0
+
+    def _account_assignment(self, cloudlet_id: str) -> None:
+        self._assigned_concurrency[cloudlet_id] = self._assigned_concurrency.get(cloudlet_id, 0) + 1
     
     
     def _greedy_assignment(self, user_location: Dict[str, float]) -> Tuple[str, float]:
@@ -913,14 +978,8 @@ class Scheduler:
     def calculate_turnaround_time_breakdown(self) -> Dict[str, float]:
         """Return total turnaround time split by container status (warm/cold/unknown).
 
-        This is useful for comparing scheduling policies that trade off cold starts vs distance.
-
-        Returned keys:
-          - total_turnaround_time
-          - total_turnaround_time_warm
-          - total_turnaround_time_cold
-          - total_turnaround_time_unknown
-          - warm_count / cold_count / unknown_count
+        Adds per-user latency percentiles, average latency, warm-pool utilization,
+        and rejected request count to support IEEE-quality metrics reporting.
         """
         total = 0.0
         warm_total = 0.0
@@ -929,6 +988,7 @@ class Scheduler:
         warm_count = 0
         cold_count = 0
         unknown_count = 0
+        per_user_latencies: List[float] = []
 
         for _, user_node in self.user_nodes.items():
             cloudlet_id = user_node.assigned_node_id
@@ -946,6 +1006,7 @@ class Scheduler:
             migration_cost = float(getattr(user_node, "migration_cost", 0.0) or 0.0)
             turnaround_time = propagation_delay + transmission_delay + computation_delay + migration_cost
             total += turnaround_time
+            per_user_latencies.append(turnaround_time)
 
             status = str(getattr(getattr(user_node, "latency", None), "container_status", "unknown") or "unknown")
             if status == "warm":
@@ -958,6 +1019,31 @@ class Scheduler:
                 unknown_total += turnaround_time
                 unknown_count += 1
 
+        n = len(per_user_latencies)
+        avg_latency = total / n if n > 0 else 0.0
+        if n > 0:
+            sorted_lat = sorted(per_user_latencies)
+            def _pct(p: float) -> float:
+                if n == 1:
+                    return sorted_lat[0]
+                idx = min(n - 1, max(0, int(round((p / 100.0) * (n - 1)))))
+                return sorted_lat[idx]
+            p50 = _pct(50.0)
+            p95 = _pct(95.0)
+            p99 = _pct(99.0)
+        else:
+            p50 = p95 = p99 = 0.0
+
+        total_invocations = warm_count + cold_count + unknown_count
+        warm_rate = (warm_count / total_invocations) if total_invocations > 0 else 0.0
+
+        # Warm-pool utilization snapshot per node.
+        pool_util = {}
+        if getattr(self, "warm_pool", None) is not None:
+            for node_id in self.edge_nodes.keys():
+                pool_util[node_id] = self.warm_pool.utilization(node_id)
+            pool_util["central_node"] = self.warm_pool.utilization("central_node")
+
         return {
             "total_turnaround_time": total,
             "total_turnaround_time_warm": warm_total,
@@ -966,6 +1052,16 @@ class Scheduler:
             "warm_count": float(warm_count),
             "cold_count": float(cold_count),
             "unknown_count": float(unknown_count),
+            # Quality-of-service metrics
+            "avg_latency_ms": avg_latency,
+            "p50_latency_ms": p50,
+            "p95_latency_ms": p95,
+            "p99_latency_ms": p99,
+            "warm_rate": warm_rate,
+            "rejected_count": float(getattr(self, "timestep_rejections", 0)),
+            "pool_evictions": float(getattr(self, "timestep_evictions", 0)) if getattr(self, "warm_pool", None) is None
+                else float(self.warm_pool.evictions),
+            "pool_utilization_avg": (sum(pool_util.values()) / len(pool_util)) if pool_util else 0.0,
         }
 
     def calculate_total_turnaround_time(self) -> float:

@@ -16,3 +16,4 @@ from .power_monitor import (
     get_current_power,
     measure_energy,
 )
+from .warm_pool import WarmPoolManager

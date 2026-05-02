@@ -260,6 +260,7 @@ class GetAllUsersController:
         # `EXECUTION_MODE=simulated` avoids network/Docker and assigns computation_delay analytically.
         if getattr(Config, "EXECUTION_MODE", "real") == "simulated":
             step_id = self.current_step_id or 0
+            pool = getattr(self.scheduler, "warm_pool", None)
             for _, user_node in self.scheduler.user_nodes.items():
                 assigned_node = user_node.assigned_node_id
                 if not assigned_node:
@@ -271,13 +272,19 @@ class GetAllUsersController:
                     Config.SIM_EXEC_COLD_PENALTY_MS_EDGE if is_edge else Config.SIM_EXEC_COLD_PENALTY_MS_CENTRAL
                 )
 
-                # Consider node warm if:
-                # - user executed on the same node previously, OR
-                # - predictive prewarm-only has planned this node for the current step
-                warm = user_node.last_executed_node_id == assigned_node
-                if getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
-                    if user_node.planned_node_id == assigned_node and user_node.planned_step_id == step_id:
-                        warm = True
+                # Warm/cold determined by the (function_id, node) pool, NOT per-user history.
+                # This models real serverless reuse: many users share each function, and a
+                # container kept warm at node N for function F serves any user invoking F at N.
+                # The predictive scheduler must have already paid the cost of inserting an
+                # entry into the pool at prewarm time — no free pass at switch time.
+                if pool is not None:
+                    fn_id = self.scheduler._function_id_for(user_node)
+                    warm = pool.lookup(assigned_node, fn_id)
+                    if not warm:
+                        pool.admit_cold(assigned_node, fn_id)
+                else:
+                    # Fallback path if pool failed to import: legacy per-user semantic.
+                    warm = user_node.last_executed_node_id == assigned_node
 
                 user_node.latency.computation_delay = warm_ms if warm else (warm_ms + cold_penalty_ms)
                 user_node.latency.container_status = "warm" if warm else "cold"

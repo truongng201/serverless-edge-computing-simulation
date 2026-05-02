@@ -799,10 +799,12 @@ class EnergyModel:
                 - average_power_w: Average power consumption
         """
         # ===== STATIC ENERGY =====
-        # Base idle power - scaled down to represent only the marginal overhead
-        # of having edge infrastructure running (not full server power)
-        # Use a fraction of idle power to make it less dominant
-        static_scale = 0.1  # 10% of full idle - represents marginal overhead
+        # Idle power that the marginal serverless edge stack consumes on top of the
+        # underlying host. STATIC_OVERHEAD_FRACTION (default 0.1) attributes only the
+        # share of idle power belonging to the serverless runtime (containerd, agent,
+        # health checks), not the full server. Set to 1.0 to bill full idle power.
+        from config import Config as _Cfg
+        static_scale = float(getattr(_Cfg, "STATIC_OVERHEAD_FRACTION", 0.1))
         edge_static = num_edge_nodes * self.calculate_static_energy(NodeType.EDGE, timestep_duration_s) * static_scale
         central_static = self.calculate_static_energy(NodeType.CENTRAL, timestep_duration_s) * static_scale
         static_energy = edge_static + central_static
@@ -821,7 +823,8 @@ class EnergyModel:
         
         # Execution energy: ONLY warm executions count as dynamic
         # Cold execution overhead goes to cold_start_energy (not double counted)
-        warm_exec_duration_s = 0.05   # 50ms for warm execution
+        # Pulled from Config.SIM_EXEC_WARM_MS_EDGE so latency and energy stay aligned.
+        warm_exec_duration_s = float(getattr(_Cfg, "SIM_EXEC_WARM_MS_EDGE", 300.0)) / 1000.0
         warm_exec_cpu_percent = 30.0  # CPU spike during warm execution
         
         # Energy per warm execution
@@ -884,8 +887,9 @@ class EnergyModel:
         cold_start_energy = 0.0
         
         # Realistic cold start parameters
-        # Cold start overhead in serverless is typically 50-150ms extra
-        extra_latency_s = 0.1       # 100ms extra latency
+        # Pulled from Config.SIM_EXEC_COLD_PENALTY_MS_EDGE so the cold-start energy
+        # penalty matches the cold-start latency penalty applied in the latency model.
+        extra_latency_s = float(getattr(_Cfg, "SIM_EXEC_COLD_PENALTY_MS_EDGE", 1050.0)) / 1000.0
         cold_init_cpu = 40.0        # Moderate CPU spike (not 60%)
         
         # Energy for the extra latency at init CPU (the penalty)

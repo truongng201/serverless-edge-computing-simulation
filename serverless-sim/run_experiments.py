@@ -64,50 +64,89 @@ class ExperimentRunner:
         return False
     
     def deploy_edge_nodes(self, num_edges: int, start_port: int = 5001) -> bool:
+        """Register `num_edges` virtual edges with the central node.
+
+        In simulated mode (Config.EXECUTION_MODE='simulated') the central does not
+        call back into the edge processes — they are needed only as registered
+        endpoints for the scheduler's grid placement and metrics bookkeeping.
+        We therefore register them directly via /nodes/register instead of
+        spawning real Flask processes (which also avoids the bash-only
+        deploy_edge.sh on Windows).
+
+        Set env SPAWN_REAL_EDGES=1 to fall back to the legacy spawn path
+        (only useful for EXECUTION_MODE='real' on Linux/macOS).
+        """
         print(f"\n{'-'*40}")
         print(f"Deploying {num_edges} edge nodes starting from port {start_port}")
         print(f"{'-'*40}")
+        os.environ["EXPECTED_EDGE_NODES"] = str(num_edges)
+
+        spawn_real = os.getenv("SPAWN_REAL_EDGES", "0").lower() in ("1", "true", "yes")
+        if spawn_real:
+            return self._spawn_real_edges(num_edges, start_port)
+
+        # Fast path: register virtual edges directly.
         try:
-            # Set expected total edge nodes for proper grid placement
-            os.environ["EXPECTED_EDGE_NODES"] = str(num_edges)
-            
             self.cleanup_processes()
-            
-            # Start edge nodes
+            registered = 0
             for i in range(num_edges):
                 node_id = f"edge_{i+1:03d}"
                 port = start_port + i
-                
+                payload = {
+                    "node_id": node_id,
+                    "endpoint": f"localhost:{port}",
+                    "cpus": 2,
+                    "memory": "1g",
+                }
+                try:
+                    r = requests.post(
+                        f"{self.api_base}/nodes/register",
+                        json=payload,
+                        timeout=10,
+                    )
+                    if r.status_code == 200:
+                        registered += 1
+                    else:
+                        print(f"register {node_id} failed: {r.status_code} {r.text}")
+                except Exception as e:
+                    print(f"register {node_id} error: {e}")
+            print(f"Successfully registered {registered}/{num_edges} virtual edge nodes")
+            return registered >= num_edges * 0.8
+        except Exception as e:
+            print(f"Failed to register virtual edges: {e}")
+            return False
+
+    def _spawn_real_edges(self, num_edges: int, start_port: int) -> bool:
+        try:
+            self.cleanup_processes()
+            for i in range(num_edges):
+                node_id = f"edge_{i+1:03d}"
+                port = start_port + i
                 cmd = [
                     "./deploy_edge.sh",
                     "--node-id", node_id,
                     "--central-url", self.central_url,
                     "--port", str(port),
                     "--cpus", "2",
-                    "--memory", "1g"
+                    "--memory", "1g",
                 ]
-                
                 print(f"Starting {node_id} on port {port}")
                 process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    start_new_session=True  # create a new session so we can kill the entire group with os.killpg
+                    start_new_session=True,
                 )
                 self.edge_processes.append(process)
-            
             print("Waiting for edge nodes to register...")
-            time.sleep(num_edges * 2 // 10)  # Wait time proportional to number of edges
-            
+            time.sleep(max(2, num_edges // 5))
             response = requests.get(f"{self.api_base}/cluster/status")
             if response.status_code == 200:
                 cluster_status = response.json()
                 registered_edges = len(cluster_status.get('data', {}).get('cluster_info', {}).get('edge_nodes_info', []))
                 print(f"Successfully registered {registered_edges}/{num_edges} edge nodes")
-                return registered_edges >= num_edges * 0.8  # Allow some tolerance
-            
+                return registered_edges >= num_edges * 0.8
             return False
-            
         except Exception as e:
             print(f"Failed to deploy edge nodes: {e}")
             return False
@@ -184,6 +223,15 @@ class ExperimentRunner:
                     "warm_count": int(float(m.get("warm_count", 0) or 0)),
                     "cold_count": int(float(m.get("cold_count", 0) or 0)),
                     "unknown_count": int(float(m.get("unknown_count", 0) or 0)),
+                    # QoS metrics
+                    "avg_latency_ms": float(m.get("avg_latency_ms", 0.0) or 0.0),
+                    "p50_latency_ms": float(m.get("p50_latency_ms", 0.0) or 0.0),
+                    "p95_latency_ms": float(m.get("p95_latency_ms", 0.0) or 0.0),
+                    "p99_latency_ms": float(m.get("p99_latency_ms", 0.0) or 0.0),
+                    "warm_rate": float(m.get("warm_rate", 0.0) or 0.0),
+                    "rejected_count": int(float(m.get("rejected_count", 0) or 0)),
+                    "pool_evictions": int(float(m.get("pool_evictions", 0) or 0)),
+                    "pool_utilization_avg": float(m.get("pool_utilization_avg", 0.0) or 0.0),
                     # Energy consumption metrics
                     "static_energy_j": float(m.get("static_energy_j", 0.0) or 0.0),
                     "dynamic_energy_j": float(m.get("dynamic_energy_j", 0.0) or 0.0),
@@ -303,6 +351,15 @@ class ExperimentRunner:
             "warm_count",
             "cold_count",
             "unknown_count",
+            # QoS metrics
+            "avg_latency_ms",
+            "p50_latency_ms",
+            "p95_latency_ms",
+            "p99_latency_ms",
+            "warm_rate",
+            "rejected_count",
+            "pool_evictions",
+            "pool_utilization_avg",
             # Energy consumption metrics
             "static_energy_j",
             "dynamic_energy_j",
@@ -351,6 +408,15 @@ class ExperimentRunner:
                                 row["warm_count"] = v.get("warm_count", "")
                                 row["cold_count"] = v.get("cold_count", "")
                                 row["unknown_count"] = v.get("unknown_count", "")
+                                # QoS
+                                row["avg_latency_ms"] = v.get("avg_latency_ms", "")
+                                row["p50_latency_ms"] = v.get("p50_latency_ms", "")
+                                row["p95_latency_ms"] = v.get("p95_latency_ms", "")
+                                row["p99_latency_ms"] = v.get("p99_latency_ms", "")
+                                row["warm_rate"] = v.get("warm_rate", "")
+                                row["rejected_count"] = v.get("rejected_count", "")
+                                row["pool_evictions"] = v.get("pool_evictions", "")
+                                row["pool_utilization_avg"] = v.get("pool_utilization_avg", "")
                                 # Energy consumption metrics
                                 row["static_energy_j"] = v.get("static_energy_j", "")
                                 row["dynamic_energy_j"] = v.get("dynamic_energy_j", "")
@@ -517,10 +583,26 @@ class ExperimentRunner:
 
 
 def main():
-    central_url = "http://localhost:8000"
+    central_url = os.getenv("CENTRAL_URL", "http://localhost:8000")
     runner = ExperimentRunner(central_url=central_url)
-    
-    runner.run_comprehensive_experiments()
+
+    # =====================================================================
+    # EXPERIMENT MATRIX — edit these to change what gets run.
+    # Each combination (num_users x num_edges x algorithm) = 1 experiment.
+    # =====================================================================
+    USER_RANGES = [200, 500]                                   # number of mobile users
+    EDGE_RANGES = [10, 20]                                     # number of edge cloudlets
+    ALGORITHMS  = ["predictive", "nearest", "round_robin",     # scheduler algorithms
+                   "random", "greedy"]
+    DURATION_S  = 100                                          # seconds per experiment
+    # =====================================================================
+
+    runner.run_comprehensive_experiments(
+        user_ranges=USER_RANGES,
+        edge_ranges=EDGE_RANGES,
+        algorithms=ALGORITHMS,
+        experiment_duration=DURATION_S,
+    )
     print("Experiment runner completed successfully!")
 
 
