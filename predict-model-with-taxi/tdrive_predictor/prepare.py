@@ -90,14 +90,17 @@ def _list_taxi_files(root: str) -> List[str]:
     return files
 
 
-def load_raw_tdrive(root: str, num_taxis: int) -> pd.DataFrame:
+def load_raw_tdrive(root: str, num_taxis: int, offset: int = 0) -> pd.DataFrame:
     """Load up to `num_taxis` raw T-Drive files and return a single DataFrame.
 
     Columns: [taxi_id:int, ts:datetime64[ns], lon:float, lat:float]
     Data is sorted by (taxi_id, ts) and duplicate timestamps (per-taxi) are
-    removed, keeping the first occurrence.
+    removed, keeping the first occurrence. `offset` skips the first N files in
+    sorted-by-id order — useful for building holdout splits on unseen taxis.
     """
-    files = _list_taxi_files(root)[:num_taxis]
+    all_files = _list_taxi_files(root)
+    off = max(0, int(offset))
+    files = all_files[off:off + num_taxis]
     rows = []
     # progress over files if tqdm available
     try:
@@ -446,18 +449,32 @@ def prepare_phase_b(
     beam_size: int = 10,
     turn_penalty: float = 0.0,
     speed_scale_mps: float = 20.0,
-      adaptive_radius: Optional[Tuple[float, float, float, float]] = None,
-  ) -> None:
+    adaptive_radius: Optional[Tuple[float, float, float, float]] = None,
+    taxi_id_offset: int = 0,
+    existing_scaler_path: Optional[str] = None,
+) -> None:
     """Phase B: Map-matching + on-road resampling + features/splits.
 
     Loads/creates an OSM road graph, builds candidates and runs HMM map-matching
     per trip on raw (non-uniform) observations, then resamples to 60s on-road
     before computing features and splits.
+
+    Parameters
+    ----------
+    taxi_id_offset : int
+        Skip the first N taxi files (sorted by numeric id) before selecting
+        `num_taxis`. Used to build holdout datasets disjoint from training.
+    existing_scaler_path : Optional[str]
+        Path to a pickled scaler dict {col: (mu, sigma)}. When provided, skips
+        fit_scaler and applies this scaler instead — required for valid
+        out-of-distribution evaluation against an already-trained model.
     """
     os.makedirs(out_dir, exist_ok=True)
     t0 = time.time()
     # 1) Load raw and project to UTM XY
-    raw = load_raw_tdrive(tdrive_root, num_taxis=num_taxis)
+    raw = load_raw_tdrive(tdrive_root, num_taxis=num_taxis, offset=taxi_id_offset)
+    if taxi_id_offset:
+        print(f"[Phase B] taxi_id_offset={taxi_id_offset} | loaded taxis={raw['taxi_id'].nunique()} (id range {int(raw['taxi_id'].min())}..{int(raw['taxi_id'].max())})", flush=True)
     raw = _compute_xy(raw)
     raw = _segment_trips(raw, max_idle_gap_sec=int(max_idle_gap_min * 60))
     print(f"[Phase B] Segmented trips={raw['trip_id'].nunique()} | max_idle_gap_min={max_idle_gap_min}", flush=True)
@@ -716,7 +733,17 @@ def prepare_phase_b(
     ]
     if use_graph_context:
         feature_cols = feature_cols + ['node_degree', 'is_junction']
-    scaler = fit_scaler(train_df, feature_cols)
+    if existing_scaler_path is not None:
+        scaler = pd.read_pickle(existing_scaler_path)
+        missing = [c for c in feature_cols if c not in scaler]
+        if missing:
+            raise ValueError(
+                f"Existing scaler at {existing_scaler_path} is missing keys for feature_cols: {missing}. "
+                "Make sure the holdout dataset is prepared with the same feature set as the training run."
+            )
+        print(f"[Phase B] Reusing scaler from {existing_scaler_path} (skipping fit)", flush=True)
+    else:
+        scaler = fit_scaler(train_df, feature_cols)
     train_df_s = apply_scaler(train_df, scaler)
     val_df_s = apply_scaler(val_df, scaler)
     test_df_s = apply_scaler(test_df, scaler)
@@ -733,6 +760,8 @@ def prepare_phase_b(
     pd.Series(split).to_json(os.path.join(out_dir, 'split.json'))
     # map-matching fallback ratio (no candidate -> fallback to original xy)
     match_fallback_ratio = float(total_nomatch) / float(total_obs) if total_obs > 0 else None
+    taxi_ids_seen = sorted(set(int(t) for t in raw['taxi_id'].unique().tolist()))
+    taxi_id_range = [taxi_ids_seen[0], taxi_ids_seen[-1]] if taxi_ids_seen else None
     meta = {
         'num_taxis': int(num_taxis),
         'phase': 'B',
@@ -753,6 +782,9 @@ def prepare_phase_b(
         'speed_scale_mps': float(speed_scale_mps),
         'adaptive_radius': list(adaptive_radius) if adaptive_radius is not None else None,
         'match_fallback_ratio': match_fallback_ratio,
+        'taxi_id_offset': int(taxi_id_offset),
+        'taxi_id_range': taxi_id_range,
+        'scaler_source': existing_scaler_path if existing_scaler_path is not None else 'fit_on_train',
         'created': pd.Timestamp.utcnow().isoformat(),
     }
     pd.Series(meta).to_json(os.path.join(out_dir, 'meta.json'))

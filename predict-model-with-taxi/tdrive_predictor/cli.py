@@ -41,6 +41,10 @@ def main():
     p_prep.add_argument('--speed-scale-mps', type=float, default=20.0, help='Speed scale (m/s) in transition length penalty')
     p_prep.add_argument('--adaptive-radius', type=float, nargs=4, default=None, metavar=('A','B','MIN','MAX'),
                         help='Adaptive candidate radius params: r = clip(A + B*v, MIN, MAX)')
+    p_prep.add_argument('--taxi-id-offset', type=int, default=0,
+                        help='Skip the first N taxi files (sorted by id) before selecting --num-taxis. Useful for unseen-taxi holdout splits.')
+    p_prep.add_argument('--scaler-from', type=str, default=None,
+                        help='Path to an existing scaler.pkl. When set, reuse it instead of fitting on the new train split (required for valid OOD eval).')
 
     p_train = sub.add_parser('train', help='Train GRU baseline for Phase A')
     p_train.add_argument('--data-dir', type=str, default='tdrive_predictor_artifacts/phase_a')
@@ -132,6 +136,8 @@ def main():
                 turn_penalty=args.turn_penalty,
                 speed_scale_mps=args.speed_scale_mps,
                 adaptive_radius=tuple(args.adaptive_radius) if args.adaptive_radius is not None else None,
+                taxi_id_offset=args.taxi_id_offset,
+                existing_scaler_path=args.scaler_from,
             )
         else:
             prepare_phase_a(

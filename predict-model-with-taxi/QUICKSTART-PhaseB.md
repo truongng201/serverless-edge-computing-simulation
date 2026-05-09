@@ -412,6 +412,43 @@ Quick read:
 - The biggest improvement comes from scaling the dataset and model capacity (`5k_fast` and the final large run).
 - The final metric block is dramatically better than all earlier runs, but the exact train/eval command is not included immediately above it, so its label is inferred from the nearby `phase_b_7k_fast` log.
 
+## 7) Holdout evaluation on unseen taxis
+
+The default split (Feb 2–6 train / 7 val / 8 test) keeps **the same taxis** in every split, so test-set numbers reflect generalization to a *different day of the same fleet*, not to a *different fleet*. To probe true generalization, prepare a holdout dataset whose taxis were **never seen during training** and evaluate the existing checkpoint against it.
+
+The `prepare` command exposes two new flags for this:
+- `--taxi-id-offset N`  → skip the first `N` taxi files (sorted by id) before slicing `--num-taxis`.
+- `--scaler-from PATH`  → reuse the training scaler instead of fitting a new one (required for valid OOD eval — otherwise inputs land in a different normalized distribution from what the model was trained on).
+
+Example (Best model trained on first **7000** taxis → holdout uses the remaining **3357** taxis at positions 7000..10356; total T-Drive size is 10,357 files):
+
+```bash
+# 1) Prepare the holdout artifact (reuses the trained scaler)
+python -m tdrive_predictor.cli prepare \
+  --tdrive-root "./T-drive Taxi Trajectories/release/taxi_log_2008_by_id" \
+  --num-taxis 5000 \
+  --taxi-id-offset 7000 \
+  --max-idle-gap-min 15 \
+  --use-osm \
+  --graphml ./osm/beijing_taxid.graphml \
+  --cand-radius-m 150 --k-candidates 6 --beam-size 10 --sigma-gps-m 12 \
+  --road-resample \
+  --scaler-from tdrive_predictor_artifacts/phase_b_7k_fast/scaler.pkl \
+  --out-dir tdrive_predictor_artifacts/phase_b_holdout_unseen
+
+# 2) Evaluate Best ckpt against the holdout
+python -m tdrive_predictor.cli eval \
+  --data-dir tdrive_predictor_artifacts/phase_b_holdout_unseen \
+  --ckpt tdrive_predictor_artifacts/phase_b_7k_fast/gru_phase_curv_step.pt \
+  --mode curv_step \
+  --graphml ./osm/beijing_taxid.graphml
+```
+
+Notes:
+- The slice `[offset:offset+num_taxis]` is bounds-clipped, so requesting 5000 taxis past offset 7000 will return whatever remains (≈3357 files).
+- The holdout `train.pkl`/`val.pkl` are also written but are **not used for fitting** — the scaler is loaded from `--scaler-from`. We still rely on `test.pkl` (Feb 8 of unseen taxis) for the actual generalization metric.
+- Compare the resulting ADE/FDE/Hit@K against the in-distribution Best numbers (`ADE=201.66`, `FDE=417.74`, `Hit@200=0.748`) to quantify the generalization gap.
+
 
 Phân tích model mới: GRUStepDecoderRoadAttn (curv_step + Attention)
 Setup của run mới
