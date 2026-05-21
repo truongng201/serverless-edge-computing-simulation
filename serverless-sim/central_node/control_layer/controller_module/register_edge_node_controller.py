@@ -79,14 +79,23 @@ class RegisterEdgeNodeController:
         cell_height = usable_height / rows
         
         # Anchor: use current central node location if available; else map center.
+        # NOTE: scheduler.central_node is a dict (see Scheduler.__init__), so we
+        # must use item access, not attribute access. The previous getattr-based
+        # check silently fell through to map center every time.
         map_center_x = self.MAP_WIDTH_PX / 2
         map_center_y = self.MAP_HEIGHT_PX / 2
         anchor_x = map_center_x
         anchor_y = map_center_y
         try:
-            if getattr(self.scheduler, "central_node", None) and getattr(self.scheduler.central_node, "location", None):
-                anchor_x = float(self.scheduler.central_node.location.get("x", anchor_x))
-                anchor_y = float(self.scheduler.central_node.location.get("y", anchor_y))
+            central = getattr(self.scheduler, "central_node", None)
+            loc = None
+            if isinstance(central, dict):
+                loc = central.get("location")
+            elif central is not None:
+                loc = getattr(central, "location", None)
+            if isinstance(loc, dict):
+                anchor_x = float(loc.get("x", anchor_x))
+                anchor_y = float(loc.get("y", anchor_y))
         except Exception:
             anchor_x, anchor_y = map_center_x, map_center_y
         
@@ -160,10 +169,22 @@ class RegisterEdgeNodeController:
             uptime=0
         )
         node_id = self.node_data.get('node_id')
-        
-        # Use expected total from Config (set by run_experiments.py via environment variable)
-        # This ensures all nodes know the final total during deployment
-        total_nodes = Config.EXPECTED_TOTAL_EDGE_NODES
+
+        # Dynamic total_nodes: Config.EXPECTED_TOTAL_EDGE_NODES is evaluated once at
+        # module import, so it cannot reflect env changes made after the central
+        # process started (e.g. run_experiments.py setting EXPECTED_EDGE_NODES for
+        # its own process). We take the max of the configured hint and the
+        # currently-registered fleet size (+1 for the node being added) so the
+        # grid always has enough cells for `idx` to fall inside `chosen`.
+        # For taxiD datasets `_spread_existing_edge_nodes` will re-place everyone
+        # using the real count after dataset load anyway, but using a sensible
+        # value here keeps registration-time placement coherent for non-taxiD
+        # datasets and for any code that inspects locations pre-dataset.
+        current_count = len(getattr(self.scheduler, "edge_nodes", {}) or {})
+        total_nodes = max(
+            int(getattr(Config, "EXPECTED_TOTAL_EDGE_NODES", 10)),
+            current_count + (0 if node_id in (self.scheduler.edge_nodes or {}) else 1),
+        )
         
         # Use GRID-BASED placement for even distribution across map
         # Each edge node covers approximately equal area

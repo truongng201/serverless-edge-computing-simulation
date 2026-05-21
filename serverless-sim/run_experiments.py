@@ -88,6 +88,19 @@ class ExperimentRunner:
         # Fast path: register virtual edges directly.
         try:
             self.cleanup_processes()
+            # Clear any edges left over from a previous EDGE_RANGES iteration so
+            # the new fleet size is exactly num_edges (not max(prev, num_edges)).
+            try:
+                clear_resp = requests.delete(f"{self.api_base}/nodes", timeout=10)
+                if clear_resp.status_code == 200:
+                    body = clear_resp.json() if clear_resp.content else {}
+                    cleared = (body.get("data") or {}).get("cleared", 0)
+                    if cleared:
+                        print(f"Cleared {cleared} stale edge node(s) before deploy")
+                else:
+                    print(f"WARN: clear-edges returned {clear_resp.status_code} (ok if endpoint missing on older central)")
+            except Exception as e:
+                print(f"WARN: failed to clear stale edges: {e}")
             registered = 0
             for i in range(num_edges):
                 node_id = f"edge_{i+1:03d}"
@@ -594,7 +607,7 @@ def main():
     EDGE_RANGES = [10, 20]                                     # number of edge cloudlets
     ALGORITHMS  = ["predictive", "nearest", "round_robin",     # scheduler algorithms
                    "random", "greedy"]
-    DURATION_S  = 100                                          # seconds per experiment
+    DURATION_S  = 300                                          # seconds per experiment
     # =====================================================================
 
     runner.run_comprehensive_experiments(

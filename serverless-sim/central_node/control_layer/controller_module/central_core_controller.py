@@ -23,6 +23,10 @@ class CentralCoreController:
         controller.execute()
         return f"Node {request_data.get('node_id')} registered successfully"
 
+    def clear_edge_nodes(self):
+        n = self.scheduler.clear_edges()
+        return {"cleared": n}
+
     def update_node_metrics(self, node_id, request_data):
         controller = UpdateNodeMetricsController(self.scheduler, node_id, request_data)
         controller.execute()

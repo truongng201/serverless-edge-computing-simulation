@@ -170,11 +170,30 @@ class Scheduler:
         
     def register_edge_node(self, node_info: EdgeNodeInfo):
         if node_info.node_id in self.edge_nodes:
-            self.logger.info(f"Edge node {node_info.node_id} is already registered")
+            # Update specs/location on re-registration; preserve runtime metrics so
+            # heartbeats and counters from a prior session are not wiped out.
+            existing = self.edge_nodes[node_info.node_id]
+            existing_metrics = getattr(existing, "metrics_info", None)
+            if existing_metrics is not None and getattr(node_info, "metrics_info", None) is not None:
+                # Heuristic: incoming controller seeds a "blank" NodeMetrics with all-zero
+                # counters; if the existing one has activity, keep it.
+                if getattr(existing_metrics, "total_requests", 0) > 0 or \
+                   getattr(existing_metrics, "timestamp", 0) > 0:
+                    node_info.metrics_info = existing_metrics
+            self.edge_nodes[node_info.node_id] = node_info
+            self.logger.info(f"Re-registered edge node (specs/location updated): {node_info.node_id}")
             return
         self.edge_nodes[node_info.node_id] = node_info
         self.logger.info(f"Registered edge node: {node_info.node_id}")
-        
+
+    def clear_edges(self):
+        """Remove all registered edge nodes. Used by experiment runner between
+        edge_range iterations to guarantee a clean fleet size."""
+        n = len(self.edge_nodes)
+        self.edge_nodes = {}
+        self.logger.info(f"Cleared all {n} edge nodes")
+        return n
+
     def unregister_edge_node(self, node_id: str):
         if node_id in self.edge_nodes:
             del self.edge_nodes[node_id]
