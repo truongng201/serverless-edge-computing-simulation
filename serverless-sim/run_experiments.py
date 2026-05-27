@@ -685,8 +685,8 @@ def main():
     # EXPERIMENT MATRIX — edit these to change what gets run.
     # Each combination (num_users x num_edges x algorithm) = 1 experiment.
     # =====================================================================
-    USER_RANGES = [200, 500]                                   # number of mobile users
-    EDGE_RANGES = [10, 20]                                     # number of edge cloudlets
+    USER_RANGES = [100, 500, 1000, 5000]                                   # number of mobile users
+    EDGE_RANGES = [10, 20, 100, 200]                                     # number of edge cloudlets
     ALGORITHMS  = []                                           # empty = fetch and run all backend algorithms
     DURATION_S  = 300                                          # seconds per experiment
     # =====================================================================
