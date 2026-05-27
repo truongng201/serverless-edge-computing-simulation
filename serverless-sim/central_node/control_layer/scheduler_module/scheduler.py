@@ -28,6 +28,9 @@ class AssignmentAlgorithm(Enum):
     GREEDY = "greedy"
     CVX = "convex optimization"
     PREDICTIVE = "predictive"
+    STICKY_GREEDY = "sticky greedy"
+    GREEDY_KEEPALIVE = "greedy + keep-alive"
+    PREDICTIVE_NO_WARM = "prediction without warm-state awareness"
 
 class Scheduler:
     def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
@@ -421,10 +424,17 @@ class Scheduler:
     def node_assignment(self) -> dict:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             return self._assign_users_greedy()
+        elif self.assignment_algorithm == AssignmentAlgorithm.GREEDY_KEEPALIVE:
+            return self._assign_users_greedy()
+        elif self.assignment_algorithm == AssignmentAlgorithm.STICKY_GREEDY:
+            return self._assign_users_sticky_greedy()
         elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
             self._convex_optimization_assignment_all_users()
             return self.assignment_matrix
-        elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
+        elif self.assignment_algorithm in (
+            AssignmentAlgorithm.PREDICTIVE,
+            AssignmentAlgorithm.PREDICTIVE_NO_WARM,
+        ):
             return self._predictive_assignment()
         else:
             self.logger.error(f"Unknown assignment algorithm: {self.assignment_algorithm}")
@@ -434,6 +444,45 @@ class Scheduler:
         self.assignment_matrix = {}
         for user_id, user_node in self.user_nodes.items():
             assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+            user_node.assigned_node_id = assigned_node_id
+            user_node.latency.distance = assigned_node_distance
+            user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
+            total_turnaround_time = (
+                user_node.latency.propagation_delay
+                + user_node.latency.transmission_delay
+                + user_node.latency.computation_delay
+            )
+            user_node.latency.total_turnaround_time = total_turnaround_time
+            self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
+        return self.assignment_matrix
+
+    def _assign_users_sticky_greedy(self) -> dict:
+        """Keep the current node if still feasible; otherwise fall back to greedy nearest.
+
+        This baseline isolates the benefit of reducing handoff churn without using
+        mobility prediction.
+        """
+        self.assignment_matrix = {}
+        for user_id, user_node in self.user_nodes.items():
+            assigned_node_id = None
+            assigned_node_distance = None
+
+            previous = user_node.assigned_node_id
+            if previous:
+                if previous == "central_node":
+                    assigned_node_id = previous
+                    assigned_node_distance = self._calculate_distance(
+                        user_node.location, self.central_node["location"]
+                    )
+                elif previous in self.edge_nodes and self._check_resource_constraints(user_node, previous):
+                    assigned_node_id = previous
+                    assigned_node_distance = self._calculate_distance(
+                        user_node.location, self.edge_nodes[previous].location
+                    )
+
+            if assigned_node_id is None:
+                assigned_node_id, assigned_node_distance = self._greedy_assignment(user_node.location)
+
             user_node.assigned_node_id = assigned_node_id
             user_node.latency.distance = assigned_node_distance
             user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)

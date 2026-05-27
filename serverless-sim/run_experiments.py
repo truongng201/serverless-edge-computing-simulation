@@ -20,6 +20,94 @@ class ExperimentRunner:
         self.results = []
         self.edge_processes = []
         self.current_experiment_id = None
+        self.current_csv_filename = None
+
+    @staticmethod
+    def _csv_fieldnames():
+        return [
+            "num_users",
+            "num_edges",
+            "algorithm",
+            "experiment_duration",
+            "total_experiment_time",
+            "timestep",
+            "total_turnaround_time",
+            "total_turnaround_time_warm",
+            "total_turnaround_time_cold",
+            "total_turnaround_time_unknown",
+            "warm_count",
+            "cold_count",
+            "unknown_count",
+        ]
+
+    def init_results_csv(self, filename: str = None) -> str:
+        """Create the CSV upfront so each finished experiment can append immediately."""
+        if filename:
+            self.current_csv_filename = filename
+        elif not self.current_csv_filename:
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            self.current_csv_filename = f"experiment_results_{timestamp}.csv"
+
+        fieldnames = self._csv_fieldnames()
+        if not os.path.exists(self.current_csv_filename) or os.path.getsize(self.current_csv_filename) == 0:
+            with open(self.current_csv_filename, "w", newline="") as csvfile:
+                writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                writer.writeheader()
+        return self.current_csv_filename
+
+    def append_result_to_csv(self, result: Dict[str, Any], filename: str = None) -> str:
+        """Append a single experiment result to CSV immediately."""
+        import json
+
+        csv_filename = self.init_results_csv(filename)
+        fieldnames = self._csv_fieldnames()
+
+        base_row = {
+            "num_users": result.get("num_users", ""),
+            "num_edges": result.get("num_edges", ""),
+            "algorithm": result.get("algorithm", ""),
+            "experiment_duration": result.get("experiment_duration", ""),
+            "total_experiment_time": result.get("total_experiment_time", ""),
+        }
+
+        with open(csv_filename, "a", newline="") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            metrics = result.get("metrics")
+            if isinstance(metrics, dict) and metrics:
+                def key_to_int(k):
+                    try:
+                        return int(k)
+                    except Exception:
+                        return k
+
+                for k, v in sorted(metrics.items(), key=lambda kv: key_to_int(kv[0])):
+                    try:
+                        timestep = int(k)
+                    except Exception:
+                        timestep = k
+                    row = dict(base_row)
+                    row["timestep"] = timestep
+                    if isinstance(v, dict):
+                        row["total_turnaround_time"] = v.get("total_turnaround_time", "")
+                        row["total_turnaround_time_warm"] = v.get("total_turnaround_time_warm", "")
+                        row["total_turnaround_time_cold"] = v.get("total_turnaround_time_cold", "")
+                        row["total_turnaround_time_unknown"] = v.get("total_turnaround_time_unknown", "")
+                        row["warm_count"] = v.get("warm_count", "")
+                        row["cold_count"] = v.get("cold_count", "")
+                        row["unknown_count"] = v.get("unknown_count", "")
+                    else:
+                        row["total_turnaround_time"] = v
+                    writer.writerow(row)
+            else:
+                row = dict(base_row)
+                row["timestep"] = ""
+                try:
+                    row["total_turnaround_time"] = json.dumps(metrics) if metrics is not None else ""
+                except Exception:
+                    row["total_turnaround_time"] = str(metrics)
+                writer.writerow(row)
+            csvfile.flush()
+        return csv_filename
         
     def cleanup_processes(self):
         print("Cleaning up edge processes...")
@@ -254,6 +342,8 @@ class ExperimentRunner:
         import json
 
         if not filename:
+            filename = self.current_csv_filename
+        if not filename:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             filename = f"experiment_results_{timestamp}.csv"
 
@@ -262,21 +352,7 @@ class ExperimentRunner:
             print("No results to save")
             return
 
-        fieldnames = [
-            "num_users",
-            "num_edges",
-            "algorithm",
-            "experiment_duration",
-            "total_experiment_time",
-            "timestep",
-            "total_turnaround_time",
-            "total_turnaround_time_warm",
-            "total_turnaround_time_cold",
-            "total_turnaround_time_unknown",
-            "warm_count",
-            "cold_count",
-            "unknown_count",
-        ]
+        fieldnames = self._csv_fieldnames()
 
         try:
             with open(filename, "w", newline="") as csvfile:
@@ -563,6 +639,8 @@ class ExperimentRunner:
         print(f"Edge ranges: {edge_ranges}")
         print(f"Algorithms: {algorithms}")
         print(f"Total experiments: {total_experiments}")
+        csv_filename = self.init_results_csv()
+        print(f"Streaming results to {csv_filename}")
         
         start_time = time.time()
         for num_edges in edge_ranges:
@@ -576,18 +654,21 @@ class ExperimentRunner:
                             num_users, num_edges, algorithm, experiment_duration
                         )
                         self.results.append(result)
+                        self.append_result_to_csv(result, csv_filename)
                         
                         
                     except Exception as e:
                         print(f"Experiment failed: {e}")
-                        self.results.append({
+                        failed = {
                             "timestamp": datetime.now().isoformat(),
                             "num_users": num_users,
                             "num_edges": num_edges,
                             "algorithm": algorithm,
                             "error": str(e),
                             "success": False
-                        })
+                        }
+                        self.results.append(failed)
+                        self.append_result_to_csv(failed, csv_filename)
                     
                     time.sleep(5)
             res = requests.post(f"{self.api_base}/reset_simulation")
@@ -598,7 +679,7 @@ class ExperimentRunner:
                 print("Simulation reset successfully")
             self.cleanup_processes()
         total_time = time.time() - start_time
-        csv_filename = self.save_results_to_csv()
+        csv_filename = self.current_csv_filename or csv_filename
         if csv_filename:
             print("Generating plots...")
             self.plot_comparison(csv_filename, save_path=f"experiment_comparison_{user_ranges[0]}.png")

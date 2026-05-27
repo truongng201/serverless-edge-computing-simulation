@@ -263,8 +263,11 @@ class GetAllUsersController:
                 # Consider node warm if:
                 # - user executed on the same node previously, OR
                 # - predictive prewarm-only has planned this node for the current step
+                algorithm = str(self.scheduler.get_assignment_algorithm() or "")
                 warm = user_node.last_executed_node_id == assigned_node
-                if getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
+                if algorithm == "prediction without warm-state-awareness":
+                    warm = False
+                elif getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
                     if user_node.planned_node_id == assigned_node and user_node.planned_step_id == step_id:
                         warm = True
 

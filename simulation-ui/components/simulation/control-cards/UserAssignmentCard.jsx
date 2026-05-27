@@ -90,7 +90,10 @@ export default function UserAssignmentCard({}) {
               {error}
             </div>
           )}
-          {assignmentAlgorithm === "predictive" && (
+          {(
+            assignmentAlgorithm === "predictive" ||
+            assignmentAlgorithm === "prediction without warm-state-awareness"
+          ) && (
             <div className="text-xs text-amber-600">
               Note: Predictive requires 20+ history points per user
             </div>
