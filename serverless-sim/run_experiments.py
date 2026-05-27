@@ -279,6 +279,19 @@ class ExperimentRunner:
             print(f"Failed to set assignment algorithm: {e}")
             return False
 
+    def get_all_assignment_algorithms(self):
+        """Fetch all assignment algorithms exposed by the backend."""
+        try:
+            response = requests.get(f"{self.api_base}/all_assignment_algorithms", timeout=10)
+            if response.status_code == 200:
+                algorithms = response.json().get("data", {}).get("algorithms", []) or []
+                return [str(alg) for alg in algorithms if alg]
+            print(f"Failed to fetch assignment algorithms: {response.status_code} {response.text}")
+            return []
+        except Exception as e:
+            print(f"Failed to fetch assignment algorithms: {e}")
+            return []
+
     def set_dataset(self, num_users: int) -> bool:
         # Use taxiD_Replay for proper predictive model testing (trained on T-drive data)
         dataset_name = 'taxiD_Replay'
@@ -599,7 +612,9 @@ class ExperimentRunner:
         if not edge_ranges:
             edge_ranges = [200]
         if not algorithms:
-            algorithms = ["predictive", "round_robin", "random", "greedy"]
+            algorithms = self.get_all_assignment_algorithms()
+            if not algorithms:
+                algorithms = ["greedy", "predictive"]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():
@@ -672,8 +687,7 @@ def main():
     # =====================================================================
     USER_RANGES = [200, 500]                                   # number of mobile users
     EDGE_RANGES = [10, 20]                                     # number of edge cloudlets
-    ALGORITHMS  = ["predictive", "nearest", "round_robin",     # scheduler algorithms
-                   "random", "greedy"]
+    ALGORITHMS  = []                                           # empty = fetch and run all backend algorithms
     DURATION_S  = 300                                          # seconds per experiment
     # =====================================================================
 
