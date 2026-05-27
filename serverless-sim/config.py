@@ -122,7 +122,7 @@ class Config:
     # Energy monitoring configuration
     # USE_RAPL: If True, use Intel RAPL for real power measurements; if False, use estimation
     # Requires: sudo chmod a+r /sys/class/powercap/intel-rapl:*/energy_uj
-    USE_RAPL = os.getenv("USE_RAPL", "1").lower() in ("1", "true", "yes")
+    USE_RAPL = os.getenv("USE_RAPL", "0").lower() in ("1", "true", "yes")
     
     # Predictive scheduling parameters
     TDRIVE_ARTIFACT_DIR = os.getenv(

@@ -285,7 +285,10 @@ class ExperimentRunner:
             response = requests.get(f"{self.api_base}/all_assignment_algorithms", timeout=10)
             if response.status_code == 200:
                 algorithms = response.json().get("data", {}).get("algorithms", []) or []
-                return [str(alg) for alg in algorithms if alg]
+                algorithms = [str(alg) for alg in algorithms if alg]
+                # Exclude expensive CVX from the default experiment sweep unless
+                # the caller explicitly passes it in `algorithms=...`.
+                return [alg for alg in algorithms if alg != "convex optimization"]
             print(f"Failed to fetch assignment algorithms: {response.status_code} {response.text}")
             return []
         except Exception as e:

@@ -49,6 +49,10 @@ LARGE_CAP = 1e12
 
 class AssignmentAlgorithm(Enum):
     GREEDY = "greedy"
+    RANDOM = "random"
+    ROUND_ROBIN = "round robin"
+    NEAREST = "nearest"
+    CVX = "convex optimization"
     PREDICTIVE = "predictive"
     STICKY_GREEDY = "sticky greedy"
     GREEDY_KEEPALIVE = "greedy + keep-alive"
@@ -1217,4 +1221,3 @@ class Scheduler:
             energy_metrics["source"] = "estimate"
         
         return energy_metrics
-

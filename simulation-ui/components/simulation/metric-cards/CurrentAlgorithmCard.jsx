@@ -33,6 +33,12 @@ export default function CurrentAlgorithmCard() {
           <div className="text-xs text-gray-600">
             {assignmentAlgorithm === "greedy" &&
               "Rule-based greedy algorithm that assigns users to the nearest healthy edge node within coverage and resource constraints. Fast but may not be globally optimal."}
+            {assignmentAlgorithm === "random" &&
+              "Random baseline that assigns each user to a feasible node uniformly at random. It provides a weak lower baseline for comparison."}
+            {assignmentAlgorithm === "round robin" &&
+              "Round-robin baseline that cycles users across feasible edge nodes to balance load, without using mobility or distance information."}
+            {assignmentAlgorithm === "nearest" &&
+              "Pure nearest-node baseline that selects the geographically closest feasible node without predictive or warm-state logic."}
             {assignmentAlgorithm === "greedy + keep-alive" &&
               "Nearest-node assignment with normal warm-container retention. This baseline isolates generic keep-alive reuse without mobility foresight."}
             {assignmentAlgorithm === "sticky greedy" &&
