@@ -12,5 +12,9 @@ class GetPerformanceMetricsController:
         # warm/cold breakdown for experiment analysis.
         breakdown = self.scheduler.calculate_turnaround_time_breakdown()
         self.response = dict(breakdown)
+        
+        # Add energy consumption metrics
+        energy_metrics = self.scheduler.calculate_energy_consumption(timestep_duration_s=1.0)
+        self.response.update(energy_metrics)
 
         return self.response

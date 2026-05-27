@@ -53,6 +53,7 @@ class GetAllUsersController:
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, 'transmission_delay', 0)
                     + getattr(user_node.latency, 'computation_delay', 0)
+                    + float(getattr(user_node, "migration_cost", 0.0) or 0.0)
                 )
             else:
                 location = {'x': item.get('x', 0), 'y': item.get('y', 0)}
@@ -117,6 +118,7 @@ class GetAllUsersController:
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, 'transmission_delay', 0)
                     + getattr(user_node.latency, 'computation_delay', 0)
+                    + float(getattr(user_node, "migration_cost", 0.0) or 0.0)
                 )
             else:
                 data_size = Config.DEFAULT_DATA_SIZE_IN_BYTES
@@ -196,6 +198,7 @@ class GetAllUsersController:
                     user_node.latency.propagation_delay
                     + getattr(user_node.latency, "transmission_delay", 0.0)
                     + getattr(user_node.latency, "computation_delay", 0.0)
+                    + float(getattr(user_node, "migration_cost", 0.0) or 0.0)
                 )
         
         if max_len == 0:
@@ -210,12 +213,15 @@ class GetAllUsersController:
 
         if dataset_name == "dact":
             self._update_dact_sample()
+            self.scheduler.set_current_step_id(self.current_step_id)
         elif dataset_name == "random_generated":
             self._update_random_generated_sample()
+            self.scheduler.set_current_step_id(self.current_step_id)
             self.scheduler.node_assignment()
         elif dataset_name == "taxiD_Replay":
             self._update_taxid_replay_sample()
-            # Keep scheduler step in sync so predictive planning uses the correct timestep.
+            # Keep scheduler step in sync so predictive planning and RR shuffle
+            # use the correct timestep.
             self.scheduler.set_current_step_id(self.current_step_id)
             self.scheduler.node_assignment()
         
@@ -231,7 +237,12 @@ class GetAllUsersController:
                 assigned_central = "central_node"
             elif user_node.assigned_node_id in self.scheduler.edge_nodes:
                 assigned_edge = user_node.assigned_node_id
-            user_node.latency.total_turnaround_time = user_node.latency.propagation_delay + user_node.latency.transmission_delay + user_node.latency.computation_delay
+            user_node.latency.total_turnaround_time = (
+                user_node.latency.propagation_delay
+                + user_node.latency.transmission_delay
+                + user_node.latency.computation_delay
+                + float(getattr(user_node, "migration_cost", 0.0) or 0.0)
+            )
             self.response.append({
                 "user_id": user_id,
                 "location": user_node.location,
@@ -249,6 +260,7 @@ class GetAllUsersController:
         # `EXECUTION_MODE=simulated` avoids network/Docker and assigns computation_delay analytically.
         if getattr(Config, "EXECUTION_MODE", "real") == "simulated":
             step_id = self.current_step_id or 0
+            pool = getattr(self.scheduler, "warm_pool", None)
             for _, user_node in self.scheduler.user_nodes.items():
                 assigned_node = user_node.assigned_node_id
                 if not assigned_node:

@@ -25,9 +25,18 @@ class Config:
     # When enabled, each user will consistently invoke the same logical function name derived
     # from user_id (instead of a random name per call). This makes warm/cold behavior more
     # meaningful for mobility experiments and enables intentional prewarming.
-    STICKY_FUNCTION_PER_USER = os.getenv("STICKY_FUNCTION_PER_USER", "0").lower() in ("1", "true", "yes")
-    # Optional: reduce number of distinct functions by hashing user_id into K buckets (0=disabled).
-    FUNCTION_NAME_BUCKETS = int(os.getenv("FUNCTION_NAME_BUCKETS", "0"))
+    STICKY_FUNCTION_PER_USER = os.getenv("STICKY_FUNCTION_PER_USER", "1").lower() in ("1", "true", "yes")
+    # Number of distinct logical functions in the catalogue; users are hashed into buckets.
+    # Defaulting to 32 makes container reuse meaningful (many users sharing each function).
+    FUNCTION_NAME_BUCKETS = int(os.getenv("FUNCTION_NAME_BUCKETS", "32"))
+
+    # Warm-pool capacity per edge node (max distinct functions kept warm at once).
+    # When exceeded, LRU function entries are evicted (next invocation = cold start).
+    MAX_WARM_PER_NODE = int(os.getenv("MAX_WARM_PER_NODE", "16"))
+    # Central node has higher but still finite concurrency budget.
+    CENTRAL_MAX_CONCURRENT = int(os.getenv("CENTRAL_MAX_CONCURRENT", "256"))
+    # Max concurrent users that can be assigned to a single edge node per timestep.
+    MAX_CONCURRENT_PER_EDGE = int(os.getenv("MAX_CONCURRENT_PER_EDGE", "64"))
     
     
     # Cleanup
@@ -64,8 +73,6 @@ class Config:
     
     # User Configuration
     DEFAULT_EXECUTION_TIME_INTERVAL = 10 # seconds: every 5 seconds all user in simulation call it assigned node
-    DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES = (1024, 10240)  # 1 KB to 10 KB
-    DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (10000, 50000)  # 10-50 KB/ms = 80-400 Mbps
     DEFAULT_DATA_SIZE_IN_BYTES = 512 * 1024  # 512 KB (typical serverless payload)
     
     # Bandwidth settings per network type (B/ms)
@@ -81,11 +88,22 @@ class Config:
     DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s) - DEPRECATED, use NETWORK_*_LATENCY_MS below
     DEFAULT_PIXEL_TO_METERS = 10 # 1 pixel = 10 m
     
-    # Network propagation delay model (4G)
-    # Propagation delay (ms) = base + per_km * distance_km
-    # Note: jitter is intentionally removed for this configuration.
-    NETWORK_BASE_LATENCY_MS = 48.0
-    NETWORK_PER_KM_LATENCY_MS = 0.01
+    # Network propagation delay model (4G, deterministic)
+    # propagation_ms = RAN + FIBER_PER_KM * distance_km
+    #                + ceil(distance_km / AGG_SPACING_KM) * PER_HOP_LATENCY
+    #
+    # - RAN_LATENCY_MS (15): 4G LTE one-way radio access latency
+    #   (3GPP TR 36.912; Ericsson/Nokia LTE latency reports, ~10-20 ms).
+    # - FIBER_PER_KM_LATENCY_MS (0.005): fiber propagation at ~2e8 m/s
+    #   (speed of light in glass, one-way).
+    # - AGG_SPACING_KM (3.0) and PER_HOP_LATENCY_MS (1.0): urban backhaul
+    #   aggregation routers roughly every ~2-5 km, each adding ~0.5-2 ms
+    #   of queueing+forwarding. Gives ~22 ms spread between 1 km and 69 km,
+    #   so location-aware policies have a measurable signal over random.
+    NETWORK_RAN_LATENCY_MS = 15.0
+    NETWORK_FIBER_PER_KM_LATENCY_MS = 0.005
+    NETWORK_AGG_SPACING_KM = 3.0
+    NETWORK_PER_HOP_LATENCY_MS = 1.0
 
     # User cleanup
     # If a user hasn't been updated for this many seconds, remove it
@@ -100,6 +118,11 @@ class Config:
 
     # Edge node deployment configuration
     EXPECTED_TOTAL_EDGE_NODES = int(os.getenv("EXPECTED_EDGE_NODES", "10"))
+    
+    # Energy monitoring configuration
+    # USE_RAPL: If True, use Intel RAPL for real power measurements; if False, use estimation
+    # Requires: sudo chmod a+r /sys/class/powercap/intel-rapl:*/energy_uj
+    USE_RAPL = os.getenv("USE_RAPL", "1").lower() in ("1", "true", "yes")
     
     # Predictive scheduling parameters
     TDRIVE_ARTIFACT_DIR = os.getenv(
@@ -124,12 +147,12 @@ class Config:
     PREDICTIVE_WARM_BASE_PROB = 0.2  # base warm probability when metrics are missing
     # Which horizon (in minutes) to use when selecting the "best" edge from the
     # predictor output. For curv_step we currently expose horizons (1,3,5,10).
-    PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
+    # PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
 
     # Predictive "prewarm-only" mode:
     # - Plan a future node using the predictor, but keep serving on the current node until the planned step.
     # - Intended mainly for `EXECUTION_MODE=simulated`, where prewarm effects are modeled analytically.
-    PREDICTIVE_PREWARM_ONLY = os.getenv("PREDICTIVE_PREWARM_ONLY", "0").lower() in ("1", "true", "yes")
+    # PREDICTIVE_PREWARM_ONLY = os.getenv("PREDICTIVE_PREWARM_ONLY", "0").lower() in ("1", "true", "yes")
     # How many simulation steps ahead to schedule the switch (lead time).
     PREDICTIVE_PREWARM_LEAD_STEPS = int(os.getenv("PREDICTIVE_PREWARM_LEAD_STEPS", "5"))
     # How often to run planning (in simulation steps). Lower = more compute.
@@ -143,12 +166,19 @@ class Config:
     # ============================================================
     # `real`: call /execute on nodes (Docker-backed)
     # `simulated`: do not call /execute; instead assign computation_delay analytically
-    EXECUTION_MODE = os.getenv("EXECUTION_MODE", "real").lower()
+    # EXECUTION_MODE = os.getenv("EXECUTION_MODE", "real").lower()
+    EXECUTION_MODE = "simulated"
+    PREDICTIVE_PREWARM_ONLY = 1
+    PREDICTIVE_TARGET_HORIZON_MIN = 5
     # Defaults derived from local benchmarking (median warm + median cold-warm delta).
     SIM_EXEC_WARM_MS_CENTRAL = float(os.getenv("SIM_EXEC_WARM_MS_CENTRAL", "300"))
     SIM_EXEC_COLD_PENALTY_MS_CENTRAL = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_CENTRAL", "900"))
     SIM_EXEC_WARM_MS_EDGE = float(os.getenv("SIM_EXEC_WARM_MS_EDGE", "300"))
     SIM_EXEC_COLD_PENALTY_MS_EDGE = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_EDGE", "1050"))
+
+    # Fraction of host idle power attributed to the serverless runtime overhead.
+    # 0.1 (default) = bill 10% of idle power; 1.0 = bill the full host idle.
+    STATIC_OVERHEAD_FRACTION = float(os.getenv("STATIC_OVERHEAD_FRACTION", "0.1"))
     
     # User Movement Configuration
     USER_MIN_SPEED = 1  # m/s - minimum user movement speed (walking speed)

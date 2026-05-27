@@ -141,7 +141,7 @@ class ExperimentRunner:
         print("Waiting for central node to be ready...")
         for _ in range(timeout):
             try:
-                response = requests.get(f"{self.api_base}/health", timeout=5)
+                response = requests.get(f"{self.api_base}/health", timeout=600)
                 if response.status_code == 200:
                     print("Central node is ready!")
                     return True
@@ -152,50 +152,102 @@ class ExperimentRunner:
         return False
     
     def deploy_edge_nodes(self, num_edges: int, start_port: int = 5001) -> bool:
+        """Register `num_edges` virtual edges with the central node.
+
+        In simulated mode (Config.EXECUTION_MODE='simulated') the central does not
+        call back into the edge processes — they are needed only as registered
+        endpoints for the scheduler's grid placement and metrics bookkeeping.
+        We therefore register them directly via /nodes/register instead of
+        spawning real Flask processes (which also avoids the bash-only
+        deploy_edge.sh on Windows).
+
+        Set env SPAWN_REAL_EDGES=1 to fall back to the legacy spawn path
+        (only useful for EXECUTION_MODE='real' on Linux/macOS).
+        """
         print(f"\n{'-'*40}")
         print(f"Deploying {num_edges} edge nodes starting from port {start_port}")
         print(f"{'-'*40}")
+        os.environ["EXPECTED_EDGE_NODES"] = str(num_edges)
+
+        spawn_real = os.getenv("SPAWN_REAL_EDGES", "0").lower() in ("1", "true", "yes")
+        if spawn_real:
+            return self._spawn_real_edges(num_edges, start_port)
+
+        # Fast path: register virtual edges directly.
         try:
-            # Set expected total edge nodes for proper grid placement
-            os.environ["EXPECTED_EDGE_NODES"] = str(num_edges)
-            
             self.cleanup_processes()
-            
-            # Start edge nodes
+            # Clear any edges left over from a previous EDGE_RANGES iteration so
+            # the new fleet size is exactly num_edges (not max(prev, num_edges)).
+            try:
+                clear_resp = requests.delete(f"{self.api_base}/nodes", timeout=10)
+                if clear_resp.status_code == 200:
+                    body = clear_resp.json() if clear_resp.content else {}
+                    cleared = (body.get("data") or {}).get("cleared", 0)
+                    if cleared:
+                        print(f"Cleared {cleared} stale edge node(s) before deploy")
+                else:
+                    print(f"WARN: clear-edges returned {clear_resp.status_code} (ok if endpoint missing on older central)")
+            except Exception as e:
+                print(f"WARN: failed to clear stale edges: {e}")
+            registered = 0
             for i in range(num_edges):
                 node_id = f"edge_{i+1:03d}"
                 port = start_port + i
-                
+                payload = {
+                    "node_id": node_id,
+                    "endpoint": f"localhost:{port}",
+                    "cpus": 2,
+                    "memory": "1g",
+                }
+                try:
+                    r = requests.post(
+                        f"{self.api_base}/nodes/register",
+                        json=payload,
+                        timeout=10,
+                    )
+                    if r.status_code == 200:
+                        registered += 1
+                    else:
+                        print(f"register {node_id} failed: {r.status_code} {r.text}")
+                except Exception as e:
+                    print(f"register {node_id} error: {e}")
+            print(f"Successfully registered {registered}/{num_edges} virtual edge nodes")
+            return registered >= num_edges * 0.8
+        except Exception as e:
+            print(f"Failed to register virtual edges: {e}")
+            return False
+
+    def _spawn_real_edges(self, num_edges: int, start_port: int) -> bool:
+        try:
+            self.cleanup_processes()
+            for i in range(num_edges):
+                node_id = f"edge_{i+1:03d}"
+                port = start_port + i
                 cmd = [
                     "./deploy_edge.sh",
                     "--node-id", node_id,
                     "--central-url", self.central_url,
                     "--port", str(port),
                     "--cpus", "2",
-                    "--memory", "1g"
+                    "--memory", "1g",
                 ]
-                
                 print(f"Starting {node_id} on port {port}")
                 process = subprocess.Popen(
                     cmd,
                     stdout=subprocess.DEVNULL,
                     stderr=subprocess.DEVNULL,
-                    start_new_session=True  # create a new session so we can kill the entire group with os.killpg
+                    start_new_session=True,
                 )
                 self.edge_processes.append(process)
-            
             print("Waiting for edge nodes to register...")
-            time.sleep(num_edges * 2 // 10)  # Wait time proportional to number of edges
-            
+            time.sleep(max(2, num_edges // 5))
             response = requests.get(f"{self.api_base}/cluster/status")
             if response.status_code == 200:
                 cluster_status = response.json()
                 registered_edges = len(cluster_status.get('data', {}).get('cluster_info', {}).get('edge_nodes_info', []))
                 print(f"Successfully registered {registered_edges}/{num_edges} edge nodes")
-                return registered_edges >= num_edges * 0.8  # Allow some tolerance
-            
+                return registered_edges >= num_edges * 0.8
             return False
-            
         except Exception as e:
             print(f"Failed to deploy edge nodes: {e}")
             return False
@@ -206,12 +258,12 @@ class ExperimentRunner:
             response = requests.post(
                 f"{self.api_base}/assignment_algorithm",
                 json={"algorithm": algorithm},
-                timeout=10
+                timeout=600
             )
             
             if response.status_code == 200:
                 print(f"Successfully set algorithm to {algorithm}")
-                response = requests.get(f"{self.api_base}/assignment_algorithm", timeout=10)
+                response = requests.get(f"{self.api_base}/assignment_algorithm", timeout=600)
                 if response.status_code == 200:
                     current_algorithm = response.json().get('data', {}).get('algorithm', '')
                     if current_algorithm == algorithm:
@@ -233,7 +285,7 @@ class ExperimentRunner:
         try:
             print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
             payload = {"dataset_name": dataset_name, "sample_size": num_users}
-            response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=50)
+            response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=600)
             if response.status_code == 200:
                 return True
             else:
@@ -263,6 +315,7 @@ class ExperimentRunner:
             if metrics_response.status_code == 200:
                 m = metrics_response.json().get('data', {}) or {}
                 # Keep total turnaround time for plotting, but also store warm/cold totals for analysis.
+                # Also include energy consumption metrics
                 metrics[timestep + 1] = {
                     "total_turnaround_time": float(m.get("total_turnaround_time", 0.0) or 0.0),
                     "total_turnaround_time_warm": float(m.get("total_turnaround_time_warm", 0.0) or 0.0),
@@ -271,6 +324,23 @@ class ExperimentRunner:
                     "warm_count": int(float(m.get("warm_count", 0) or 0)),
                     "cold_count": int(float(m.get("cold_count", 0) or 0)),
                     "unknown_count": int(float(m.get("unknown_count", 0) or 0)),
+                    # QoS metrics
+                    "avg_latency_ms": float(m.get("avg_latency_ms", 0.0) or 0.0),
+                    "p50_latency_ms": float(m.get("p50_latency_ms", 0.0) or 0.0),
+                    "p95_latency_ms": float(m.get("p95_latency_ms", 0.0) or 0.0),
+                    "p99_latency_ms": float(m.get("p99_latency_ms", 0.0) or 0.0),
+                    "warm_rate": float(m.get("warm_rate", 0.0) or 0.0),
+                    "rejected_count": int(float(m.get("rejected_count", 0) or 0)),
+                    "pool_evictions": int(float(m.get("pool_evictions", 0) or 0)),
+                    "pool_utilization_avg": float(m.get("pool_utilization_avg", 0.0) or 0.0),
+                    # Energy consumption metrics
+                    "static_energy_j": float(m.get("static_energy_j", 0.0) or 0.0),
+                    "dynamic_energy_j": float(m.get("dynamic_energy_j", 0.0) or 0.0),
+                    "network_energy_j": float(m.get("network_energy_j", 0.0) or 0.0),
+                    "cold_start_energy_j": float(m.get("cold_start_energy_j", 0.0) or 0.0),
+                    "total_energy_j": float(m.get("total_energy_j", 0.0) or 0.0),
+                    "total_energy_wh": float(m.get("total_energy_wh", 0.0) or 0.0),
+                    "average_power_w": float(m.get("average_power_w", 0.0) or 0.0),
                 }
                 print(
                     f"Timestep {timestep + 1}: "
@@ -278,7 +348,9 @@ class ExperimentRunner:
                     f"Warm={metrics[timestep + 1]['total_turnaround_time_warm']:.1f} "
                     f"(n={metrics[timestep + 1]['warm_count']}) | "
                     f"Cold={metrics[timestep + 1]['total_turnaround_time_cold']:.1f} "
-                    f"(n={metrics[timestep + 1]['cold_count']})"
+                    f"(n={metrics[timestep + 1]['cold_count']}) | "
+                    f"Energy={metrics[timestep + 1]['total_energy_j']:.2f}J "
+                    f"(Power={metrics[timestep + 1]['average_power_w']:.1f}W)"
                 )
             else:
                 print(f"Failed to get metrics at timestep {timestep + 1}: {metrics_response.text}")
@@ -318,6 +390,16 @@ class ExperimentRunner:
         
         experiment_time = time.time() - experiment_start
         
+        # Calculate total energy consumption across all timesteps
+        total_energy_j = 0.0
+        total_cold_start_energy_j = 0.0
+        total_network_energy_j = 0.0
+        if metrics:
+            for ts_metrics in metrics.values():
+                total_energy_j += ts_metrics.get("total_energy_j", 0.0)
+                total_cold_start_energy_j += ts_metrics.get("cold_start_energy_j", 0.0)
+                total_network_energy_j += ts_metrics.get("network_energy_j", 0.0)
+        
         result = {
             "timestamp": datetime.now().isoformat(),
             "num_users": num_users,
@@ -326,10 +408,16 @@ class ExperimentRunner:
             "experiment_duration": experiment_duration,
             "total_experiment_time": experiment_time,
             "metrics": metrics,
+            "total_energy_j": total_energy_j,
+            "total_cold_start_energy_j": total_cold_start_energy_j,
+            "total_network_energy_j": total_network_energy_j,
             "success": True if metrics and len(metrics) > 0 else False
         }
         
         print(f"Experiment completed in {experiment_time:.2f} seconds")
+        print(f"  Total Energy: {total_energy_j:.2f}J ({total_energy_j/3600:.4f}Wh)")
+        print(f"  Cold Start Energy: {total_cold_start_energy_j:.2f}J")
+        print(f"  Network Energy: {total_network_energy_j:.2f}J")
         return result
     
     def save_results_to_csv(self, filename: str = None):
@@ -392,6 +480,23 @@ class ExperimentRunner:
                                 row["warm_count"] = v.get("warm_count", "")
                                 row["cold_count"] = v.get("cold_count", "")
                                 row["unknown_count"] = v.get("unknown_count", "")
+                                # QoS
+                                row["avg_latency_ms"] = v.get("avg_latency_ms", "")
+                                row["p50_latency_ms"] = v.get("p50_latency_ms", "")
+                                row["p95_latency_ms"] = v.get("p95_latency_ms", "")
+                                row["p99_latency_ms"] = v.get("p99_latency_ms", "")
+                                row["warm_rate"] = v.get("warm_rate", "")
+                                row["rejected_count"] = v.get("rejected_count", "")
+                                row["pool_evictions"] = v.get("pool_evictions", "")
+                                row["pool_utilization_avg"] = v.get("pool_utilization_avg", "")
+                                # Energy consumption metrics
+                                row["static_energy_j"] = v.get("static_energy_j", "")
+                                row["dynamic_energy_j"] = v.get("dynamic_energy_j", "")
+                                row["network_energy_j"] = v.get("network_energy_j", "")
+                                row["cold_start_energy_j"] = v.get("cold_start_energy_j", "")
+                                row["total_energy_j"] = v.get("total_energy_j", "")
+                                row["total_energy_wh"] = v.get("total_energy_wh", "")
+                                row["average_power_w"] = v.get("average_power_w", "")
                             else:
                                 # Backward-compatible: older runs stored just a float total_turnaround_time
                                 row["total_turnaround_time"] = v
@@ -444,188 +549,57 @@ class ExperimentRunner:
                 data[combo][alg] = OrderedDict(sorted(data[combo][alg].items(), key=lambda kv: kv[0]))
         return data
     
-    def plot_comparison(self, csv_filename: str = None, save_path: str = None, show: bool = True):
-        """Plot algorithm comparison in two separate figures with better zoom"""
-        if csv_filename is None:
-            import glob
-            csv_files = glob.glob("experiment_results_*.csv")
-            if not csv_files:
-                print("No CSV files found to plot")
-                return
-            csv_filename = max(csv_files, key=os.path.getctime)
-            print(f"Using most recent CSV: {csv_filename}")
-
-        data = self.load_results_from_csv(csv_filename)
-        if not data:
-            print("No data to plot")
-            return
-
-        # Load experiment times from CSV
-        exp_times = {}  # (users, edges, algorithm) -> total_experiment_time
+    def load_energy_results_from_csv(self, filename: str):
+        """Load energy consumption data from CSV.
+        
+        Returns:
+            data[(num_users,num_edges)][algorithm] = OrderedDict[timestep] = {energy_metrics}
+        """
+        data = defaultdict(lambda: defaultdict(OrderedDict))
         try:
-            with open(csv_filename, newline='') as f:
+            with open(filename, newline='') as f:
                 reader = csv.DictReader(f)
                 for r in reader:
                     try:
-                        users = int(r.get("num_users", 0))
-                        edges = int(r.get("num_edges", 0))
+                        num_users = int(r.get("num_users") or 0)
+                        num_edges = int(r.get("num_edges") or 0)
                         alg = r.get("algorithm", "").strip()
-                        exp_time = float(r.get("total_experiment_time", 0))
-                        exp_times[(users, edges, alg)] = exp_time
-                    except:
+                        t = r.get("timestep", "")
+                        if t == "":
+                            continue
+                        timestep = int(t)
+                        
+                        # Extract energy metrics
+                        energy_metrics = {
+                            "static_energy_j": float(r.get("static_energy_j", 0) or 0),
+                            "dynamic_energy_j": float(r.get("dynamic_energy_j", 0) or 0),
+                            "network_energy_j": float(r.get("network_energy_j", 0) or 0),
+                            "cold_start_energy_j": float(r.get("cold_start_energy_j", 0) or 0),
+                            "total_energy_j": float(r.get("total_energy_j", 0) or 0),
+                            "total_energy_wh": float(r.get("total_energy_wh", 0) or 0),
+                            "average_power_w": float(r.get("average_power_w", 0) or 0),
+                        }
+                    except Exception:
                         continue
-        except:
-            pass
-
-        combos = sorted(data.keys())
-        n = len(combos)
-        cols = min(4, n)  # More columns for better layout
-        rows = math.ceil(n / cols)
-
-        # ===== FIGURE 1: TURNAROUND TIMES =====
-        plt.style.use("seaborn-v0_8-darkgrid")
-        fig1, axes1 = plt.subplots(rows, cols, figsize=(5*cols, 4*rows), squeeze=False)
-
-        for idx, combo in enumerate(combos):
-            r = idx // cols
-            c = idx % cols
-            ax = axes1[r][c]
-            
-            algs = data[combo]
-            if not algs:
-                ax.set_visible(False)
-                continue
-                
-            all_timesteps = set()
-            for alg in algs:
-                all_timesteps.update(algs[alg].keys())
-            if not all_timesteps:
-                ax.set_visible(False)
-                continue
-            all_timesteps = sorted(all_timesteps)
-            
-            # Get all values to determine proper zoom range
-            all_values = []
-            for alg, od in algs.items():
-                all_values.extend(od.values())
-            if not all_values:
-                continue
-                
-            min_val = min(all_values)
-            max_val = max(all_values)
-            
-            # Plot with thicker lines and larger markers
-            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
-            for i, (alg, od) in enumerate(algs.items()):
-                xs = list(od.keys())
-                ys = list(od.values())
-                if not xs:
-                    continue
-                ax.plot(xs, ys, marker='o', linewidth=3, markersize=8, 
-                       label=alg, color=colors[i % len(colors)])
-
-            ax.set_title(f"Users={combo[0]}, Edges={combo[1]}", fontsize=14, fontweight='bold')
-            ax.set_xlabel("Timestep", fontsize=12)
-            ax.set_ylabel("Total Turnaround Time", fontsize=12)
-            ax.set_xticks(all_timesteps)
-            
-            # Better zoom: focus on the actual data range
-            if max_val > min_val:
-                range_val = max_val - min_val
-                margin = max(range_val * 0.05, abs(min_val) * 0.0001)  # At least 0.01% margin
-                ax.set_ylim(min_val - margin, max_val + margin)
-            
-            # Format y-axis with more precision
-            if min_val > 100:
-                from matplotlib.ticker import FuncFormatter
-                def format_func(x, p):
-                    return f'{x:.3f}'
-                ax.yaxis.set_major_formatter(FuncFormatter(format_func))
-            
-            ax.grid(True, alpha=0.4)
-            ax.legend(fontsize=11, loc='best')
-            ax.tick_params(axis='both', which='major', labelsize=10)
-
-        # Hide unused subplots
-        for idx in range(len(combos), rows * cols):
-            r = idx // cols
-            c = idx % cols
-            axes1[r][c].set_visible(False)
-
-        fig1.suptitle("Algorithm Performance: Total Turnaround Time Comparison", 
-                     fontsize=18, fontweight='bold')
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-        # ===== FIGURE 2: EXPERIMENT DURATION =====
-        fig2, axes2 = plt.subplots(rows, cols, figsize=(5*cols, 4*rows), squeeze=False)
-
-        for idx, combo in enumerate(combos):
-            r = idx // cols
-            c = idx % cols  
-            ax = axes2[r][c]
-            
-            # Get experiment times for this combo
-            exp_data = []
-            exp_labels = []
-            exp_colors = []
-            colors = ['#1f77b4', '#ff7f0e', '#2ca02c', '#d62728']
-            
-            for i, alg in enumerate(sorted(data[combo].keys()) if combo in data else []):
-                key = (combo[0], combo[1], alg)
-                if key in exp_times:
-                    exp_data.append(exp_times[key])
-                    exp_labels.append(alg)
-                    exp_colors.append(colors[i % len(colors)])
-            
-            if exp_data:
-                bars = ax.bar(exp_labels, exp_data, alpha=0.8, color=exp_colors, width=0.6)
-                ax.set_title(f"Users={combo[0]}, Edges={combo[1]}", fontsize=14, fontweight='bold')
-                ax.set_ylabel("Experiment Time (seconds)", fontsize=12)
-                ax.tick_params(axis='x', rotation=0, labelsize=11)
-                ax.tick_params(axis='y', labelsize=10)
-                
-                # Add value labels on bars with better formatting
-                for bar, val in zip(bars, exp_data):
-                    height = bar.get_height()
-                    ax.text(bar.get_x() + bar.get_width()/2., height + height*0.02,
-                          f'{val:.1f}s', ha='center', va='bottom', fontsize=11, fontweight='bold')
-                
-                # Set y-limit with some margin
-                max_time = max(exp_data)
-                ax.set_ylim(0, max_time * 1.15)
-                ax.grid(True, alpha=0.3, axis='y')
-            else:
-                ax.set_visible(False)
-
-        # Hide unused subplots  
-        for idx in range(len(combos), rows * cols):
-            r = idx // cols
-            c = idx % cols
-            axes2[r][c].set_visible(False)
-
-        fig2.suptitle("Algorithm Performance: Experiment Duration Comparison", 
-                     fontsize=18, fontweight='bold')
-        plt.tight_layout(rect=[0, 0, 1, 0.95])
-
-        # Save both figures
-        if save_path:
-            base_name = save_path.replace('.png', '')
-            turnaround_path = f"{base_name}_turnaround.png"
-            duration_path = f"{base_name}_duration.png"
-            
-            fig1.savefig(turnaround_path, dpi=300, bbox_inches='tight')
-            fig2.savefig(duration_path, dpi=300, bbox_inches='tight')
-            print(f"Saved turnaround plot to {turnaround_path}")
-            print(f"Saved duration plot to {duration_path}")
+                    combo = (num_users, num_edges)
+                    data[combo][alg][timestep] = energy_metrics
+        except Exception as e:
+            print(f"Failed to load energy data from CSV {filename}: {e}")
+            return {}
         
+        # ensure ordered timesteps
+        for combo in list(data.keys()):
+            for alg in list(data[combo].keys()):
+                data[combo][alg] = OrderedDict(sorted(data[combo][alg].items(), key=lambda kv: kv[0]))
+        return data
     
     def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 100):
         if not user_ranges:
-            user_ranges = [5000]  # 100 users
+            user_ranges = [1000]  # 100 users
         if not edge_ranges:
-            edge_ranges = [100] 
+            edge_ranges = [200]
         if not algorithms:
-            algorithms = ["predictive", "greedy"]
+            algorithms = ["predictive", "round_robin", "random", "greedy"]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():
@@ -689,10 +663,26 @@ class ExperimentRunner:
 
 
 def main():
-    central_url = "http://localhost:8000"
+    central_url = os.getenv("CENTRAL_URL", "http://localhost:8000")
     runner = ExperimentRunner(central_url=central_url)
-    
-    runner.run_comprehensive_experiments()
+
+    # =====================================================================
+    # EXPERIMENT MATRIX — edit these to change what gets run.
+    # Each combination (num_users x num_edges x algorithm) = 1 experiment.
+    # =====================================================================
+    USER_RANGES = [200, 500]                                   # number of mobile users
+    EDGE_RANGES = [10, 20]                                     # number of edge cloudlets
+    ALGORITHMS  = ["predictive", "nearest", "round_robin",     # scheduler algorithms
+                   "random", "greedy"]
+    DURATION_S  = 300                                          # seconds per experiment
+    # =====================================================================
+
+    runner.run_comprehensive_experiments(
+        user_ranges=USER_RANGES,
+        edge_ranges=EDGE_RANGES,
+        algorithms=ALGORITHMS,
+        experiment_duration=DURATION_S,
+    )
     print("Experiment runner completed successfully!")
 
 

@@ -46,6 +46,16 @@ def register_node():
     return result
 
 
+@central_route.route('/nodes', methods=['DELETE'])
+@standard_response
+def clear_nodes():
+    """Unregister every edge node. Used by the experiment runner to guarantee
+    a clean fleet between EDGE_RANGES iterations (otherwise stale edges from
+    a previous iteration persist and skew distance/assignment metrics)."""
+    result = central_core_controller.clear_edge_nodes()
+    return result
+
+
 @central_route.route('/nodes/<node_id>/metrics', methods=['POST'])
 @standard_response
 def update_metrics(node_id):

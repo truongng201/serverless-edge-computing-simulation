@@ -422,3 +422,171 @@ python scripts/plot_experiment_results.py --csv experiment_results_20251228_1311
 
 **File Modified:**
 - `serverless-sim/central_node/control_layer/scheduler_module/scheduler.py`
+
+---
+
+# Change Notes — Session 2026-04-16
+
+## Horizon-Aligned Attention Decoder cho trajectory predictor
+
+### Context & motivation
+
+- `GRUStepDecoderRoad` ([model.py:47-87](predict-model-with-taxi/tdrive_predictor/model.py#L47-L87)) predict 10 step Δs (mỗi step 1 phút), nhưng serverless-sim scheduler **chỉ consume h=5** ở cả 2 chỗ planning ([scheduler.py:527](serverless-sim/central_node/control_layer/scheduler_module/scheduler.py#L527), [scheduler.py:671](serverless-sim/central_node/control_layer/scheduler_module/scheduler.py#L671)), khớp với `PREDICTIVE_PREWARM_LEAD_STEPS=5` ([config.py:134](serverless-sim/config.py#L134)).
+- Kết quả 7k_fast: h1 ADE=27.7m, **h5 ADE=240.8m**, h10=417.7m. h5 error gấp ~9× h1, một phần do **information bottleneck** (decoder chỉ nhận `h_T` — 1 vector nén 20 timesteps — rồi autoregressive qua 5 bước).
+- Loss weighting hiện tại: default `ones(10)`; `TDRIVE_CURVSTEP_WEIGHTED_LOSS=1` → `[1,1,1,1,0.8,0.8,0.8,0.8,0.7,0.7]` (đang down-weight đúng h=5 — ngược hướng mong muốn).
+
+Hai thay đổi complementary, kết hợp thành 1 experiment:
+1. **Bahdanau attention decoder** — mở information channel cho mọi horizon; decoder query encoder outputs tại mỗi step.
+2. **Peaked h=5 horizon weighting** — allocate gradient budget cho horizon scheduler consume.
+
+### Files modified
+
+| File | Action |
+|---|---|
+| `predict-model-with-taxi/tdrive_predictor/model.py` | Thêm class `GRUStepDecoderRoadAttn` (~50 LOC), giữ class cũ nguyên |
+| `predict-model-with-taxi/tdrive_predictor/train.py` | Thêm 2 env flag, model-selection logic, peaked-h5 weight branch, ckpt tên riêng, ghi `arch` vào `meta.json` |
+| `predict-model-with-taxi/tdrive_predictor/inference_service.py` | `_build_model(..., arch=...)` route class; `load_predictor_bundle` đọc `meta["arch"]`, fallback sniff state_dict có `W_attn`/`V_attn` không |
+
+Không đổi: dataset, evaluate.py, scheduler serverless-sim, config.py, output shape model.
+
+### Chi tiết thay đổi
+
+**1. `GRUStepDecoderRoadAttn`** (`model.py`)
+- Encoder giữ nguyên (GRU). Decoder mỗi step:
+  - Bahdanau additive attention: `scores = V_attn(tanh(W_attn(h) + U_attn(enc_out)))`, softmax → context [B, H].
+  - `GRUCell(input_size=1 + H)` nhận `[prev_pred, context]` concat.
+  - `U_attn(enc_out)` precompute 1 lần/forward để tránh compute lại trong loop.
+  - Scheduled sampling / teacher forcing logic copy nguyên từ class cũ.
+- Param cost (H=512): +~1.05M (+56%, total ~2.9M, vẫn ~12MB FP32).
+
+**2. Env flags & selection** (`train.py`)
+- `TDRIVE_CURVSTEP_ATTN=1` → train class Attn, ckpt `gru_phase_curv_step_attn.pt`, `meta.arch = "gru_step_attn"`.
+- `TDRIVE_CURVSTEP_PEAKED_H5=1` → weights `[0.3, 0.5, 0.8, 1.2, 1.6, 1.2, 0.8, 0.5, 0.3, 0.2]` (peak @ h5).
+- Priority: `PEAKED_H5` > `WEIGHTED_LOSS` > uniform.
+- Giữ `TDRIVE_CURVSTEP_HIGH_SS=1` tương thích ngược.
+
+**3. Inference routing** (`inference_service.py`)
+- Đọc `meta["arch"]` → chọn `GRUStepDecoderRoad` hoặc `GRUStepDecoderRoadAttn`.
+- Fallback khi `arch` thiếu: sniff keys `W_attn.*` / `V_attn.*` trong state_dict.
+- Default checkpoint filename route theo arch cho `curv_step`.
+
+### Hướng dẫn chạy
+
+**Prerequisites**
+- Phase B dataset build xong (có `train.pkl`, `val.pkl`, `test.pkl`, `meta.json`, `scaler.pkl`).
+- GPU khuyến nghị cho 7k_fast (80 epochs, H=512, batch=256). CPU OK smoke test.
+- Mỗi config dùng artifact dir riêng để không đè baseline:
+
+```bash
+cd predict-model-with-taxi/tdrive_predictor_artifacts
+cp -r phase_b_7k_fast phase_b_7k_fast_attn_peaked
+rm phase_b_7k_fast_attn_peaked/gru_phase_curv_step*.pt
+```
+
+**Training — 6 configs ablation**
+
+Chạy từ `predict-model-with-taxi/`. Common args: `--mode curv_step --batch-size 256 --epochs 80 --early-stop-patience 6 --target-scale 100`.
+
+```bash
+# A — baseline (GRU-512, uniform)
+python -m tdrive_predictor.cli train \
+  --mode curv_step --hidden-size 512 --batch-size 256 \
+  --epochs 80 --early-stop-patience 6 --target-scale 100 \
+  --data-dir tdrive_predictor_artifacts/phase_b_7k_fast
+
+# B — peaked-h5 only
+TDRIVE_CURVSTEP_PEAKED_H5=1 \
+python -m tdrive_predictor.cli train \
+  --mode curv_step --hidden-size 512 --batch-size 256 \
+  --epochs 80 --early-stop-patience 6 --target-scale 100 \
+  --data-dir tdrive_predictor_artifacts/phase_b_7k_fast_peaked
+
+# C — attention only
+TDRIVE_CURVSTEP_ATTN=1 \
+python -m tdrive_predictor.cli train \
+  --mode curv_step --hidden-size 512 --batch-size 256 \
+  --epochs 80 --early-stop-patience 6 --target-scale 100 \
+  --data-dir tdrive_predictor_artifacts/phase_b_7k_fast_attn
+
+# D — PROPOSED: attention + peaked-h5
+TDRIVE_CURVSTEP_ATTN=1 TDRIVE_CURVSTEP_PEAKED_H5=1 \
+python -m tdrive_predictor.cli train \
+  --mode curv_step --hidden-size 512 --batch-size 256 \
+  --epochs 80 --early-stop-patience 6 --target-scale 100 \
+  --data-dir tdrive_predictor_artifacts/phase_b_7k_fast_attn_peaked
+
+# E — lightweight combined (GRU-128)
+TDRIVE_CURVSTEP_ATTN=1 TDRIVE_CURVSTEP_PEAKED_H5=1 \
+python -m tdrive_predictor.cli train \
+  --mode curv_step --hidden-size 128 --batch-size 256 \
+  --epochs 80 --early-stop-patience 6 --target-scale 100 \
+  --data-dir tdrive_predictor_artifacts/phase_b_7k_fast_lite_attn_peaked
+
+# F — lightweight baseline (GRU-128, uniform)
+python -m tdrive_predictor.cli train \
+  --mode curv_step --hidden-size 128 --batch-size 256 \
+  --epochs 80 --early-stop-patience 6 --target-scale 100 \
+  --data-dir tdrive_predictor_artifacts/phase_b_7k_fast_lite
+```
+
+Windows PowerShell: thay `VAR=... command` bằng `$env:VAR="1"; command` (mỗi flag 1 dòng).
+
+**Smoke test nhanh (khuyến nghị trước full train)**
+
+Dùng dataset nhỏ, 5-10 epochs, chỉ verify không NaN và loss giảm:
+
+```bash
+TDRIVE_CURVSTEP_ATTN=1 TDRIVE_CURVSTEP_PEAKED_H5=1 \
+python -m tdrive_predictor.cli train \
+  --mode curv_step --hidden-size 256 --batch-size 128 \
+  --epochs 10 --target-scale 100 \
+  --data-dir tdrive_predictor_artifacts/phase_b_1k_fast_smoke
+```
+
+**Offline evaluation**
+
+```bash
+python -m tdrive_predictor.cli evaluate \
+  --mode curv_step \
+  --data-dir tdrive_predictor_artifacts/phase_b_7k_fast_attn_peaked
+```
+
+Chạy cho mỗi artifact dir, export bảng ADE/FDE/Hit@200 tại h=1, 3, 5, 10 cho cả 6 configs.
+
+**Simulation eval (downstream)**
+
+```bash
+# Linux/macOS
+export EXECUTION_MODE=simulated
+export TDRIVE_ARTIFACT_DIR=$(pwd)/predict-model-with-taxi/tdrive_predictor_artifacts/phase_b_7k_fast_attn_peaked
+export PREDICTIVE_PREWARM_ONLY=1
+export STICKY_FUNCTION_PER_USER=1
+cd serverless-sim && python web_start.py
+```
+
+```powershell
+# Windows PowerShell
+$env:EXECUTION_MODE="simulated"
+$env:TDRIVE_ARTIFACT_DIR="$PWD\predict-model-with-taxi\tdrive_predictor_artifacts\phase_b_7k_fast_attn_peaked"
+$env:PREDICTIVE_PREWARM_ONLY="1"
+$env:STICKY_FUNCTION_PER_USER="1"
+cd serverless-sim; python web_start.py
+```
+
+Chạy cùng scenario (TaxiD_Replay, seed cố định, cùng số user + thời gian) cho từng config, collect metrics từ `/api/v1/central/metrics`: avg turnaround_time, cold_start_rate, migration_count.
+
+### Expected impact (D vs A)
+
+| Metric | Baseline (A) | Proposed (D) | Δ |
+|---|---|---|---|
+| ADE h1 | 27.7m | 30-33m | +10-20% (unused bởi scheduler) |
+| **ADE h5** | **240.8m** | **195-210m** | **-13 to -19%** |
+| ADE h10 | 417.7m | 440-470m | +5-12% (unused) |
+| Turnaround time (sim) | baseline | giảm 5-8% | — |
+| Cold start rate (sim) | baseline | giảm 8-12% | — |
+
+### Backward compatibility
+
+- Baseline checkpoints (`gru_phase_curv_step.pt` không có `arch` trong meta) vẫn load bình thường qua fallback sniffing.
+- Mọi flag mới default OFF → run mặc định y hệt trước session này.
+- Shape output [B, 10] không đổi → scheduler serverless-sim không cần update.
