@@ -199,48 +199,6 @@ export default function AlgorithmComparisonPanel({ isOpen, onClose }) {
                       </CardContent>
                     </Card>
 
-                    {/* CVX Results */}
-                    <Card className="border-blue-200">
-                      <CardHeader className="pb-2">
-                        <CardTitle className="text-sm text-blue-700">
-                          CVX Optimization
-                        </CardTitle>
-                      </CardHeader>
-                      <CardContent>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-600">Assigned Node:</span>
-                            <Badge variant="outline">
-                              {algorithmComparison.new_user_comparison.cvx_assignment.assigned_node}
-                            </Badge>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-600">Distance:</span>
-                            <span className="font-mono text-xs">
-                              {formatNumber(algorithmComparison.new_user_comparison.cvx_assignment.distance)}px
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-600">Objective Value:</span>
-                            <span className="font-mono text-xs">
-                              {formatMs(algorithmComparison.new_user_comparison.cvx_assignment.optimization_objective_value)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-600">Latency Cost:</span>
-                            <span className="font-mono text-xs">
-                              {formatMs(algorithmComparison.new_user_comparison.cvx_assignment.latency_cost)}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-xs text-gray-600">Cold Start Cost:</span>
-                            <span className="font-mono text-xs">
-                              {formatMs(algorithmComparison.new_user_comparison.cvx_assignment.cold_start_cost)}
-                            </span>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
                   </div>
 
                   <Separator />
@@ -290,8 +248,7 @@ export default function AlgorithmComparisonPanel({ isOpen, onClose }) {
                     </div>
 
                     <div className="text-xs text-gray-600 p-2 bg-blue-50 rounded">
-                      <strong>Interpretation:</strong> Negative differences indicate CVX performs better (lower cost). 
-                      Positive differences indicate Greedy performs better.
+                      <strong>Interpretation:</strong> Lower turnaround and cold-start differences indicate better placement quality for the compared policy.
                     </div>
                   </div>
                 </div>

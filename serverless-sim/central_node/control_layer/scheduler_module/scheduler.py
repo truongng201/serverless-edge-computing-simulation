@@ -52,9 +52,7 @@ class AssignmentAlgorithm(Enum):
     RANDOM = "random"
     ROUND_ROBIN = "round robin"
     NEAREST = "nearest"
-    CVX = "convex optimization"
     PREDICTIVE = "predictive"
-    STICKY_GREEDY = "sticky greedy"
     GREEDY_KEEPALIVE = "greedy + keep-alive"
     PREDICTIVE_NO_WARM = "prediction without warm-state awareness"
 
@@ -384,7 +382,7 @@ class Scheduler:
 
         for node in self.edge_nodes.values():
             if node.metrics_info.cpu_usage < Config.EDGE_NODE_WARNING_CPU_THRESHOLD and \
-               node.metrics_info.memory_usage < Config.EDGE_NODE_WARNING_CPU_THRESHOLD:
+               node.metrics_info.memory_usage < Config.EDGE_NODE_WARNING_MEMORY_THRESHOLD:
                 classified_nodes["healthy"].add(node.node_id)
             elif node.metrics_info.cpu_usage < Config.EDGE_NODE_UNHEALTHY_CPU_THRESHOLD and \
                  node.metrics_info.memory_usage < Config.EDGE_NODE_UNHEALTHY_MEMORY_THRESHOLD:
@@ -485,12 +483,7 @@ class Scheduler:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             return self._assign_users_greedy()
         elif self.assignment_algorithm == AssignmentAlgorithm.GREEDY_KEEPALIVE:
-            return self._assign_users_greedy()
-        elif self.assignment_algorithm == AssignmentAlgorithm.STICKY_GREEDY:
-            return self._assign_users_sticky_greedy()
-        elif self.assignment_algorithm == AssignmentAlgorithm.CVX:
-            self._convex_optimization_assignment_all_users()
-            return self.assignment_matrix
+            return self._assign_users_nearest()
         elif self.assignment_algorithm in (
             AssignmentAlgorithm.PREDICTIVE,
             AssignmentAlgorithm.PREDICTIVE_NO_WARM,
@@ -993,19 +986,26 @@ class Scheduler:
             last_executed=0,
             latency=None,
         )
-        
-        best_node = self.central_node["node_id"]
-        min_distance = self._calculate_distance(user_location, self.central_node["location"])
-        
-        for node in self.edge_nodes.values():
-            if not self._check_resource_constraints(temp_user, node.node_id):
-                continue
-            distance = self._calculate_distance(user_location, node.location)
-            if distance < min_distance:
-                min_distance = distance
-                best_node = node.node_id
 
-        return best_node, min_distance
+        classified = self._classify_nodes()
+        central_distance = self._calculate_distance(user_location, self.central_node["location"])
+
+        for tier in ("healthy", "warning", "unhealthy"):
+            best_node = None
+            min_distance = float("inf")
+            for node_id in classified[tier]:
+                if node_id not in self.edge_nodes:
+                    continue
+                if not self._check_resource_constraints(temp_user, node_id):
+                    continue
+                distance = self._calculate_distance(user_location, self.edge_nodes[node_id].location)
+                if distance < min_distance:
+                    min_distance = distance
+                    best_node = node_id
+            if best_node is not None:
+                return best_node, min_distance
+
+        return self.central_node["node_id"], central_distance
 
    
     def calculate_turnaround_time_breakdown(self) -> Dict[str, float]:

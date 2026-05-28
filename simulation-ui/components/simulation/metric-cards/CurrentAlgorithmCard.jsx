@@ -25,14 +25,14 @@ export default function CurrentAlgorithmCard() {
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium">Current:</span>
-            <Badge variant={assignmentAlgorithm === "convex optimization" ? "default" : "secondary"}>
+            <Badge variant="secondary">
               {assignmentAlgorithm}
             </Badge>
           </div>
           
           <div className="text-xs text-gray-600">
             {assignmentAlgorithm === "greedy" &&
-              "Rule-based greedy algorithm that assigns users to the nearest healthy edge node within coverage and resource constraints. Fast but may not be globally optimal."}
+              "Tier-aware greedy baseline that prefers healthy feasible edges first, then warning, then unhealthy, and chooses the nearest node within the best available tier."}
             {assignmentAlgorithm === "random" &&
               "Random baseline that assigns each user to a feasible node uniformly at random. It provides a weak lower baseline for comparison."}
             {assignmentAlgorithm === "round robin" &&
@@ -41,13 +41,9 @@ export default function CurrentAlgorithmCard() {
               "Pure nearest-node baseline that selects the geographically closest feasible node without predictive or warm-state logic."}
             {assignmentAlgorithm === "greedy + keep-alive" &&
               "Nearest-node assignment with normal warm-container retention. This baseline isolates generic keep-alive reuse without mobility foresight."}
-            {assignmentAlgorithm === "sticky greedy" &&
-              "Keeps a user on the previously assigned node if it remains feasible; otherwise falls back to nearest-node assignment. This tests whether gains come mainly from avoiding switches."}
-            {assignmentAlgorithm === "convex optimization" &&
-              "CVX-based convex optimization that minimizes total cost (turnaround time + migration cost + cold start penalty) subject to coverage and resource constraints. Mathematically optimal but computationally intensive."}
             {assignmentAlgorithm === "predictive" &&
-              "Mobility-predictive assignment using the T-Drive predictor output to choose a likely future-serving node."}
-            {assignmentAlgorithm === "prediction without warm-state-awareness" &&
+              "Mobility-predictive assignment that ranks cloudlets using the T-Drive future-location forecast and selects the highest-probability feasible node."}
+            {assignmentAlgorithm === "prediction without warm-state awareness" &&
               "Uses mobility prediction for placement, but simulated execution does not preserve warm-state benefit. This isolates the contribution of prediction alone."}
           </div>
         </div>

@@ -38,7 +38,45 @@ class ExperimentRunner:
             "warm_count",
             "cold_count",
             "unknown_count",
+            "avg_latency_ms",
+            "p50_latency_ms",
+            "p95_latency_ms",
+            "p99_latency_ms",
+            "warm_rate",
+            "rejected_count",
+            "pool_evictions",
+            "pool_utilization_avg",
+            "static_energy_j",
+            "dynamic_energy_j",
+            "network_energy_j",
+            "cold_start_energy_j",
+            "total_energy_j",
+            "total_energy_wh",
+            "average_power_w",
         ]
+
+    def _ensure_results_csv_schema(self, filename: str, fieldnames):
+        """Rewrite an existing CSV if it was created with an older header."""
+        if not os.path.exists(filename) or os.path.getsize(filename) == 0:
+            return
+
+        try:
+            with open(filename, newline="") as csvfile:
+                reader = csv.DictReader(csvfile)
+                existing_fieldnames = reader.fieldnames or []
+                if existing_fieldnames == fieldnames:
+                    return
+                rows = list(reader)
+        except Exception as e:
+            print(f"Failed to inspect CSV schema for {filename}: {e}")
+            return
+
+        with open(filename, "w", newline="") as csvfile:
+            writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in rows:
+                normalized_row = {name: row.get(name, "") for name in fieldnames}
+                writer.writerow(normalized_row)
 
     def init_results_csv(self, filename: str = None) -> str:
         """Create the CSV upfront so each finished experiment can append immediately."""
@@ -53,6 +91,8 @@ class ExperimentRunner:
             with open(self.current_csv_filename, "w", newline="") as csvfile:
                 writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                 writer.writeheader()
+        else:
+            self._ensure_results_csv_schema(self.current_csv_filename, fieldnames)
         return self.current_csv_filename
 
     def append_result_to_csv(self, result: Dict[str, Any], filename: str = None) -> str:
@@ -95,6 +135,21 @@ class ExperimentRunner:
                         row["warm_count"] = v.get("warm_count", "")
                         row["cold_count"] = v.get("cold_count", "")
                         row["unknown_count"] = v.get("unknown_count", "")
+                        row["avg_latency_ms"] = v.get("avg_latency_ms", "")
+                        row["p50_latency_ms"] = v.get("p50_latency_ms", "")
+                        row["p95_latency_ms"] = v.get("p95_latency_ms", "")
+                        row["p99_latency_ms"] = v.get("p99_latency_ms", "")
+                        row["warm_rate"] = v.get("warm_rate", "")
+                        row["rejected_count"] = v.get("rejected_count", "")
+                        row["pool_evictions"] = v.get("pool_evictions", "")
+                        row["pool_utilization_avg"] = v.get("pool_utilization_avg", "")
+                        row["static_energy_j"] = v.get("static_energy_j", "")
+                        row["dynamic_energy_j"] = v.get("dynamic_energy_j", "")
+                        row["network_energy_j"] = v.get("network_energy_j", "")
+                        row["cold_start_energy_j"] = v.get("cold_start_energy_j", "")
+                        row["total_energy_j"] = v.get("total_energy_j", "")
+                        row["total_energy_wh"] = v.get("total_energy_wh", "")
+                        row["average_power_w"] = v.get("average_power_w", "")
                     else:
                         row["total_turnaround_time"] = v
                     writer.writerow(row)
@@ -286,9 +341,7 @@ class ExperimentRunner:
             if response.status_code == 200:
                 algorithms = response.json().get("data", {}).get("algorithms", []) or []
                 algorithms = [str(alg) for alg in algorithms if alg]
-                # Exclude expensive CVX from the default experiment sweep unless
-                # the caller explicitly passes it in `algorithms=...`.
-                return [alg for alg in algorithms if alg != "convex optimization"]
+                return algorithms
             print(f"Failed to fetch assignment algorithms: {response.status_code} {response.text}")
             return []
         except Exception as e:
