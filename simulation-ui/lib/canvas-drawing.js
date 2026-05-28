@@ -2,12 +2,11 @@ import { useCallback } from "react";
 import {
   drawGrid,
   drawUsers,
-  drawRoads,
-  drawRoadNetwork,
   drawConnections,
   drawUserConnections,
   drawCentralNodes,
   drawEdgeNodes,
+  drawRoads,
 } from "./draw";
 import useGlobalState from "@/hooks/use-global-state";
 
@@ -59,22 +58,11 @@ export const useCanvasDrawing = () => {
       zoomLevel
     );
 
-    if (showRoads && roads.length > 0) {
+    // Optional: draw roads first so nodes overlay
+    if (showRoads && roads && roads.length > 0) {
       drawRoads(
         ctx,
         roads,
-        visibleLeft,
-        visibleTop,
-        visibleRight,
-        visibleBottom,
-        zoomLevel
-      );
-    }
-
-    if (roadNetwork) {
-      drawRoadNetwork(
-        ctx,
-        roadNetwork,
         visibleLeft,
         visibleTop,
         visibleRight,

@@ -1,34 +1,26 @@
 import {
   EdgeNodeSettingsCard,
-  CentralNodeSettingsCard,
   UserSettingsCard,
   EditModeCard,
   ClearControlsCard,
   SimulationControlsCard,
-  NodePlacementCard,
   UserAssignmentCard,
   LiveSystemStatusCard,
-  ScenarioSelectionCard,
+  DatasetSelectionCard,
   ZoomControlsCard,
   ModelSelectionCard,
 } from "./control-cards/ControlCards";
 import { ChevronLeft } from "lucide-react";
 import { useEffect, useRef } from "react";
 import useGlobalState from "@/hooks/use-global-state";
-// import { calculateLatency } from "@/lib/helper"; // unused here
-// Frontend assignment removed; backend is authoritative
-// import { runGAPAssignment } from "@/lib/user-management";
 import { getClusterStatusAndUsersData } from "@/lib/simulation-management";
 
 export default function ControlPanelContent() {
   const intervalRef = useRef(null);
   const {
-    users,
     leftPanelOpen,
     setLeftPanelOpen,
     simulationSpeed,
-    edgeNodes,
-    centralNodes,
   } = useGlobalState();
 
   // GAP batch (client-side) is deprecated; backend handles assignment
@@ -77,23 +69,16 @@ export default function ControlPanelContent() {
 
         <SimulationControlsCard />
 
-        <ClearControlsCard />
-
-        <ScenarioSelectionCard />
-
-        <NodePlacementCard />
-
         <UserAssignmentCard />
 
-        <ZoomControlsCard />
+        <DatasetSelectionCard />
 
-        <ModelSelectionCard />
+        <ClearControlsCard />
 
-        <UserSettingsCard />
-
-        <CentralNodeSettingsCard />
-
-        <EdgeNodeSettingsCard />
+        {/* <ModelSelectionCard /> */}
+        {/* <UserSettingsCard /> */}
+        {/* <ZoomControlsCard /> */}
+        {/* <EdgeNodeSettingsCard /> */}
       </div>
     </>
   );

@@ -1,4 +1,3 @@
-import { drawStreetMapUser } from "./draw-street-map-user";
 
 export const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visibleTop, visibleRight, visibleBottom, zoomLevel) => {
   // Reduced logging to avoid console spam
@@ -13,12 +12,6 @@ export const drawUsers = (ctx, users, selectedUser, editMode, visibleLeft, visib
     }
 
     const isSelected = selectedUser && selectedUser.id === user.id;
-
-    // Use special drawing for street map users
-    if (user.type === 'street_map') {
-      drawStreetMapUser(ctx, user, isSelected, editMode, zoomLevel);
-      return;
-    }
 
     // Apply transition properties if they exist
     const opacity = user.opacity !== undefined ? user.opacity : 1;

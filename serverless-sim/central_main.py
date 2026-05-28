@@ -29,16 +29,34 @@ def create_central_node_app():
     
     return app
 
-def setup_logging(log_level: str = "INFO"):
+def setup_logging(port, log_level: str = "INFO"):
     """Setup logging configuration"""
-    logging.basicConfig(
-        level=getattr(logging, log_level.upper()),
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        handlers=[
-            logging.StreamHandler(sys.stdout),
-            logging.FileHandler('central_node.log')
-        ]
-    )
+    # Create logger
+    logger = logging.getLogger()
+    logger.setLevel(getattr(logging, log_level.upper()))
+    
+    # Clear existing handlers
+    logger.handlers.clear()
+    
+    # Create formatter
+    formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    
+    # File handler
+    file_handler = logging.FileHandler(f'logs/central_node_{port}.log')
+    file_handler.setLevel(getattr(logging, log_level.upper()))
+    file_handler.setFormatter(formatter)
+    
+    # Console handler
+    console_handler = logging.StreamHandler(sys.stdout)
+    console_handler.setLevel(getattr(logging, log_level.upper()))
+    console_handler.setFormatter(formatter)
+    
+    # Add handlers to logger
+    logger.addHandler(file_handler)
+    logger.addHandler(console_handler)
+    
+    # Prevent duplicate logs
+    logger.propagate = False
 
 def main():
     parser = argparse.ArgumentParser(description='Serverless Central Node')
@@ -57,7 +75,7 @@ def main():
     args = parser.parse_args()
     
     # Setup logging
-    setup_logging(args.log_level)
+    setup_logging(args.port, args.log_level)
     logger = logging.getLogger(__name__)
     
     logger.info("=" * 60)

@@ -1,0 +1,125 @@
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Navigation } from "lucide-react";
+import useGlobalState from "@/hooks/use-global-state";
+import { 
+  setDataset, 
+  getDatasetInfo, 
+  loadTaxiDRoads,
+  loadTaxiDRoadsPreprocessed 
+} from "@/lib/simulation-management";
+import { clearAllUsers } from "@/lib/user-management";
+import { useEffect, useState } from "react";
+
+export default function DatasetSelectionCard() {
+  const { selectedDataset, setSelectedDataset, datasetInfo, setDatasetInfo, setRoads, setShowRoads } = useGlobalState();
+  const [sampleSize, setSampleSize] = useState(100);
+
+  // Datasets that support sample size selection
+  const datasetsWithSampleSize = ["random_generated", "taxiD_Replay"];
+
+  const handleDatasetChange = async (value, sampleSizeOverride = null) => {
+    setSelectedDataset(value);
+    const effectiveSampleSize = sampleSizeOverride !== null ? sampleSizeOverride : sampleSize;
+    // Pass sample size for datasets that support it
+    const shouldPassSampleSize = datasetsWithSampleSize.includes(value);
+    await setDataset(value, shouldPassSampleSize ? effectiveSampleSize : null);
+    if (value === "none") {
+      await clearAllUsers();
+      setRoads([])
+      setShowRoads(false)
+    } else if (value === "taxiD" || value === "taxiD_Replay") {
+      const ok = await loadTaxiDRoadsPreprocessed();
+      if (!ok) {
+        await loadTaxiDRoads();
+      }
+    } else{
+      setRoads([])
+      setShowRoads(false)
+    }
+  };
+
+  useEffect(() => {
+    const fetchDatasetInfo = async () => {
+      const response = await getDatasetInfo();
+      setDatasetInfo(response);
+    };
+    fetchDatasetInfo();
+  }, []);
+
+  return (
+    <Card className="mb-4">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm flex items-center gap-2">
+          <Navigation className="w-4 h-4" />
+          Dataset Selection
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        <div className="space-y-2">
+          <Label className="text-xs">Dataset</Label>
+          <Select value={selectedDataset} onValueChange={handleDatasetChange}>
+            <SelectTrigger className="h-8">
+              <SelectValue placeholder="Select a dataset" />
+            </SelectTrigger>
+            <SelectContent>
+              {datasetInfo?.dataset_list?.length > 0 ? (
+                datasetInfo.dataset_list.map((dataset) => (
+                  <SelectItem key={dataset.name} value={dataset.name}>
+                    {dataset.ui_name}
+                  </SelectItem>
+                ))
+              ) : (
+                <SelectItem value="none">No datasets available</SelectItem>
+              )}
+            </SelectContent>
+          </Select>
+        </div>
+
+        {datasetsWithSampleSize.includes(selectedDataset) && (
+          <div className="space-y-2">
+            <Label className="text-xs">
+              {selectedDataset === "taxiD_Replay" ? "Number of Trajectories" : "Sample Size"}
+            </Label>
+            <Select
+              value={sampleSize.toString()}
+              onValueChange={(value) => {
+                const newSampleSize = Number(value);
+                setSampleSize(newSampleSize);
+                handleDatasetChange(selectedDataset, newSampleSize);
+              }}
+            >
+              <SelectTrigger className="h-8">
+                <SelectValue placeholder="Select a sample size" />
+              </SelectTrigger>
+              <SelectContent>
+                {[100, 200, 300, 400, 500, 600, 700, 800, 900, 1000].map((size) => (
+                  <SelectItem key={size} value={size.toString()}>
+                    {size}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {selectedDataset === "taxiD_Replay" && (
+              <div className="text-xs text-blue-600">
+                Using T-drive taxi trajectories for predictive model testing
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="text-xs text-gray-600">
+          Select a predefined Dataset to load sample data, or choose "None" to
+          manually add users.
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

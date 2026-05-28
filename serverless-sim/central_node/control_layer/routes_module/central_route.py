@@ -46,6 +46,16 @@ def register_node():
     return result
 
 
+@central_route.route('/nodes', methods=['DELETE'])
+@standard_response
+def clear_nodes():
+    """Unregister every edge node. Used by the experiment runner to guarantee
+    a clean fleet between EDGE_RANGES iterations (otherwise stale edges from
+    a previous iteration persist and skew distance/assignment metrics)."""
+    result = central_core_controller.clear_edge_nodes()
+    return result
+
+
 @central_route.route('/nodes/<node_id>/metrics', methods=['POST'])
 @standard_response
 def update_metrics(node_id):
@@ -124,16 +134,16 @@ def delete_user(user_id):
     result = central_core_controller.delete_user(user_id)
     return result
 
-@central_route.route('/start_dact_sample', methods=['POST'])
+@central_route.route('/taxid/roads', methods=['GET'])
 @standard_response
-def start_dact_sample():
-    result = central_core_controller.start_dact_sample()
+def get_taxid_roads():
+    result = central_core_controller.get_taxid_roads()
     return result
 
-@central_route.route('/start_vehicles_sample', methods=['POST'])
+@central_route.route('/taxid/roads_preprocessed', methods=['GET'])
 @standard_response
-def start_vehicles_sample():
-    result = central_core_controller.start_vehicles_sample()
+def get_taxid_roads_preprocessed():
+    result = central_core_controller.get_taxid_roads_preprocessed()
     return result
 
 @central_route.route('/execute', methods=['POST'])
@@ -143,23 +153,40 @@ def execute_function():
     result = central_core_controller.execute_function(request_data)
     return result
 
-# Assignment strategy/config endpoints
-@central_route.route('/assignment/strategy', methods=['POST'])
+@central_route.route('/assignment_algorithm', methods=['POST'])
 @standard_response
-def set_assignment_strategy():
+def set_assignment_algorithm():
     request_data = request.get_json() or {}
-    result = central_core_controller.set_assignment_strategy(request_data)
+    result = central_core_controller.set_assignment_algorithm(request_data)
     return result
 
-@central_route.route('/assignment/config', methods=['POST'])
+@central_route.route('/assignment_algorithm', methods=['GET'])
 @standard_response
-def set_assignment_config():
-    request_data = request.get_json() or {}
-    result = central_core_controller.update_assignment_config(request_data)
+def get_assignment_algorithm():
+    result = central_core_controller.get_assignment_algorithm()
     return result
 
-@central_route.route('/assignment/status', methods=['GET'])
+@central_route.route('/all_assignment_algorithms', methods=['GET'])
 @standard_response
-def assignment_status():
-    result = central_core_controller.get_assignment_status()
+def get_all_assignment_algorithms():
+    result = central_core_controller.get_all_assignment_algorithms()
+    return result
+
+@central_route.route('/performance_metrics', methods=['GET'])
+@standard_response
+def get_performance_metrics():
+    result = central_core_controller.get_performance_metrics()
+    return result
+
+@central_route.route('/get_dataset_info', methods=['GET'])
+@standard_response
+def get_dataset_info():
+    result = central_core_controller.get_dataset_info()
+    return result
+
+@central_route.route('/set_dataset', methods=['POST'])
+@standard_response
+def set_dataset():
+    request_data = request.get_json()
+    result = central_core_controller.set_dataset(request_data)
     return result

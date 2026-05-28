@@ -5,40 +5,27 @@ from central_node.control_layer.scheduler_module.scheduler import Scheduler
 from central_node.control_layer.agents_module.scheduler_agent import SchedulerAgent
 from central_node.control_layer.agents_module.users_agent import UsersAgent
 from central_node.control_layer.prediction_module.prediction import WorkloadPredictor
-from central_node.control_layer.prediction_module.trajectory_predictor import TrajectoryPredictor
 from central_node.control_layer.helper_module.data_manager import DataManager
 
 class CentralCoreController:
     def __init__(self):
         self.scheduler = Scheduler()
         self.predictor = WorkloadPredictor()
-        # Attach trajectory predictor (optional GNN)
-        try:
-            import os
-            base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-            # model file path relative to prediction_module
-            model_path = os.path.join(
-                base,
-                'prediction_module',
-                'spatial_temporal_gnn',
-                'st-gnn_small_9_nodes_model.keras'
-            )
-            self.trajectory_predictor = TrajectoryPredictor(model_path=model_path, sequence_length=5)
-        except Exception:
-            self.trajectory_predictor = TrajectoryPredictor(model_path=None)
-        # Share with scheduler
-        self.scheduler.trajectory_predictor = self.trajectory_predictor
         self.data_manager = DataManager()
         self.central_node_api_controller = CentralNodeAPIController()
         
         CentralNodeAPIAgent(self.central_node_api_controller).start_all_tasks()
         SchedulerAgent(self.scheduler).start_all_tasks()
-        UsersAgent(self.scheduler).start_all_tasks()
+        # UsersAgent(self.scheduler).start_all_tasks()
 
     def register_edge_node(self, request_data):
         controller = RegisterEdgeNodeController(self.scheduler, request_data)
         controller.execute()
         return f"Node {request_data.get('node_id')} registered successfully"
+
+    def clear_edge_nodes(self):
+        n = self.scheduler.clear_edges()
+        return {"cleared": n}
 
     def update_node_metrics(self, node_id, request_data):
         controller = UpdateNodeMetricsController(self.scheduler, node_id, request_data)
@@ -102,29 +89,35 @@ class CentralCoreController:
         response = controller.execute()
         return response
 
-    # Assignment strategy/config APIs
-    def set_assignment_strategy(self, request_data):
-        strategy = request_data.get('strategy', 'round_robin')
-        self.scheduler.set_scheduling_strategy(strategy)
-        return f"Assignment strategy set to {self.scheduler.get_scheduling_strategy()}"
+    def set_assignment_algorithm(self, request_data):
+        controller = SetAssignmentAlgorithmController(self.scheduler, request_data)
+        return controller.execute()
 
-    def update_assignment_config(self, request_data):
-        cfg = {}
-        for key in ['handoff_min_dwell_seconds', 'handoff_improvement_threshold', 'assignment_scan_interval', 'load_aware_alpha']:
-            if key in request_data:
-                cfg[key] = request_data[key]
-        self.scheduler.set_assignment_config(**cfg)
-        return self.scheduler.get_assignment_status()
+    def get_assignment_algorithm(self):
+        controller = GetAssignmentAlgorithmController(self.scheduler)
+        return controller.execute()
 
-    def get_assignment_status(self):
-        return self.scheduler.get_assignment_status()
+    def get_all_assignment_algorithms(self):
+        controller = GetAllAssignmentAlgorithmsController(self.scheduler)
+        return controller.execute()
 
-    def start_dact_sample(self):
-        controller = StartDactSampleController(self.data_manager, self.scheduler)
-        controller.execute()
-        return "Start using dact sample"
+    def get_performance_metrics(self):
+        controller = GetPerformanceMetricsController(self.scheduler)
+        return controller.execute()
+
+
+    def get_taxid_roads(self):
+        controller = GetTaxiDRoadsController(self.scheduler)
+        return controller.execute()
+
+    def get_taxid_roads_preprocessed(self):
+        controller = GetTaxiDRoadsPreprocessedController(self.scheduler)
+        return controller.execute()
     
-    def start_vehicles_sample(self):
-        controller = StartVehiclesSampleController(self.data_manager, self.scheduler)
-        controller.execute()
-        return "Start using vehicles sample"
+    def get_dataset_info(self):
+        controller = GetDatasetListController(self.scheduler, self.data_manager)
+        return controller.execute()
+    
+    def set_dataset(self, request_data):
+        controller = SetDatasetController(self.scheduler, self.data_manager, request_data)
+        return controller.execute()

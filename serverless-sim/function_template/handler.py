@@ -1,2 +1,13 @@
+import time
+
+def simulate_cpu(seconds=2):
+    end = time.time() + seconds
+    x = 0
+    while time.time() < end:
+        x += 1
+    return x
+
 def handler(event, context):
-    return f"Say hi to this simulation. Event: {event}, Context: {context}"
+    print("Simulate an simple execution with sleeping")
+    work = simulate_cpu(2)
+    return f"CPU work finished. Iterations: {work}"

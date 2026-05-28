@@ -263,7 +263,7 @@ const useGlobalState = create((set) => ({
     })),
   
   // User Assignment state
-  assignmentAlgorithm: "nearest-distance",
+  assignmentAlgorithm: "greedy",
   setAssignmentAlgorithm: (updater) =>
     set((state) => ({
       assignmentAlgorithm: typeof updater === "function"
@@ -302,11 +302,11 @@ const useGlobalState = create((set) => ({
     })),
 
   // Scenario selection state
-  selectedScenario: "none",
-  setSelectedScenario: (updater) =>
+  selectedDataset: "none",
+  setSelectedDataset: (updater) =>
     set((state) => ({
-      selectedScenario: typeof updater === "function"
-        ? updater(state.selectedScenario)
+      selectedDataset: typeof updater === "function"
+        ? updater(state.selectedDataset)
         : updater
     })),
 
@@ -319,6 +319,13 @@ const useGlobalState = create((set) => ({
         : updater
     })),
 
+  datasetInfo: {},
+  setDatasetInfo: (updater) =>
+    set((state) => ({
+      datasetInfo: typeof updater === "function"
+        ? updater(state.datasetInfo)
+        : updater
+    })),
   
 
   // Loading and error request
@@ -341,6 +348,55 @@ const useGlobalState = create((set) => ({
     set((state) => ({
       loadingSimulation: typeof updater === "function"
         ? updater(state.loadingSimulation)
+        : updater
+    })),
+
+  // Performance Metrics state
+  performanceMetrics: {
+    algorithm: "greedy",
+    total_cost: 0,
+    total_turnaround_time: 0,
+    total_migration_cost: 0,
+    total_cold_start_penalty: 0,
+    num_users: 0,
+    resource_utilization: {
+      avg_memory_utilization: 0,
+      avg_cpu_utilization: 0,
+      avg_bandwidth_utilization: 0,
+      total_cold_starts: 0
+    }
+  },
+  setPerformanceMetrics: (updater) =>
+    set((state) => ({
+      performanceMetrics: typeof updater === "function"
+        ? updater(state.performanceMetrics)
+        : updater
+    })),
+
+  // Algorithm comparison data
+  algorithmComparison: null,
+  setAlgorithmComparison: (updater) =>
+    set((state) => ({
+      algorithmComparison: typeof updater === "function"
+        ? updater(state.algorithmComparison)
+        : updater
+    })),
+
+  // Detailed cloudlet metrics
+  cloudletMetrics: {},
+  setCloudletMetrics: (updater) =>
+    set((state) => ({
+      cloudletMetrics: typeof updater === "function"
+        ? updater(state.cloudletMetrics)
+        : updater
+    })),
+
+  // TAT History for live charting
+  tatHistory: [],
+  setTatHistory: (updater) =>
+    set((state) => ({
+      tatHistory: typeof updater === "function"
+        ? updater(state.tatHistory)
         : updater
     }))
 }));

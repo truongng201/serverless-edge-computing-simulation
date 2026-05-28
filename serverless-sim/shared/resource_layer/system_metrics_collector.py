@@ -1,8 +1,3 @@
-"""
-Resource Layer - System Metrics Collection
-Collects real-time system metrics from /proc files
-"""
-
 import logging
 import time
 import os
@@ -25,18 +20,213 @@ class SystemMetrics:
 class SystemMetricsCollector:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        self.last_cpu_times = None
-        self.last_cpu_measurement_time = None
+        self._container_cpu_limit = self._get_container_cpu_limit()
+        self._container_memory_limit = self._get_container_memory_limit()
+        self._is_containerized = self._detect_container()
+        self._cgroup_version = self._detect_cgroup_version()
         
-    def collect_metrics(self) -> Optional[SystemMetrics]:
-        """Collect all system metrics"""
+        if self._is_containerized:
+            self.logger.info(f"Running in container (cgroup v{self._cgroup_version}) - CPU limit: {self._container_cpu_limit} cores, Memory limit: {self._container_memory_limit / (1024**3):.2f} GB")
+        else:
+            self.logger.info("Running on host machine")
+    
+    def _detect_container(self) -> bool:
+        """Detect if running inside a Docker container"""
+        try:
+            # Check for .dockerenv file
+            if os.path.exists('/.dockerenv'):
+                return True
+            
+            # Check cgroup
+            if os.path.exists('/proc/1/cgroup'):
+                with open('/proc/1/cgroup', 'rt') as f:
+                    return 'docker' in f.read()
+            
+            return False
+        except:
+            return False
+    
+    def _detect_cgroup_version(self) -> int:
+        """Detect cgroup version (v1 or v2)"""
+        try:
+            # Check if cgroup v2 is being used
+            if os.path.exists('/sys/fs/cgroup/cgroup.controllers'):
+                return 2
+            elif os.path.exists('/sys/fs/cgroup/cpu'):
+                return 1
+            return 1  # Default to v1
+        except:
+            return 1
+    
+    def _get_container_cpu_limit(self) -> Optional[float]:
+        """Get CPU limit from Docker container cgroup"""
+        try:
+            # Try cgroup v2 first
+            cpu_max_path = '/sys/fs/cgroup/cpu.max'
+            if os.path.exists(cpu_max_path):
+                with open(cpu_max_path, 'r') as f:
+                    content = f.read().strip().split()
+                    if len(content) == 2 and content[0] != 'max':
+                        quota = int(content[0])
+                        period = int(content[1])
+                        return quota / period
+            
+            # Try cgroup v1
+            quota_path = '/sys/fs/cgroup/cpu/cpu.cfs_quota_us'
+            period_path = '/sys/fs/cgroup/cpu/cpu.cfs_period_us'
+            
+            if os.path.exists(quota_path) and os.path.exists(period_path):
+                with open(quota_path, 'r') as f:
+                    quota = int(f.read().strip())
+                with open(period_path, 'r') as f:
+                    period = int(f.read().strip())
+                
+                if quota > 0 and period > 0:
+                    return quota / period
+            
+            return None
+        except Exception as e:
+            self.logger.debug(f"Could not read container CPU limit: {e}")
+            return None
+    
+    def _get_container_memory_limit(self) -> Optional[int]:
+        """Get memory limit from Docker container cgroup"""
+        try:
+            # Try cgroup v2 first
+            mem_max_path = '/sys/fs/cgroup/memory.max'
+            if os.path.exists(mem_max_path):
+                with open(mem_max_path, 'r') as f:
+                    content = f.read().strip()
+                    if content != 'max':
+                        return int(content)
+            
+            # Try cgroup v1
+            limit_path = '/sys/fs/cgroup/memory/memory.limit_in_bytes'
+            if os.path.exists(limit_path):
+                with open(limit_path, 'r') as f:
+                    limit = int(f.read().strip())
+                    # Check if it's a real limit (not the default huge value)
+                    if limit < (1 << 62):  # Reasonable memory limit
+                        return limit
+            
+            return None
+        except Exception as e:
+            self.logger.debug(f"Could not read container memory limit: {e}")
+            return None
+    
+    def _get_container_memory_usage(self) -> Optional[int]:
+        """Get current memory usage from Docker container cgroup"""
+        try:
+            # Try cgroup v2 first
+            mem_current_path = '/sys/fs/cgroup/memory.current'
+            if os.path.exists(mem_current_path):
+                with open(mem_current_path, 'r') as f:
+                    return int(f.read().strip())
+            
+            # Try cgroup v1
+            usage_path = '/sys/fs/cgroup/memory/memory.usage_in_bytes'
+            if os.path.exists(usage_path):
+                with open(usage_path, 'r') as f:
+                    return int(f.read().strip())
+            
+            return None
+        except Exception as e:
+            self.logger.debug(f"Could not read container memory usage: {e}")
+            return None
+
+    def _get_uptime(self) -> float:
+        try:
+            boot_time = psutil.boot_time()
+            return time.time() - boot_time
+        except Exception as e:
+            self.logger.error(f"Failed to get uptime: {e}")
+            return 0.0
+
+    def _get_cpu_usage(self) -> float:
+        """Get CPU usage considering container limits"""
+        try:
+            # Get raw CPU usage
+            cpu_usage = psutil.cpu_percent(interval=1)
+            
+            # If running in container with CPU limit, scale the usage
+            if self._container_cpu_limit is not None:
+                total_cores = psutil.cpu_count()
+                # Scale usage based on the limited cores
+                cpu_usage = (cpu_usage / total_cores) * self._container_cpu_limit
+            
+            return cpu_usage
+        except Exception as e:
+            self.logger.error(f"Failed to read CPU usage: {e}")
+            return 0.0
+        
+    def _get_load_average(self) -> tuple:
+        try:
+            if platform.system() == "Windows" or not hasattr(os, "getloadavg"):
+                try:
+                    cpu_percent = psutil.cpu_percent(interval=0)
+                    cpu_cores = self._container_cpu_limit if self._container_cpu_limit else max(1, psutil.cpu_count() or 1)
+                    approx_load = round((cpu_percent / 100.0) * cpu_cores, 2)
+                    return (approx_load, approx_load, approx_load)
+                except Exception:
+                    return (0.0, 0.0, 0.0)
+            return os.getloadavg()
+        except Exception:
+            return (0.0, 0.0, 0.0)
+        
+    def _get_memory_info(self) -> Dict[str, Any]:
+        """Get memory info considering container limits"""
+        try:
+            # If running in container with memory limit, use container stats
+            if self._container_memory_limit is not None:
+                total = self._container_memory_limit
+                used = self._get_container_memory_usage()
+                
+                if used is not None:
+                    available = total - used
+                    usage_percentage = (used / total) * 100.0
+                    
+                    return {
+                        'total': total,
+                        'available': available,
+                        'used': used,
+                        'usage_percentage': usage_percentage
+                    }
+            
+            # Fallback to psutil for host or if container stats unavailable
+            mem = psutil.virtual_memory()
+            return {
+                'total': mem.total,
+                'available': mem.available,
+                'used': mem.used,
+                'usage_percentage': mem.percent
+            }
+        except Exception as e:
+            self.logger.error(f"Failed to read memory info: {e}")
+            # Final fallback
+            try:
+                mem = psutil.virtual_memory()
+                return {
+                    'total': mem.total,
+                    'available': mem.available,
+                    'used': mem.used,
+                    'usage_percentage': mem.percent
+                }
+            except:
+                return {
+                    'total': 0,
+                    'available': 0,
+                    'used': 0,
+                    'usage_percentage': 0.0
+                }
+        
+    def _collect_metrics(self) -> Optional[SystemMetrics]:
         try:
             timestamp = time.time()
-            cpu_usage = self.get_cpu_usage()
-            memory_info = self.get_memory_info()
-            energy = self.calculate_cpu_energy(cpu_usage)
-            load_avg = self.get_load_average()
-            uptime = self.get_uptime()
+            cpu_usage = self._get_cpu_usage()
+            memory_info = self._get_memory_info()
+            energy = self._calculate_cpu_energy(cpu_usage)
+            load_avg = self._get_load_average()
+            uptime = self._get_uptime()
             
             return SystemMetrics(
                 timestamp=timestamp,
@@ -52,141 +242,30 @@ class SystemMetricsCollector:
         except Exception as e:
             self.logger.error(f"Failed to collect system metrics: {e}")
             return None
-            
-    def get_cpu_usage(self) -> float:
-        """Get CPU usage percentage using psutil"""
+    
+    def _calculate_cpu_energy(self, cpu_usage_percent: float) -> float:
         try:
-            # psutil.cpu_percent() returns the CPU utilization as a percentage
-            return psutil.cpu_percent(interval=1)
-        except Exception as e:
-            self.logger.error(f"Failed to read CPU usage: {e}")
-            return 0.0
+            # Adjust base power for container CPU limits
+            if self._container_cpu_limit is not None:
+                base_power_watts = 50 * (self._container_cpu_limit / psutil.cpu_count())
+                max_additional_watts = 100 * (self._container_cpu_limit / psutil.cpu_count())
+            else:
+                base_power_watts = 50
+                max_additional_watts = 100
             
-    def get_memory_info(self) -> Dict[str, Any]:
-        """Get memory information using psutil"""
-        try:
-            mem = psutil.virtual_memory()
-            return {
-                'total': mem.total,
-                'available': mem.available,
-                'used': mem.used,
-                'usage_percentage': mem.percent
-            }
-        except Exception as e:
-            self.logger.error(f"Failed to read memory info: {e}")
-            return {
-                'total': 0,
-                'available': 0,
-                'used': 0,
-                'usage_percentage': 0.0
-            }
-            
-    def calculate_cpu_energy(self, cpu_usage_percent: float) -> float:
-        """Calculate CPU energy consumption in kWh"""
-        try:
-            # Simple energy calculation based on CPU usage
-            # Base power consumption + variable power based on usage
-            base_power_watts = 50  # Base power consumption
-            max_additional_watts = 100  # Additional power at 100% CPU
-            
-            # Current power consumption
             current_power_watts = base_power_watts + (max_additional_watts * cpu_usage_percent / 100.0)
-            
-            # Calculate energy for the measurement interval (assume 1 second)
-            measurement_interval_hours = 1.0 / 3600.0  # 1 second in hours
+            measurement_interval_hours = 1.0 / 3600.0
             energy_kwh = (current_power_watts / 1000.0) * measurement_interval_hours
-            
             return energy_kwh
-            
         except Exception as e:
             self.logger.error(f"Failed to calculate CPU energy: {e}")
             return 0.0
-            
-    def get_load_average(self) -> tuple:
-        """Get system load average.
-
-        On Windows, os.getloadavg() is not available. We return a synthetic
-        tuple based on CPU utilization to avoid repeated errors and keep
-        downstream code stable.
-        """
-        try:
-            if platform.system() == "Windows" or not hasattr(os, "getloadavg"):
-                # Approximate: scale CPU percent (0-100) to a load-like number by cores
-                try:
-                    cpu_percent = psutil.cpu_percent(interval=0)
-                    cpu_cores = max(1, psutil.cpu_count() or 1)
-                    # Normalize to a load average-like value
-                    approx_load = round((cpu_percent / 100.0) * cpu_cores, 2)
-                    return (approx_load, approx_load, approx_load)
-                except Exception:
-                    return (0.0, 0.0, 0.0)
-            return os.getloadavg()
-        except Exception:
-            # Avoid spamming logs every 5s; return zeros silently
-            return (0.0, 0.0, 0.0)
-            
-    def get_uptime(self) -> float:
-        """Get system uptime in seconds using psutil"""
-        try:
-            boot_time = psutil.boot_time()
-            return time.time() - boot_time
-        except Exception as e:
-            self.logger.error(f"Failed to get uptime: {e}")
-            return 0.0
-            
-    def get_network_io(self) -> Dict[str, Any]:
-        """Get network I/O statistics using psutil"""
-        try:
-            net_io = psutil.net_io_counters(pernic=True)
-            network_stats = {}
-            total_rx = 0
-            total_tx = 0
-            for interface, stats in net_io.items():
-                if interface != 'lo':  # Skip loopback interface
-                    network_stats[interface] = {
-                        'rx_bytes': stats.bytes_recv,
-                        'rx_packets': stats.packets_recv,
-                        'tx_bytes': stats.bytes_sent,
-                        'tx_packets': stats.packets_sent
-                    }
-                    total_rx += stats.bytes_recv
-                    total_tx += stats.bytes_sent
-            return {
-                'interfaces': network_stats,
-                'total_rx_bytes': total_rx,
-                'total_tx_bytes': total_tx
-            }
-        except Exception as e:
-            self.logger.error(f"Failed to get network stats: {e}")
-            return {'interfaces': {}, 'total_rx_bytes': 0, 'total_tx_bytes': 0}
-            
-    def get_disk_io(self) -> Dict[str, Any]:
-        """Get disk I/O statistics using psutil"""
-        try:
-            disk_io = psutil.disk_io_counters(perdisk=True)
-            disk_stats = {}
-            for device, stats in disk_io.items():
-                disk_stats[device] = {
-                    'read_count': stats.read_count,
-                    'write_count': stats.write_count,
-                    'read_bytes': stats.read_bytes,
-                    'write_bytes': stats.write_bytes,
-                    'read_time': stats.read_time,
-                    'write_time': stats.write_time
-                }
-            return disk_stats
-        except Exception as e:
-            self.logger.error(f"Failed to get disk stats: {e}")
-            return {}
-            
+    
+    
     def get_detailed_metrics(self) -> Dict[str, Any]:
-        """Get detailed system metrics including network and disk I/O"""
-        base_metrics = self.collect_metrics()
+        base_metrics = self._collect_metrics()
         if not base_metrics:
             return {}
-            
-        # network_io = self.get_network_io()
-        # disk_io = self.get_disk_io()
         
         return {
             'timestamp': base_metrics.timestamp,
@@ -197,13 +276,18 @@ class SystemMetricsCollector:
             'cpu_energy_kwh': base_metrics.cpu_energy_kwh,
             'load_average': base_metrics.load_average,
             'uptime': base_metrics.uptime,
-            # 'network_io': network_io,
-            # 'disk_io': disk_io
+            'is_containerized': self._is_containerized,
+            'container_cpu_limit': self._container_cpu_limit,
+            'container_memory_limit': self._container_memory_limit,
+            'cgroup_version': self._cgroup_version,
         }
-
+        
     def get_system_info(self) -> Dict[str, Any]:
-        """Get basic system information"""
         try:
+            # Use container limits if available
+            cpu_cores = self._container_cpu_limit if self._container_cpu_limit else psutil.cpu_count(logical=True)
+            memory_total = self._container_memory_limit if self._container_memory_limit else psutil.virtual_memory().total
+            
             system_info = {
                 "platform": platform.system(),
                 "node_name": platform.node(),
@@ -211,18 +295,19 @@ class SystemMetricsCollector:
                 "version": platform.version(),
                 "machine": platform.machine(),
                 "processor": platform.processor(),
-                "cpu_cores_physical": psutil.cpu_count(logical=False),
-                "memory_total": round(psutil.virtual_memory().total / (1024**3), 2),
+                "cpu_cores_physical": cpu_cores if isinstance(cpu_cores, int) else round(cpu_cores, 2),
+                "memory_total": round(memory_total / (1024**3), 2),
                 "disk_size_total": 0,
+                "is_containerized": self._is_containerized,
             }
 
-            # Get disk information
             for part in psutil.disk_partitions():
-                usage = psutil.disk_usage(part.mountpoint)
-                system_info["disk_size_total"] += round(usage.total / (1024**3), 2)
-
+                try:
+                    usage = psutil.disk_usage(part.mountpoint)
+                    system_info["disk_size_total"] += round(usage.total / (1024**3), 2)
+                except:
+                    continue
             return system_info
-
         except Exception as e:
             self.logger.error(f"Failed to get system info: {e}")
             return {}

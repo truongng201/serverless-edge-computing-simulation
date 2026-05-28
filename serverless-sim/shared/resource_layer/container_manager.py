@@ -3,7 +3,11 @@ Resource Layer - Docker Container Management
 Handles Docker container lifecycle and state management
 """
 
-import docker
+try:
+    import docker
+except ImportError:
+    docker = None  # Not installed in web/simulated deployment
+
 import logging
 import time
 from typing import Dict, List, Optional, Any
@@ -25,29 +29,34 @@ class ContainerInfo:
 class ContainerManager:
     def __init__(self):
         self.logger = logging.getLogger(__name__)
-        try:
-            self.client = docker.DockerClient(base_url=Config.DOCKER_SOCKET)
-            # Test connection
-            self.client.ping()
-            self._create_network()
-            self.logger.info("Docker client initialized successfully")
-        except Exception as e:
-            self.logger.error(f"Failed to initialize Docker client: {e}")
-            self.client = None
-            
+        self.client = None
+        if docker is None:
+            self.logger.warning("Docker SDK not installed — container management disabled (simulated mode)")
+        else:
+            try:
+                self.client = docker.DockerClient(base_url=Config.DOCKER_SOCKET)
+                # Test connection
+                self.client.ping()
+                self._create_network()
+                self.logger.info("Docker client initialized successfully")
+            except Exception as e:
+                self.logger.error(f"Failed to initialize Docker client: {e}")
+                self.client = None
+
         self.containers: Dict[str, ContainerInfo] = {}
-        
+
     def _create_network(self):
         """Create a new Docker network"""
         if not self.client:
             self.logger.error("Docker client not available")
             return
-        
+
+        _NotFound = docker.errors.NotFound if docker is not None else Exception
         try:
             # Check if current network exist
             self.client.networks.get(Config.CONTAINER_NETWORK)
             self.logger.info(f"Docker network {Config.CONTAINER_NETWORK} already exists")
-        except docker.errors.NotFound:
+        except _NotFound:
             self.client.networks.create(Config.CONTAINER_NETWORK)
             self.logger.info(f"Docker network {Config.CONTAINER_NETWORK} created successfully")
         except Exception as e:
@@ -162,26 +171,13 @@ class ContainerManager:
                 stdout=True,
                 stderr=True
             )
-
+            self.containers[container_id].state = ContainerState.WARM
             output = exec_result.output.decode("utf-8").strip()
             self.logger.debug(f"Exec output from {container_id[:12]}:\n{output}")
             return output
         except Exception as e:
             self.logger.error(f"Failed to exec in container {container_id}: {e}")
             return None
-
-    def warm_container(self, container_id: str) -> bool:
-        if not container_id or container_id not in self.containers:
-            return False
-
-        try:
-            self.containers[container_id].stopped_at = time.time()
-            self.containers[container_id].state = ContainerState.WARM
-            self.logger.info(f"Container warmed: {container_id[:12]}")
-            return True
-        except Exception as e:
-            self.logger.error(f"Failed to warm container {container_id}: {e}")
-            return False
 
     def remove_container(self, container_id: str, force: bool = False) -> bool:
         """Remove a container (WARM -> DEAD)"""

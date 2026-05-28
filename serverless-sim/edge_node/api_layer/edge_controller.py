@@ -3,9 +3,33 @@ import time
 import random
 import string
 from typing import Dict, Any, Tuple
+import re
 
 from shared.resource_layer import ContainerManager, SystemMetricsCollector
 from config import Config, ContainerState
+
+
+_SAFE_CONTAINER_NAME_RE = re.compile(r"[^a-zA-Z0-9_.-]+")
+
+
+def _safe_name(value: str) -> str:
+    value = _SAFE_CONTAINER_NAME_RE.sub("_", value).strip("_.-")
+    return value or "anon"
+
+
+def _function_name_for_request(function_data: Dict[str, Any]) -> str:
+    if not Config.STICKY_FUNCTION_PER_USER:
+        random_string_name = "".join(
+            random.choices(string.ascii_letters + string.digits, k=Config.DEFAULT_CONTAINER_ID_LENGTH)
+        )
+        return f"fn_{random_string_name}"
+
+    user_id = str(function_data.get("user_id", "unknown"))
+    base = _safe_name(user_id)
+    if getattr(Config, "FUNCTION_NAME_BUCKETS", 0) and Config.FUNCTION_NAME_BUCKETS > 0:
+        bucket = abs(hash(user_id)) % int(Config.FUNCTION_NAME_BUCKETS)
+        return f"fn_bucket_{bucket:04d}"
+    return f"fn_user_{base}"
 
 
 class EdgeNodeAPIController:
@@ -40,9 +64,8 @@ class EdgeNodeAPIController:
         self.total_requests += 1
         
         try:
-            random_string_name = ''.join(random.choices(string.ascii_letters + string.digits, k=Config.DEFAULT_CONTAINER_ID_LENGTH))
             image = function_data.get("image", Config.DEFAULT_CONTAINER_IMAGE)
-            function_data["function_name"] = f"fn_{random_string_name}"
+            function_data["function_name"] = _function_name_for_request(function_data)
             function_data["image"] = image
 
             # Check if we need to create a new container or reuse existing
@@ -55,17 +78,10 @@ class EdgeNodeAPIController:
                     "execution_time": time.time() - start_time
                 }
 
+            result = self.container_manager.execute_container(container_id, function_data)
             execution_time = time.time() - start_time
             self.response_times.append(execution_time)
-            result = self.container_manager.execute_container(container_id, function_data)
-            
-            if not self.container_manager.warm_container(container_id):
-                return {
-                    "success": False,
-                    "error": "Failed to create or reuse container",
-                    "execution_time": time.time() - start_time
-                }
-
+                
             return {
                 "success": True,
                 "result": result,
@@ -88,16 +104,30 @@ class EdgeNodeAPIController:
             
     def _get_or_create_container(self, function_name: str, image: str) -> Tuple[str]:
         """Get existing container or create new one"""
-        # Check for existing warm container for this function
-        containers = self.container_manager.list_containers(ContainerState.WARM)
-        for container in containers:
-            # Reuse existing container (warm start)
-            if time.time() - container.stopped_at > Config.DEFAULT_MAX_WARM_TIME:
-                continue
+        now = time.time()
+        warm_containers = self.container_manager.list_containers(ContainerState.WARM)
 
-            if self.container_manager.restart_container(container.container_id, function_name):
-                self.logger.info(f"Warm start for function {function_name}")
-                return container.container_id, "warm"
+        if Config.STICKY_FUNCTION_PER_USER:
+            for container in warm_containers:
+                if container.name != function_name:
+                    continue
+                if container.started_at and now - container.started_at > Config.DEFAULT_MAX_WARM_TIME:
+                    container.state = ContainerState.DEAD
+                    self.container_manager.remove_container(container.container_id, force=True)
+                    break
+                if self.container_manager.restart_container(container.container_id, function_name):
+                    self.logger.info(f"Warm start for function {function_name}")
+                    return container.container_id, "warm"
+        else:
+            for container in warm_containers:
+                # Reuse existing container (warm start)
+                if container.started_at and now - container.started_at > Config.DEFAULT_MAX_WARM_TIME:
+                    container.state = ContainerState.DEAD
+                    continue
+
+                if self.container_manager.restart_container(container.container_id, function_name):
+                    self.logger.info(f"Warm start for function {function_name}")
+                    return container.container_id, "warm"
 
         # Create new container (cold start)
         container_id = self.container_manager.create_container(
@@ -112,7 +142,7 @@ class EdgeNodeAPIController:
 
     def get_node_status(self) -> Dict[str, Any]:
         """Get current node status"""
-        system_metrics = self.metrics_collector.collect_metrics()
+        system_metrics = self.metrics_collector.get_detailed_metrics()
         containers = self.container_manager.list_containers()
         
         container_states = {}
@@ -124,12 +154,12 @@ class EdgeNodeAPIController:
         return {
             "node_id": self.node_id,
             "status": "running",
-            "cpu_usage": system_metrics.cpu_usage if system_metrics else 0,
-            "memory_usage": system_metrics.memory_usage if system_metrics else 0,
+            "cpu_usage": system_metrics["cpu_usage"] if system_metrics else 0,
+            "memory_usage": system_metrics["memory_usage"] if system_metrics else 0,
             "containers": container_states,
             "active_requests": self.active_requests,
             "total_requests": self.total_requests,
-            "uptime": system_metrics.uptime if system_metrics else 0,
+            "uptime": system_metrics["uptime"] if system_metrics else 0,
             "timestamp": time.time()
         }
 

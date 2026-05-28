@@ -11,26 +11,48 @@ usage() {
     echo ""
     echo "Required arguments:"
     echo "  --node-id <ID>        Unique identifier for this edge node"
-    echo "  --central-url <URL>   Central node URL (e.g., http://192.168.1.100:5001)"
+    echo "  --central-url <URL>   Central node URL (e.g., http://localhost:8000)"
     echo ""
     echo "Optional arguments:"
-    echo "  --port <PORT>         Port to run on (auto-detect if not specified)"
+    echo "  --port <PORT>         Host port to expose (forwards to container port 5000)"
     echo "  --host <HOST>         Host to bind to (default: 0.0.0.0)"
     echo "  --log-level <LEVEL>   Log level: DEBUG, INFO, WARNING, ERROR (default: INFO)"
+    echo "  --cpus <CORES>        Number of CPU cores to use (e.g., 1, 0.5, 2)"
+    echo "  --memory <RAM>        Memory limit (e.g., 512m, 1g, 2g)"
+    echo "  --detach              Run in detached mode (don't remove on exit)"
     echo "  --help               Show this help message"
     echo ""
-    echo "Environment variables:"
-    echo "  NODE_ID              Edge node ID"
-    echo "  CENTRAL_URL          Central node URL"
-    echo "  EDGE_PORT            Edge node port"
-    echo "  EDGE_HOST            Edge node host"
-    echo "  LOG_LEVEL            Logging level"
-    echo ""
     echo "Examples:"
-    echo "  $0 --node-id edge_001 --central-url http://192.168.1.100:5001"
-    echo "  $0 --node-id edge_lab1 --central-url http://10.0.0.50:5001 --port 5002"
+    echo "  $0 --node-id edge_001 --central-url http://localhost:8000 --port 8001"
+    echo "  $0 --node-id edge_lab1 --central-url http://localhost:8000 --port 5002 --cpus 2 --memory 1g"
+    echo "  $0 --node-id edge_002 --central-url http://localhost:8000 --port 8002 --detach"
     echo ""
 }
+
+# Cleanup function to stop and remove container
+cleanup() {
+    echo ""
+    echo "🛑 Stopping edge node container..."
+    if docker ps --filter "name=$CONTAINER_NAME" --format '{{.Names}}' | grep -q "$CONTAINER_NAME"; then
+        docker stop "$CONTAINER_NAME" > /dev/null 2>&1
+        echo "✅ Container stopped"
+    fi
+    
+    if [ "$DETACHED" = false ]; then
+        echo "🧹 Removing container..."
+        docker rm "$CONTAINER_NAME" > /dev/null 2>&1
+        echo "✅ Container removed"
+    else
+        echo "ℹ️  Container kept (detached mode)"
+    fi
+    
+    echo ""
+    echo "👋 Edge node deployment terminated"
+    exit 0
+}
+
+# Set up trap to catch Ctrl+C and other signals
+trap cleanup SIGINT SIGTERM
 
 # Parse command line arguments
 NODE_ID=""
@@ -38,6 +60,9 @@ CENTRAL_URL=""
 EDGE_PORT=""
 EDGE_HOST="${EDGE_HOST:-0.0.0.0}"
 LOG_LEVEL="${LOG_LEVEL:-INFO}"
+EDGE_CPUS="${EDGE_CPUS:-}"
+EDGE_MEMORY="${EDGE_MEMORY:-}"
+DETACHED=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -61,6 +86,18 @@ while [[ $# -gt 0 ]]; do
             LOG_LEVEL="$2"
             shift 2
             ;;
+        --cpus)
+            EDGE_CPUS="$2"
+            shift 2
+            ;;
+        --memory)
+            EDGE_MEMORY="$2"
+            shift 2
+            ;;
+        --detach)
+            DETACHED=true
+            shift
+            ;;
         --help|-h)
             usage
             exit 0
@@ -72,11 +109,6 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
-
-# Use environment variables if command line arguments not provided
-NODE_ID="${NODE_ID:-$NODE_ID}"
-CENTRAL_URL="${CENTRAL_URL:-$CENTRAL_URL}"
-EDGE_PORT="${EDGE_PORT:-$EDGE_PORT}"
 
 # Validate required arguments
 if [[ -z "$NODE_ID" ]]; then
@@ -93,83 +125,161 @@ if [[ -z "$CENTRAL_URL" ]]; then
     exit 1
 fi
 
-# Check if Python 3 is installed
-if ! command -v python3 &> /dev/null; then
-    echo "❌ Python 3 is required but not installed"
-    exit 1
+# Convert localhost/127.0.0.1 to Docker host gateway
+CONTAINER_CENTRAL_URL="$CENTRAL_URL"
+if [[ "$CENTRAL_URL" == *"localhost"* ]] || [[ "$CENTRAL_URL" == *"127.0.0.1"* ]]; then
+    CONTAINER_CENTRAL_URL="${CENTRAL_URL//localhost/host.docker.internal}"
+    CONTAINER_CENTRAL_URL="${CONTAINER_CENTRAL_URL//127.0.0.1/host.docker.internal}"
+    echo "ℹ️  Converting $CENTRAL_URL to $CONTAINER_CENTRAL_URL for Docker container"
 fi
 
-# Check if pip is installed
-if ! command -v pip3 &> /dev/null; then
-    echo "❌ pip3 is required but not installed"
-    exit 1
+# Set default port if not specified
+if [[ -z "$EDGE_PORT" ]]; then
+    EDGE_PORT="5000"
+    echo "ℹ️  No port specified, using default: $EDGE_PORT"
 fi
-
-# Install dependencies
-# echo "📦 Installing dependencies..."
-# pip3 install -r requirements.txt
 
 # Check if Docker is installed and running
 if ! command -v docker &> /dev/null; then
     echo "❌ Docker is required but not installed"
-    echo "   Please install Docker from: https://docs.docker.com/get-docker/"
     exit 1
-else
-    if ! docker info &> /dev/null; then
-        echo "⚠️  Docker is not running. Starting Docker..."
-        # Try to start Docker (platform-specific)
-        if [[ "$OSTYPE" == "darwin"* ]]; then
-            open /Applications/Docker.app
-            echo "   Please wait for Docker to start and run this script again"
-            exit 1
-        elif [[ "$OSTYPE" == "linux-gnu"* ]]; then
-            sudo systemctl start docker
-            sleep 5
-        fi
-        
-        # Check again
-        if ! docker info &> /dev/null; then
-            echo "❌ Failed to start Docker. Please start Docker manually and try again."
-            exit 1
-        fi
-    fi
-    echo "✅ Docker is running"
 fi
 
-# Test central node connectivity
-echo "🔗 Testing connection to central node..."
-if command -v curl &> /dev/null; then
-    if curl -s --connect-timeout 5 "$CENTRAL_URL/api/v1/central/health" > /dev/null; then
-        echo "✅ Central node is reachable"
+if ! docker info &> /dev/null; then
+    echo "❌ Docker is not running. Please start Docker and try again."
+    exit 1
+fi
+
+echo "✅ Docker is running"
+
+# Build or check for edge-node image
+if ! docker images | grep -q "edge-node"; then
+    echo "🔨 Building edge-node Docker image..."
+    if [ -f "Dockerfile" ]; then
+        docker build -t edge-node:latest . || {
+            echo "❌ Failed to build Docker image"
+            exit 1
+        }
     else
-        echo "⚠️  Cannot reach central node at $CENTRAL_URL"
-        echo "   Please ensure:"
-        echo "   1. Central node is running"
-        echo "   2. URL is correct"
-        echo "   3. Network connectivity exists"
-        echo ""
-        read -p "Continue anyway? (y/N): " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            exit 1
-        fi
+        echo "❌ Dockerfile not found. Please ensure you're in the correct directory."
+        exit 1
     fi
 else
-    echo "⚠️  curl not found, skipping connectivity test"
+    echo "✅ Edge-node Docker image found"
 fi
 
-echo "🚀 Starting Edge Node..."
+# Stop and remove existing container
+CONTAINER_NAME="edge_${NODE_ID}"
+if docker ps -a --format '{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+    echo "🧹 Removing existing container: $CONTAINER_NAME"
+    docker stop "$CONTAINER_NAME" > /dev/null 2>&1
+    docker rm "$CONTAINER_NAME" > /dev/null 2>&1
+fi
+
+echo ""
+echo "🚀 Starting Edge Node in Docker container..."
 echo "   Node ID: $NODE_ID"
-echo "   Central Node: $CENTRAL_URL"
-echo "🛑 Press Ctrl+C to stop"
+echo "   Central Node (original): $CENTRAL_URL"
+echo "   Central Node (container): $CONTAINER_CENTRAL_URL"
+echo "   Port Mapping: Host $EDGE_PORT -> Container 5000"
+echo "   Log Level: $LOG_LEVEL"
+if [[ -n "$EDGE_CPUS" ]]; then
+    echo "   CPU Limit: $EDGE_CPUS cores"
+fi
+if [[ -n "$EDGE_MEMORY" ]]; then
+    echo "   Memory Limit: $EDGE_MEMORY"
+fi
+if [ "$DETACHED" = true ]; then
+    echo "   Mode: Detached (container will persist)"
+else
+    echo "   Mode: Interactive (container removed on Ctrl+C)"
+fi
 echo ""
 
-# Build the command
-CMD="python3 edge_main.py --node-id \"$NODE_ID\" --central-url \"$CENTRAL_URL\" --host \"$EDGE_HOST\" --log-level \"$LOG_LEVEL\""
+# Build docker run command array
+DOCKER_ARGS=(
+    "run" "-d"
+    "--name" "$CONTAINER_NAME"
+    "-p" "$EDGE_PORT:5000"
+    "-v" "/var/run/docker.sock:/var/run/docker.sock"
+)
 
-if [[ -n "$EDGE_PORT" ]]; then
-    CMD="$CMD --port \"$EDGE_PORT\""
+# Add host.docker.internal support for Linux
+if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+    DOCKER_ARGS+=("--add-host=host.docker.internal:host-gateway")
+    echo "ℹ️  Added host.docker.internal mapping for Linux"
 fi
 
-# Start the edge node
-eval $CMD
+# Add CPU limit if specified
+if [[ -n "$EDGE_CPUS" ]]; then
+    DOCKER_ARGS+=("--cpus=$EDGE_CPUS")
+fi
+
+# Add memory limit if specified
+if [[ -n "$EDGE_MEMORY" ]]; then
+    DOCKER_ARGS+=("--memory=$EDGE_MEMORY")
+fi
+
+# Add environment variables
+DOCKER_ARGS+=(
+    "-e" "NODE_ID=$NODE_ID"
+    "-e" "CENTRAL_URL=$CONTAINER_CENTRAL_URL"
+    "-e" "EDGE_PORT=5000"
+    "-e" "EDGE_HOST=$EDGE_HOST"
+    "-e" "LOG_LEVEL=$LOG_LEVEL"
+)
+
+# Add image and command arguments
+DOCKER_ARGS+=(
+    "edge-node:latest"
+    "--node-id" "$NODE_ID"
+    "--central-url" "$CONTAINER_CENTRAL_URL"
+    "--port" "5000"
+    "--host" "$EDGE_HOST"
+    "--log-level" "$LOG_LEVEL"
+)
+
+# Print the full command for debugging
+echo "🐳 Docker command:"
+echo "   docker ${DOCKER_ARGS[*]}"
+echo ""
+
+# Run Docker container
+docker "${DOCKER_ARGS[@]}"
+
+if [ $? -eq 0 ]; then
+    echo "✅ Edge node container started successfully"
+    echo "🌐 Access edge node at: http://localhost:$EDGE_PORT"
+    echo ""
+    echo "📋 Useful commands:"
+    echo "   View logs: docker logs -f $CONTAINER_NAME"
+    echo "   Stop: docker stop $CONTAINER_NAME"
+    echo "   Remove: docker rm $CONTAINER_NAME"
+    echo "   Restart: docker restart $CONTAINER_NAME"
+    echo "   Inspect: docker inspect $CONTAINER_NAME"
+    echo ""
+    echo "🔍 Verifying container startup..."
+    sleep 3
+    
+    # Check if container is still running
+    if docker ps --filter "name=$CONTAINER_NAME" --format '{{.Names}}' | grep -q "$CONTAINER_NAME"; then
+        echo "✅ Container is running"
+        echo ""
+        if [ "$DETACHED" = true ]; then
+            echo "🎯 Container is running in detached mode"
+            echo "   Use 'docker logs -f $CONTAINER_NAME' to view logs"
+            echo "   Use 'docker stop $CONTAINER_NAME' to stop"
+            exit 0
+        else
+            echo "📺 Following logs (Press Ctrl+C to stop and remove container)..."
+            docker logs -f "$CONTAINER_NAME"
+        fi
+    else
+        echo "❌ Container stopped unexpectedly. Showing logs:"
+        docker logs "$CONTAINER_NAME"
+        exit 1
+    fi
+else
+    echo "❌ Failed to start container"
+    exit 1
+fi

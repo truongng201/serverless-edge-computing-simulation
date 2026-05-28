@@ -19,7 +19,24 @@ class Config:
     DEFAULT_CONTAINER_COMMAND = "python -u /app/main.py"
     DEFAULT_CONTAINER_MEMORY_LIMIT = "256m"  # 256 MB
     DEFAULT_CONTAINER_ID_LENGTH = 12
-    DEFAULT_MAX_WARM_TIME = 5 # seconds
+    DEFAULT_MAX_WARM_TIME = 150  # seconds: warm time larger than execution time to allow reuse
+
+    # Function naming / reuse strategy
+    # When enabled, each user will consistently invoke the same logical function name derived
+    # from user_id (instead of a random name per call). This makes warm/cold behavior more
+    # meaningful for mobility experiments and enables intentional prewarming.
+    STICKY_FUNCTION_PER_USER = os.getenv("STICKY_FUNCTION_PER_USER", "1").lower() in ("1", "true", "yes")
+    # Number of distinct logical functions in the catalogue; users are hashed into buckets.
+    # Defaulting to 32 makes container reuse meaningful (many users sharing each function).
+    FUNCTION_NAME_BUCKETS = int(os.getenv("FUNCTION_NAME_BUCKETS", "32"))
+
+    # Warm-pool capacity per edge node (max distinct functions kept warm at once).
+    # When exceeded, LRU function entries are evicted (next invocation = cold start).
+    MAX_WARM_PER_NODE = int(os.getenv("MAX_WARM_PER_NODE", "16"))
+    # Central node has higher but still finite concurrency budget.
+    CENTRAL_MAX_CONCURRENT = int(os.getenv("CENTRAL_MAX_CONCURRENT", "256"))
+    # Max concurrent users that can be assigned to a single edge node per timestep.
+    MAX_CONCURRENT_PER_EDGE = int(os.getenv("MAX_CONCURRENT_PER_EDGE", "64"))
     
     
     # Cleanup
@@ -27,7 +44,7 @@ class Config:
     CLEANUP_DEAD_NODES_INTERVAL = 10  # seconds
 
     # Metrics Collection
-    METRICS_COLLECTION_INTERVAL = 5  # seconds
+    METRICS_COLLECTION_INTERVAL = 10  # seconds
     
     # Node Configuration
     CENTRAL_NODE_PORT = 8000
@@ -43,7 +60,6 @@ class Config:
     EDGE_ROUTE_PREFIX = "/api/v1/edge"
     
     # Scheduling Configuration
-    DEFAULT_SCHEDULING_ALGORITHM = "round_robin"
     MIGRATION_THRESHOLD = 0.8  # CPU usage threshold for migration
     
     # Docker Configuration
@@ -56,11 +72,38 @@ class Config:
     CONTAINER_NETWORK = "serverless-network"
     
     # User Configuration
-    DEFAULT_EXECUTION_TIME_INTERVAL = 15 # seconds: every 3 seconds all user in simulation call it assigned node
-    DEFAULT_RANDOM_DATA_SIZE_RANGE_IN_BYTES = (1024, 10240)  # 1 KB to 10 KB
-    DEFAULT_RANDOM_BANDWIDTH_RANGE_IN_BYTES_PER_MILLISECOND = (100, 1000)  # 100 B/ms to 1 KB/ms
-    DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s)
+    DEFAULT_EXECUTION_TIME_INTERVAL = 10 # seconds: every 5 seconds all user in simulation call it assigned node
+    DEFAULT_DATA_SIZE_IN_BYTES = 512 * 1024  # 512 KB (typical serverless payload)
+    
+    # Bandwidth settings per network type (B/ms)
+    # Transmission delay = data_size / bandwidth
+    # Fixed network type for this simulator configuration.
+    # (Previously supported: 4G/5G/EDGE selectable via env var.)
+    NETWORK_TYPE = "4G"
+
+    # 4G uplink/downlink throughput used for transmission delay.
+    # 3000 bytes/ms ~ 24 Mbps.
+    DEFAULT_BANDWIDTH_IN_BYTES_PER_MILLISECOND = 3000
+
+    DEFAULT_PROPAGATION_SPEED_IN_METERS = 3 * 10**8  # Speed of light in vacuum (m/s) - DEPRECATED, use NETWORK_*_LATENCY_MS below
     DEFAULT_PIXEL_TO_METERS = 10 # 1 pixel = 10 m
+    
+    # Network propagation delay model (4G, deterministic)
+    # propagation_ms = RAN + FIBER_PER_KM * distance_km
+    #                + ceil(distance_km / AGG_SPACING_KM) * PER_HOP_LATENCY
+    #
+    # - RAN_LATENCY_MS (15): 4G LTE one-way radio access latency
+    #   (3GPP TR 36.912; Ericsson/Nokia LTE latency reports, ~10-20 ms).
+    # - FIBER_PER_KM_LATENCY_MS (0.005): fiber propagation at ~2e8 m/s
+    #   (speed of light in glass, one-way).
+    # - AGG_SPACING_KM (3.0) and PER_HOP_LATENCY_MS (1.0): urban backhaul
+    #   aggregation routers roughly every ~2-5 km, each adding ~0.5-2 ms
+    #   of queueing+forwarding. Gives ~22 ms spread between 1 km and 69 km,
+    #   so location-aware policies have a measurable signal over random.
+    NETWORK_RAN_LATENCY_MS = 15.0
+    NETWORK_FIBER_PER_KM_LATENCY_MS = 0.005
+    NETWORK_AGG_SPACING_KM = 3.0
+    NETWORK_PER_HOP_LATENCY_MS = 1.0
 
     # User cleanup
     # If a user hasn't been updated for this many seconds, remove it
@@ -73,13 +116,119 @@ class Config:
     ASSIGNMENT_SCAN_INTERVAL = 0.5  # seconds between reassignment scans
     LOAD_AWARE_ALPHA = 1.0  # weight for CPU load in load-aware score
 
+    # Edge node deployment configuration
+    EXPECTED_TOTAL_EDGE_NODES = int(os.getenv("EXPECTED_EDGE_NODES", "10"))
+    
+    # Energy monitoring configuration
+    # USE_RAPL: If True, use Intel RAPL for real power measurements; if False, use estimation
+    # Requires: sudo chmod a+r /sys/class/powercap/intel-rapl:*/energy_uj
+    USE_RAPL = os.getenv("USE_RAPL", "0").lower() in ("1", "true", "yes")
+    
     # Predictive scheduling parameters
+    TDRIVE_ARTIFACT_DIR = os.getenv(
+        "TDRIVE_ARTIFACT_DIR",
+        os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "predict-model-with-taxi",
+            "tdrive_predictor_artifacts",
+            "phase_b_7k_fast",
+        ),
+    )
+    TDRIVE_CKPT_NAME = os.getenv("TDRIVE_CKPT_NAME", "gru_phase_curv_step.pt")
+    TDRIVE_DEVICE = os.getenv("TDRIVE_DEVICE", "cpu")
+    TDRIVE_HISTORY_LENGTH = int(os.getenv("TDRIVE_HISTORY_LENGTH", "20"))
+    TDRIVE_MAX_RADIUS_M = float(os.getenv("TDRIVE_MAX_RADIUS_M", "1000"))
+    TDRIVE_SOFTMAX_TEMPERATURE = float(os.getenv("TDRIVE_SOFTMAX_TEMPERATURE", "50"))
+    PREDICTIVE_STOP_SPEED = float(os.getenv("PREDICTIVE_STOP_SPEED", "0.5"))
     PREDICTIVE_DEFAULT_MEMORY_REQUIREMENT_MB = 256  # default per-user memory footprint
     PREDICTIVE_DEFAULT_DATA_SIZE_BYTES = 512 * 1024  # 512 KB when historical data missing
     PREDICTIVE_COLD_START_MS = 300  # expected cold start penalty
     PREDICTIVE_HANDOFF_COST = 0.05  # score penalty for handoff
     PREDICTIVE_WARM_BASE_PROB = 0.2  # base warm probability when metrics are missing
+    # Which horizon (in minutes) to use when selecting the "best" edge from the
+    # predictor output. For curv_step we currently expose horizons (1,3,5,10).
+    # PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
 
+    # Predictive "prewarm-only" mode:
+    # - Plan a future node using the predictor, but keep serving on the current node until the planned step.
+    # - Intended mainly for `EXECUTION_MODE=simulated`, where prewarm effects are modeled analytically.
+    # PREDICTIVE_PREWARM_ONLY = os.getenv("PREDICTIVE_PREWARM_ONLY", "0").lower() in ("1", "true", "yes")
+    # How many simulation steps ahead to schedule the switch (lead time).
+    PREDICTIVE_PREWARM_LEAD_STEPS = int(os.getenv("PREDICTIVE_PREWARM_LEAD_STEPS", "5"))
+    # How often to run planning (in simulation steps). Lower = more compute.
+    PREDICTIVE_EXECUTE_INTERVAL_STEPS = int(os.getenv("PREDICTIVE_EXECUTE_INTERVAL_STEPS", "5"))
     # Dataset playback speed (Scenario 2 / vehicles)
     # Multiply timestep advancement per poll to make movements appear faster on canvas
     DATASET_STEP_MULTIPLIER = 8
+
+    # ============================================================
+    # Execution model (real Docker vs simulated)
+    # ============================================================
+    # `real`: call /execute on nodes (Docker-backed)
+    # `simulated`: do not call /execute; instead assign computation_delay analytically
+    # EXECUTION_MODE = os.getenv("EXECUTION_MODE", "real").lower()
+    EXECUTION_MODE = "simulated"
+    PREDICTIVE_PREWARM_ONLY = 1
+    PREDICTIVE_TARGET_HORIZON_MIN = 5
+    # Defaults derived from local benchmarking (median warm + median cold-warm delta).
+    SIM_EXEC_WARM_MS_CENTRAL = float(os.getenv("SIM_EXEC_WARM_MS_CENTRAL", "300"))
+    SIM_EXEC_COLD_PENALTY_MS_CENTRAL = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_CENTRAL", "900"))
+    SIM_EXEC_WARM_MS_EDGE = float(os.getenv("SIM_EXEC_WARM_MS_EDGE", "300"))
+    SIM_EXEC_COLD_PENALTY_MS_EDGE = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_EDGE", "1050"))
+
+    # Fraction of host idle power attributed to the serverless runtime overhead.
+    # 0.1 (default) = bill 10% of idle power; 1.0 = bill the full host idle.
+    STATIC_OVERHEAD_FRACTION = float(os.getenv("STATIC_OVERHEAD_FRACTION", "0.1"))
+    
+    # User Movement Configuration
+    USER_MIN_SPEED = 1  # m/s - minimum user movement speed (walking speed)
+    USER_MAX_SPEED = 3  # m/s - maximum user movement speed (slow jogging)
+    USER_MAX_DISTANCE_FROM_CENTER = 800  # meters - maximum distance from cluster center
+    USER_MAX_SPAWN_DISTANCE = 600  # meters - initial spawn radius around center
+    USER_MIN_SPAWN_DISTANCE = 100  # meters - minimum spawn distance from center
+    
+    # User
+    DEFAULT_USER_MEMORY_DEMAND = 134217728 # 128 MB
+
+    # TaxiD (Beijing OSM) scenario
+    # Path to the OSM XML for Beijing bounding box used by TaxiD scenario
+    TAXID_OSM_XML_PATH = os.getenv(
+        "TAXID_OSM_XML_PATH",
+        os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "predict-model-with-taxi",
+            "planet_116.127,39.756_116.813,40.084.osm",
+            "planet_116.127,39.756_116.813,40.084.osm",
+        ),
+    )
+    # Optional GraphML cache (speeds up repeated loads if present)
+    TAXID_GRAPHML_PATH = os.getenv(
+        "TAXID_GRAPHML_PATH",
+        os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "predict-model-with-taxi",
+            "osm",
+            "beijing_taxid.graphml",
+        ),
+    )
+    # Initial viewport for mapping meters->pixels (used for road rendering)
+    # ACTUAL Beijing TaxiD map bounds: 58782m x 36695m = 5878px x 3670px
+    TAXID_VIEWPORT_WIDTH_PX = int(os.getenv("TAXID_VIEWPORT_WIDTH_PX", "5878"))
+    TAXID_VIEWPORT_HEIGHT_PX = int(os.getenv("TAXID_VIEWPORT_HEIGHT_PX", "3670"))
+    TAXID_VIEWPORT_MARGIN_PX = int(os.getenv("TAXID_VIEWPORT_MARGIN_PX", "200"))
+
+    # Preprocessed roads JSON (gz) path for fast UI serving
+    TAXID_ROADS_JSON_GZ_PATH = os.getenv(
+        "TAXID_ROADS_JSON_GZ_PATH",
+        os.path.join(
+            os.path.dirname(os.path.dirname(__file__)),
+            "predict-model-with-taxi",
+            "osm",
+            "beijing_taxid_roads.json.gz",
+        ),
+    )
+
+    # TaxiD replay dataset (pickled trajectories exported by serverless-sim/scripts/export_taxid_replay_last1k.py)
+    # If set, overrides the default candidate search under serverless-sim/mock_data.
+    TAXID_REPLAY_PATH = os.getenv("TAXID_REPLAY_PATH") or None
+    

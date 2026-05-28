@@ -1,46 +1,40 @@
-export const drawRoads = (ctx, roads, visibleLeft, visibleTop, visibleRight, visibleBottom, zoomLevel) => {
-    roads.forEach((road) => {
-        // Check if road is visible
-        const roadLeft = Math.min(road.startX, road.endX) - road.width;
-        const roadRight = Math.max(road.startX, road.endX) + road.width;
-        const roadTop = Math.min(road.startY, road.endY) - road.width;
-        const roadBottom = Math.max(road.startY, road.endY) + road.width;
+export const drawRoads = (
+  ctx,
+  roads,
+  visibleLeft,
+  visibleTop,
+  visibleRight,
+  visibleBottom,
+  zoomLevel
+) => {
+  if (!roads || roads.length === 0) return;
 
-        if (roadRight < visibleLeft || roadLeft > visibleRight ||
-            roadBottom < visibleTop || roadTop > visibleBottom) {
-            return;
-        }
+  const lineWidth = Math.max(0.5, 1.0 / (zoomLevel || 1));
+  ctx.lineWidth = lineWidth;
+  ctx.strokeStyle = "#8ea3b0"; // soft blue-gray
+  ctx.globalAlpha = 0.75;
 
-        // Draw road background (wider)
-        ctx.strokeStyle = "#374151";
-        ctx.lineWidth = (road.width + 4) / zoomLevel;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(road.startX, road.startY);
-        ctx.lineTo(road.endX, road.endY);
-        ctx.stroke();
+  for (const poly of roads) {
+    if (!poly || poly.length < 2) continue;
 
-        // Draw road surface
-        ctx.strokeStyle = road.color;
-        ctx.lineWidth = road.width / zoomLevel;
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        ctx.moveTo(road.startX, road.startY);
-        ctx.lineTo(road.endX, road.endY);
-        ctx.stroke();
+    // Quick culling: skip if polyline is entirely outside visible box
+    let skip = true;
+    for (const [x, y] of poly) {
+      if (x >= visibleLeft && x <= visibleRight && y >= visibleTop && y <= visibleBottom) {
+        skip = false;
+        break;
+      }
+    }
+    if (skip) continue;
 
-        // Draw center line for highways and main roads
-        if (road.type === "highway" || road.type === "main") {
-            ctx.strokeStyle = "#FFFFFF";
-            ctx.lineWidth = 2 / zoomLevel;
-            ctx.setLineDash([20 / zoomLevel, 10 / zoomLevel]);
-            ctx.beginPath();
-            ctx.moveTo(road.startX, road.startY);
-            ctx.lineTo(road.endX, road.endY);
-            ctx.stroke();
-            ctx.setLineDash([]);
-        }
+    ctx.beginPath();
+    ctx.moveTo(poly[0][0], poly[0][1]);
+    for (let i = 1; i < poly.length; i++) {
+      ctx.lineTo(poly[i][0], poly[i][1]);
+    }
+    ctx.stroke();
+  }
 
-        // Hide road labels for a cleaner view
-    });
+  ctx.globalAlpha = 1.0;
 };
+
