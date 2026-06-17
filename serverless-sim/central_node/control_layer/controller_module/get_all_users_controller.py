@@ -261,6 +261,10 @@ class GetAllUsersController:
         if getattr(Config, "EXECUTION_MODE", "real") == "simulated":
             step_id = self.current_step_id or 0
             pool = getattr(self.scheduler, "warm_pool", None)
+            # Advance the pool's step clock so all TTL decisions this step use the
+            # current simulation step as the reference time.
+            if pool is not None:
+                pool.set_now(step_id)
             for _, user_node in self.scheduler.user_nodes.items():
                 assigned_node = user_node.assigned_node_id
                 if not assigned_node:
@@ -272,16 +276,22 @@ class GetAllUsersController:
                     Config.SIM_EXEC_COLD_PENALTY_MS_EDGE if is_edge else Config.SIM_EXEC_COLD_PENALTY_MS_CENTRAL
                 )
 
-                # Consider node warm if:
-                # - user executed on the same node previously, OR
-                # - predictive prewarm-only has planned this node for the current step
-                algorithm = str(self.scheduler.get_assignment_algorithm() or "")
-                warm = user_node.last_executed_node_id == assigned_node
-                if algorithm == "prediction without warm-state-awareness":
-                    warm = False
-                elif getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
-                    if user_node.planned_node_id == assigned_node and user_node.planned_step_id == step_id:
-                        warm = True
+                # Warm/cold is decided by the warm pool, keyed by (node, function).
+                # A hit = a live container exists within the keep-alive TTL window
+                # (set per-variant: TTL=0 for plain greedy => no cross-step reuse;
+                # WARM_TTL_STEPS otherwise). A miss = cold start, which admits a
+                # fresh container. The full PREDICTIVE variant pre-admits at the
+                # planned node ahead of the switch, so the switch lands warm via
+                # this same lookup. Many users share a small function catalogue
+                # (FUNCTION_NAME_BUCKETS), so reuse across users is possible.
+                if pool is not None:
+                    fn_id = self.scheduler._function_id_for(user_node)
+                    warm = pool.lookup(assigned_node, fn_id, now=step_id)
+                    if not warm:
+                        pool.admit_cold(assigned_node, fn_id, now=step_id)
+                else:
+                    # Fallback if the pool failed to import: legacy per-user warmth.
+                    warm = user_node.last_executed_node_id == assigned_node
 
                 user_node.latency.computation_delay = warm_ms if warm else (warm_ms + cold_penalty_ms)
                 user_node.latency.container_status = "warm" if warm else "cold"

@@ -11,6 +11,8 @@ class ResetSimulationController:
         self.scheduler.delete_all_user()
         if getattr(self.scheduler, "warm_pool", None) is not None:
             self.scheduler.warm_pool.reset()
+        # Finalize the previous run's per-request log (gzip needs a clean close).
+        self.scheduler.close_request_log()
         self.scheduler._assigned_concurrency = {}
         self.scheduler.timestep_rejections = 0
         self.scheduler.timestep_evictions = 0

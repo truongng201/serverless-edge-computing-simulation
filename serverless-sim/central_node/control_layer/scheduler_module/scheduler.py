@@ -1,4 +1,8 @@
+import csv
+import gzip
 import logging
+import os
+import re
 import time
 import random
 from typing import Dict, List, Optional, Any, Tuple
@@ -85,6 +89,14 @@ class Scheduler:
         # Per-timestep counters surfaced to metrics.
         self.timestep_rejections = 0
         self.timestep_evictions = 0
+        # Align the warm-pool keep-alive TTL with the initial algorithm so the
+        # pool behaves correctly even before set_assignment_algorithm is called.
+        self._apply_keep_alive_policy()
+
+        # Per-request latency log (one gzipped CSV per run; see start_request_log).
+        self._req_log_fh = None
+        self._req_log_writer = None
+        self._req_log_last_step: Optional[int] = None
 
         self.history_max_points = getattr(Config, "TDRIVE_HISTORY_LENGTH", 20)
         self.predictor_adapter = None
@@ -132,7 +144,71 @@ class Scheduler:
             self.assignment_algorithm = AssignmentAlgorithm(assignment_algorithm)
         except ValueError:
             raise Exception(f"Invalid assignment algorithm: {assignment_algorithm}")
+        self._apply_keep_alive_policy()
+
+    def _apply_keep_alive_policy(self) -> None:
+        """Configure the warm-pool keep-alive window for the current variant.
+
+        Keep-alive is OFF (TTL=0 => every cross-step invocation is a cold start)
+        only for plain GREEDY, which is the no-reuse baseline. All other variants
+        retain warm containers for WARM_TTL_STEPS so reuse and prewarm are
+        possible. This is the single factor separating (greedy) from
+        (greedy + keep-alive)."""
+        if self.warm_pool is None:
+            return
+        if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
+            self.warm_pool.set_ttl(0)
+        else:
+            self.warm_pool.set_ttl(getattr(Config, "WARM_TTL_STEPS", 30))
     
+    # ------------------------------------------------------------------
+    # Per-request latency log
+    # ------------------------------------------------------------------
+    def start_request_log(self) -> None:
+        """Open a fresh per-request log for the run that just started.
+
+        Called by SetDatasetController once algorithm/seed/users/edges are all
+        known. One gzipped CSV per run; run metadata lives in the filename so
+        rows stay compact (300 steps x N users rows per run).
+        No-op unless Config.PER_REQUEST_LOG_DIR is set.
+        """
+        self.close_request_log()
+        log_dir = str(getattr(Config, "PER_REQUEST_LOG_DIR", "") or "")
+        if not log_dir:
+            return
+        try:
+            os.makedirs(log_dir, exist_ok=True)
+            algo_slug = re.sub(r"[^a-z0-9]+", "-", self.assignment_algorithm.value.lower()).strip("-")
+            seed = self.dataset_metadata.get("seed")
+            stamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            fname = (
+                f"req_{algo_slug}_u{len(self.user_nodes)}_e{len(self.edge_nodes)}"
+                f"_s{seed if seed is not None else 'NA'}_{stamp}.csv.gz"
+            )
+            path = os.path.join(log_dir, fname)
+            self._req_log_fh = gzip.open(path, "wt", newline="")
+            self._req_log_writer = csv.writer(self._req_log_fh)
+            self._req_log_writer.writerow([
+                "step", "user_id", "node_id", "container_status",
+                "propagation_ms", "transmission_ms", "computation_ms",
+                "migration_ms", "total_ms",
+            ])
+            self._req_log_last_step = None
+            self.logger.info(f"Per-request log started: {path}")
+        except Exception as exc:
+            self.logger.warning(f"Failed to start per-request log: {exc}")
+            self.close_request_log()
+
+    def close_request_log(self) -> None:
+        if self._req_log_fh is not None:
+            try:
+                self._req_log_fh.close()
+            except Exception:
+                pass
+        self._req_log_fh = None
+        self._req_log_writer = None
+        self._req_log_last_step = None
+
     def get_sample_size(self):
         return self.dataset_metadata.get("sample_size", 0)
     
@@ -483,7 +559,10 @@ class Scheduler:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             return self._assign_users_greedy()
         elif self.assignment_algorithm == AssignmentAlgorithm.GREEDY_KEEPALIVE:
-            return self._assign_users_nearest()
+            # Same placement as plain greedy; the only difference is keep-alive,
+            # which is applied in the warm/cold decision (TTL>0 vs 0). This makes
+            # (greedy) vs (greedy + keep-alive) a clean single-factor ablation.
+            return self._assign_users_greedy()
         elif self.assignment_algorithm in (
             AssignmentAlgorithm.PREDICTIVE,
             AssignmentAlgorithm.PREDICTIVE_NO_WARM,
@@ -646,7 +725,12 @@ class Scheduler:
         return best_node, min_distance
 
     def _predictive_assignment(self) -> dict:
-        if getattr(Config, "PREDICTIVE_PREWARM_ONLY", False):
+        # Prewarm (plan-ahead + proactive warm-pool admission) is the distinguishing
+        # mechanism of the full PREDICTIVE variant. "prediction without warm-state
+        # awareness" (PREDICTIVE_NO_WARM) uses the same predictive PLACEMENT but
+        # gets NO prewarm — it falls through to the immediate-placement path below
+        # and only benefits from passive container reuse (keep-alive), like greedy.
+        if self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
             return self._predictive_prewarm_only_assignment()
 
         if not self.predictor_adapter or not get_mobility_prediction:
@@ -908,7 +992,10 @@ class Scheduler:
             # not get a free pass.
             if self.warm_pool is not None and planned != "central_node":
                 fn_id = self._function_id_for(user_node)
-                admitted = self.warm_pool.admit_cold(planned, fn_id)
+                # Admit on the step clock: the container is warm from now until
+                # now+TTL, so the planned switch (at current_step + lead_steps)
+                # lands warm as long as lead_steps <= WARM_TTL_STEPS.
+                admitted = self.warm_pool.admit_cold(planned, fn_id, now=current_step)
                 if not admitted:
                     self.timestep_rejections += 1
                     user_node.planned_node_id = None
@@ -1023,7 +1110,16 @@ class Scheduler:
         unknown_count = 0
         per_user_latencies: List[float] = []
 
-        for _, user_node in self.user_nodes.items():
+        # Per-request logging: emit one row per user for this step, but only
+        # once per step (the metrics endpoint may be polled repeatedly).
+        step_id = self.get_current_step_id()
+        log_writer = self._req_log_writer
+        if log_writer is not None and (step_id is None or step_id == self._req_log_last_step):
+            log_writer = None
+        if log_writer is not None:
+            self._req_log_last_step = step_id
+
+        for user_id, user_node in self.user_nodes.items():
             cloudlet_id = user_node.assigned_node_id
             if cloudlet_id == "central_node":
                 distance = self._calculate_distance(user_node.location, self.central_node["location"])
@@ -1051,6 +1147,20 @@ class Scheduler:
             else:
                 unknown_total += turnaround_time
                 unknown_count += 1
+
+            if log_writer is not None and status != "unknown":
+                log_writer.writerow([
+                    step_id, user_id, cloudlet_id, status,
+                    round(propagation_delay, 3), round(transmission_delay, 3),
+                    round(computation_delay, 3), round(migration_cost, 3),
+                    round(turnaround_time, 3),
+                ])
+
+        if log_writer is not None and self._req_log_fh is not None:
+            try:
+                self._req_log_fh.flush()
+            except Exception:
+                pass
 
         n = len(per_user_latencies)
         avg_latency = total / n if n > 0 else 0.0

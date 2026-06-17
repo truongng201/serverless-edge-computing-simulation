@@ -37,8 +37,31 @@ class Config:
     CENTRAL_MAX_CONCURRENT = int(os.getenv("CENTRAL_MAX_CONCURRENT", "256"))
     # Max concurrent users that can be assigned to a single edge node per timestep.
     MAX_CONCURRENT_PER_EDGE = int(os.getenv("MAX_CONCURRENT_PER_EDGE", "64"))
-    
-    
+
+    # Keep-alive window for the warm pool, expressed in SIMULATION STEPS (the
+    # execution clock used by get_all_users_controller / the scheduler). A
+    # (node, function) container stays warm for this many steps after its last
+    # use. The plain "greedy" variant runs with keep-alive OFF (TTL forced to 0)
+    # as the no-reuse baseline; all other variants use this window. Chosen as a
+    # multiple of PREDICTIVE_PREWARM_LEAD_STEPS so a prewarmed container is still
+    # alive when the planned switch lands.
+    WARM_TTL_STEPS = int(os.getenv("WARM_TTL_STEPS", "30"))
+
+    # Global RNG seed for reproducible runs. Supplied per-run via the
+    # /set_dataset payload ("seed") or this env var. When set, the trajectory
+    # cohort sample (and other randomness) is seeded so a (config, seed) pair
+    # reproduces exactly and 5-seed runs yield distinct cohorts for CI. None =>
+    # legacy non-deterministic behavior.
+    _SEED_ENV = os.getenv("SEED")
+    SEED = int(_SEED_ENV) if _SEED_ENV not in (None, "") else None
+
+    # Directory for per-request latency logs (one gzipped CSV per run, named
+    # req_<algo>_u<users>_e<edges>_s<seed>_<ts>.csv.gz). Each row is one user
+    # request at one step with the full latency breakdown — the raw data for
+    # p95/p99/jitter/CDF analysis. Empty (default) = logging disabled.
+    PER_REQUEST_LOG_DIR = os.getenv("PER_REQUEST_LOG_DIR", "")
+
+
     # Cleanup
     CLEANUP_WARM_CONTAINERS_INTERVAL = 5  # seconds
     CLEANUP_DEAD_NODES_INTERVAL = 10  # seconds
@@ -149,10 +172,10 @@ class Config:
     # predictor output. For curv_step we currently expose horizons (1,3,5,10).
     # PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
 
-    # Predictive "prewarm-only" mode:
-    # - Plan a future node using the predictor, but keep serving on the current node until the planned step.
-    # - Intended mainly for `EXECUTION_MODE=simulated`, where prewarm effects are modeled analytically.
-    # PREDICTIVE_PREWARM_ONLY = os.getenv("PREDICTIVE_PREWARM_ONLY", "0").lower() in ("1", "true", "yes")
+    # Prewarm (plan-ahead + proactive warm-pool admission) is bound to the
+    # "predictive" algorithm variant itself (see Scheduler._predictive_assignment),
+    # not to a config flag. "prediction without warm-state awareness" uses the
+    # same predictive placement with no prewarm.
     # How many simulation steps ahead to schedule the switch (lead time).
     PREDICTIVE_PREWARM_LEAD_STEPS = int(os.getenv("PREDICTIVE_PREWARM_LEAD_STEPS", "5"))
     # How often to run planning (in simulation steps). Lower = more compute.
@@ -168,7 +191,6 @@ class Config:
     # `simulated`: do not call /execute; instead assign computation_delay analytically
     # EXECUTION_MODE = os.getenv("EXECUTION_MODE", "real").lower()
     EXECUTION_MODE = "simulated"
-    PREDICTIVE_PREWARM_ONLY = 1
     PREDICTIVE_TARGET_HORIZON_MIN = 5
     # Defaults derived from local benchmarking (median warm + median cold-warm delta).
     SIM_EXEC_WARM_MS_CENTRAL = float(os.getenv("SIM_EXEC_WARM_MS_CENTRAL", "300"))

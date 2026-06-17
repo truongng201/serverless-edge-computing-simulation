@@ -28,6 +28,7 @@ class ExperimentRunner:
             "num_users",
             "num_edges",
             "algorithm",
+            "seed",
             "experiment_duration",
             "total_experiment_time",
             "timestep",
@@ -106,6 +107,7 @@ class ExperimentRunner:
             "num_users": result.get("num_users", ""),
             "num_edges": result.get("num_edges", ""),
             "algorithm": result.get("algorithm", ""),
+            "seed": result.get("seed", ""),
             "experiment_duration": result.get("experiment_duration", ""),
             "total_experiment_time": result.get("total_experiment_time", ""),
         }
@@ -348,12 +350,14 @@ class ExperimentRunner:
             print(f"Failed to fetch assignment algorithms: {e}")
             return []
 
-    def set_dataset(self, num_users: int) -> bool:
+    def set_dataset(self, num_users: int, seed: int = None) -> bool:
         # Use taxiD_Replay for proper predictive model testing (trained on T-drive data)
         dataset_name = 'taxiD_Replay'
         try:
-            print(f"Setting dataset '{dataset_name}' with num_users={num_users}")
+            print(f"Setting dataset '{dataset_name}' with num_users={num_users}, seed={seed}")
             payload = {"dataset_name": dataset_name, "sample_size": num_users}
+            if seed is not None:
+                payload["seed"] = int(seed)
             response = requests.post(f"{self.api_base}/set_dataset", json=payload, timeout=600)
             if response.status_code == 200:
                 return True
@@ -432,27 +436,27 @@ class ExperimentRunner:
         
         return metrics
     
-    def run_single_experiment(self, num_users: int, num_edges: int, algorithm: str, 
-                            experiment_duration: int = 600) -> Dict[str, Any]:
+    def run_single_experiment(self, num_users: int, num_edges: int, algorithm: str,
+                            experiment_duration: int = 600, seed: int = None) -> Dict[str, Any]:
         """Run a single experiment configuration"""
         experiment_start = time.time()
         print(f"\n{'='*60}")
-        print(f"EXPERIMENT: {num_users} users, {num_edges} edges, {algorithm} algorithm")
+        print(f"EXPERIMENT: {num_users} users, {num_edges} edges, {algorithm} algorithm, seed={seed}")
         print(f"{'='*60}")
-        
+
         res = requests.post(f"{self.api_base}/reset_simulation")
-        
+
         if res.status_code != 200:
             return {"error": "Failed to reset simulation"}
         else:
             print("Simulation reset successfully")
         time.sleep(2)
-        
+
         # Set algorithm
         if not self.set_assignment_algorithm(algorithm):
             return {"error": f"Failed to set algorithm to {algorithm}"}
-        
-        if not self.set_dataset(num_users):
+
+        if not self.set_dataset(num_users, seed=seed):
             return {"error": f"Failed to set dataset taxiD_Replay for {num_users} users"}
         
         metrics = self.run_simulation_workload(duration=experiment_duration)
@@ -474,6 +478,7 @@ class ExperimentRunner:
             "num_users": num_users,
             "num_edges": num_edges,
             "algorithm": algorithm,
+            "seed": seed,
             "experiment_duration": experiment_duration,
             "total_experiment_time": experiment_time,
             "metrics": metrics,
@@ -662,7 +667,7 @@ class ExperimentRunner:
                 data[combo][alg] = OrderedDict(sorted(data[combo][alg].items(), key=lambda kv: kv[0]))
         return data
     
-    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 100):
+    def run_comprehensive_experiments(self, user_ranges = [], edge_ranges = [], algorithms = [], experiment_duration = 100, seeds = None):
         if not user_ranges:
             user_ranges = [1000]  # 100 users
         if not edge_ranges:
@@ -671,18 +676,23 @@ class ExperimentRunner:
             algorithms = self.get_all_assignment_algorithms()
             if not algorithms:
                 algorithms = ["greedy", "predictive"]
+        # `seeds` = list of RNG seeds; each (config, seed) is one run, enabling
+        # mean +/- CI over seeds. [None] keeps legacy single (unseeded) run.
+        if not seeds:
+            seeds = [None]
         signal.signal(signal.SIGINT, self.signal_handler)
         signal.signal(signal.SIGTERM, self.signal_handler)
         if not self.wait_for_central_node():
             print("Central node is not ready. Aborting experiments.")
             return
         
-        total_experiments = len(user_ranges) * len(edge_ranges) * len(algorithms)
-        
+        total_experiments = len(user_ranges) * len(edge_ranges) * len(algorithms) * len(seeds)
+
         print(f"Starting comprehensive experiments...")
         print(f"User ranges: {user_ranges}")
         print(f"Edge ranges: {edge_ranges}")
         print(f"Algorithms: {algorithms}")
+        print(f"Seeds: {seeds}")
         print(f"Total experiments: {total_experiments}")
         csv_filename = self.init_results_csv()
         print(f"Streaming results to {csv_filename}")
@@ -694,28 +704,30 @@ class ExperimentRunner:
                 continue
             for num_users in user_ranges:
                 for algorithm in algorithms:
-                    try:
-                        result = self.run_single_experiment(
-                            num_users, num_edges, algorithm, experiment_duration
-                        )
-                        self.results.append(result)
-                        self.append_result_to_csv(result, csv_filename)
-                        
-                        
-                    except Exception as e:
-                        print(f"Experiment failed: {e}")
-                        failed = {
-                            "timestamp": datetime.now().isoformat(),
-                            "num_users": num_users,
-                            "num_edges": num_edges,
-                            "algorithm": algorithm,
-                            "error": str(e),
-                            "success": False
-                        }
-                        self.results.append(failed)
-                        self.append_result_to_csv(failed, csv_filename)
-                    
-                    time.sleep(5)
+                    for seed in seeds:
+                        try:
+                            result = self.run_single_experiment(
+                                num_users, num_edges, algorithm, experiment_duration, seed=seed
+                            )
+                            self.results.append(result)
+                            self.append_result_to_csv(result, csv_filename)
+
+
+                        except Exception as e:
+                            print(f"Experiment failed: {e}")
+                            failed = {
+                                "timestamp": datetime.now().isoformat(),
+                                "num_users": num_users,
+                                "num_edges": num_edges,
+                                "algorithm": algorithm,
+                                "seed": seed,
+                                "error": str(e),
+                                "success": False
+                            }
+                            self.results.append(failed)
+                            self.append_result_to_csv(failed, csv_filename)
+
+                        time.sleep(5)
             res = requests.post(f"{self.api_base}/reset_simulation")
         
             if res.status_code != 200:
@@ -739,12 +751,27 @@ def main():
 
     # =====================================================================
     # EXPERIMENT MATRIX — edit these to change what gets run.
-    # Each combination (num_users x num_edges x algorithm) = 1 experiment.
+    # Each combination (num_users x num_edges x algorithm x seed) = 1 experiment.
+    #
+    # Ablation grid for Table IV: 4 variants x 4 user scales x 5 seeds @ 10
+    # cloudlets = 80 runs, reported as mean +/- 95% CI over seeds.
+    #
+    # PREREQUISITE for a TRUE 5000-user run: the taxiD_Replay pool must hold
+    # >= 5000 trajectories. The current pool (taxid_replay_last1k.pkl) has only
+    # 1000, so 5000 (and 1000) collapse to the full pool. Regenerate first:
+    #   python serverless-sim/scripts/export_taxid_replay_last1k.py \
+    #       --num-trips all --include-features
     # =====================================================================
-    USER_RANGES = [100, 500, 1000, 5000]                                   # number of mobile users
-    EDGE_RANGES = [10, 20, 100, 200]                                     # number of edge cloudlets
-    ALGORITHMS  = []                                           # empty = fetch and run all backend algorithms
-    DURATION_S  = 300                                          # seconds per experiment
+    USER_RANGES = [100, 500, 1000, 5000]                      # number of mobile users
+    EDGE_RANGES = [10]                                        # default topology = 10 cloudlets
+    ALGORITHMS  = [                                           # the 4 ablation variants
+        "greedy",
+        "greedy + keep-alive",
+        "prediction without warm-state awareness",
+        "predictive",
+    ]
+    SEEDS       = [11, 23, 42, 71, 97]                        # 5 seeds for mean +/- CI
+    DURATION_S  = 300                                         # steps per experiment
     # =====================================================================
 
     runner.run_comprehensive_experiments(
@@ -752,6 +779,7 @@ def main():
         edge_ranges=EDGE_RANGES,
         algorithms=ALGORITHMS,
         experiment_duration=DURATION_S,
+        seeds=SEEDS,
     )
     print("Experiment runner completed successfully!")
 

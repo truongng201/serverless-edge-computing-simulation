@@ -24,10 +24,38 @@ class SetDatasetController:
         self.request_data = request_data
         self.dataset_name = self.request_data.get("dataset_name", "none")
         self.sample_size = self.request_data.get("sample_size", None)
+        # Per-run RNG seed: explicit payload value wins, else fall back to Config.SEED.
+        # When set, the trajectory cohort sample is reproducible AND distinct per
+        # seed (so 5-seed runs yield genuine variance for mean +/- CI).
+        seed = self.request_data.get("seed", None)
+        if seed is None:
+            seed = getattr(Config, "SEED", None)
+        self.seed = int(seed) if seed is not None else None
         self.scheduler.clear_all_users()
         self._validate()
         self.logger = logging.getLogger(__name__)
 
+
+    def _apply_seed(self):
+        """Seed the process RNGs for this run so spawn/cohort selection is reproducible.
+
+        Seeds both the stdlib `random` module and numpy (if available). A None
+        seed leaves the RNGs untouched (legacy non-deterministic behavior). The
+        seed is also recorded on the scheduler for any seeded per-step logic.
+        """
+        if self.seed is None:
+            return
+        random.seed(self.seed)
+        try:
+            import numpy as _np
+            _np.random.seed(self.seed)
+        except Exception:
+            pass
+        try:
+            self.scheduler.dataset_metadata["seed"] = self.seed
+        except Exception:
+            pass
+        self.logger.info(f"Applied RNG seed = {self.seed}")
 
     def _validate(self):
         if self.dataset_name and self.dataset_name not in ["none", "dact", "random_generated", "taxiD", "taxiD_Replay"]:
@@ -146,6 +174,7 @@ class SetDatasetController:
     
         
     def start_sample_data(self):
+        self._apply_seed()
         sample_data = {}
         if self.dataset_name == "dact":
             self.scheduler.set_current_step_id(659)
@@ -183,10 +212,29 @@ class SetDatasetController:
                 sample_data["items"] = self._sample_points_on_edges(polylines_m, spawn_count)
             elif self.dataset_name == "taxiD_Replay":
                 trajectories = self._load_replay_trajectories()
-                # Apply sample_size limit if specified
-                if self.sample_size is not None and self.sample_size < len(trajectories):
-                    trajectories = trajectories[:self.sample_size]
-                    self.logger.info(f"TaxiD replay: limiting to {self.sample_size} trajectories")
+                pool_size = len(trajectories)
+                # Cohort selection:
+                #  - seed set  -> reproducible RANDOM subset (distinct per seed => CI variance)
+                #  - no seed    -> leading slice (legacy deterministic behavior)
+                if self.sample_size is not None and self.sample_size < pool_size:
+                    if self.seed is not None:
+                        rng = random.Random(self.seed)
+                        trajectories = rng.sample(trajectories, self.sample_size)
+                        self.logger.info(
+                            f"TaxiD replay: sampled {self.sample_size}/{pool_size} trajectories "
+                            f"(seed={self.seed})"
+                        )
+                    else:
+                        trajectories = trajectories[:self.sample_size]
+                        self.logger.info(f"TaxiD replay: limiting to {self.sample_size} trajectories (no seed)")
+                elif self.sample_size is not None and self.sample_size > pool_size:
+                    # Do NOT silently mislabel: requested users exceed the replay pool.
+                    self.logger.warning(
+                        f"TaxiD replay: requested {self.sample_size} users but replay pool only "
+                        f"has {pool_size} trajectories -> running with {pool_size} users. "
+                        f"Regenerate a larger pool (export_taxid_replay_last1k.py --num-trips {self.sample_size}) "
+                        f"for a true {self.sample_size}-user run."
+                    )
                 trajectories_px: Dict[str, List[Dict[str, float]]] = {}
                 items = []
                 
@@ -277,4 +325,10 @@ class SetDatasetController:
                 f"TaxiD replay: created {len(self.scheduler.user_nodes)} users from "
                 f"{len(self.scheduler.get_trajectories_px())} trajectories"
             )
+        # A new dataset marks the start of a run: rotate the per-request log so
+        # the file name carries this run's (algorithm, users, edges, seed).
+        try:
+            self.scheduler.start_request_log()
+        except Exception as exc:
+            self.logger.warning(f"Per-request log not started: {exc}")
         return f"Dataset set to {self.dataset_name} successfully"
