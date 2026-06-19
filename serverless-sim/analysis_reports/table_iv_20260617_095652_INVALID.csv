@@ -1,0 +1,97 @@
+num_users,num_edges,algorithm,metric,mean,ci95,n_seeds
+100,10,greedy,total_turnaround_time,46318.8,0,5
+100,10,greedy,cold_count,1200,0,5
+100,10,greedy,total_energy_j,79462.8,0,5
+100,10,greedy,warm_rate,0.959459,0,5
+100,10,greedy,p95_latency_ms,583.262,0,5
+100,10,greedy,p99_latency_ms,909.32,0,5
+100,10,greedy + keep-alive,total_turnaround_time,46385.3,0,5
+100,10,greedy + keep-alive,cold_count,1275,0,5
+100,10,greedy + keep-alive,total_energy_j,79936.2,0,5
+100,10,greedy + keep-alive,warm_rate,0.956926,0,5
+100,10,greedy + keep-alive,p95_latency_ms,577.682,0,5
+100,10,greedy + keep-alive,p99_latency_ms,979.808,1.57797e-13,5
+100,10,prediction without warm-state awareness,total_turnaround_time,44221.1,0,5
+100,10,prediction without warm-state awareness,cold_count,500,0,5
+100,10,prediction without warm-state awareness,total_energy_j,75044.3,0,5
+100,10,prediction without warm-state awareness,warm_rate,0.983108,0,5
+100,10,prediction without warm-state awareness,p95_latency_ms,466.488,7.88987e-14,5
+100,10,prediction without warm-state awareness,p99_latency_ms,504.357,0,5
+100,10,predictive,total_turnaround_time,44221.1,0,5
+100,10,predictive,cold_count,500,0,5
+100,10,predictive,total_energy_j,75044.3,0,5
+100,10,predictive,warm_rate,0.983108,0,5
+100,10,predictive,p95_latency_ms,466.488,7.88987e-14,5
+100,10,predictive,p99_latency_ms,504.357,0,5
+500,10,greedy,total_turnaround_time,235416,0,5
+500,10,greedy,cold_count,6900,0,5
+500,10,greedy,total_energy_j,358187,0,5
+500,10,greedy,warm_rate,0.953378,0,5
+500,10,greedy,p95_latency_ms,677.263,0,5
+500,10,greedy,p99_latency_ms,1199.92,0,5
+500,10,greedy + keep-alive,total_turnaround_time,232736,4.03961e-11,5
+500,10,greedy + keep-alive,cold_count,6613,0,5
+500,10,greedy + keep-alive,total_energy_j,356375,0,5
+500,10,greedy + keep-alive,warm_rate,0.955318,0,5
+500,10,greedy + keep-alive,p95_latency_ms,635.366,0,5
+500,10,greedy + keep-alive,p99_latency_ms,1079.96,0,5
+500,10,prediction without warm-state awareness,total_turnaround_time,224216,0,5
+500,10,prediction without warm-state awareness,cold_count,2500,0,5
+500,10,prediction without warm-state awareness,total_energy_j,330414,0,5
+500,10,prediction without warm-state awareness,warm_rate,0.983108,0,5
+500,10,prediction without warm-state awareness,p95_latency_ms,534.073,0,5
+500,10,prediction without warm-state awareness,p99_latency_ms,536.628,0,5
+500,10,predictive,total_turnaround_time,224216,0,5
+500,10,predictive,cold_count,2500,0,5
+500,10,predictive,total_energy_j,330414,0,5
+500,10,predictive,warm_rate,0.983108,0,5
+500,10,predictive,p95_latency_ms,534.073,0,5
+500,10,predictive,p99_latency_ms,536.628,0,5
+1000,10,greedy,total_turnaround_time,459029,0,5
+1000,10,greedy,cold_count,10500,0,5
+1000,10,greedy,total_energy_j,684342,0,5
+1000,10,greedy,warm_rate,0.964527,0,5
+1000,10,greedy,p95_latency_ms,522.338,0,5
+1000,10,greedy,p99_latency_ms,1090.35,0,5
+1000,10,greedy + keep-alive,total_turnaround_time,461090,8.07922e-11,5
+1000,10,greedy + keep-alive,cold_count,11940,0,5
+1000,10,greedy + keep-alive,total_energy_j,693432,0,5
+1000,10,greedy + keep-alive,warm_rate,0.959662,1.54099e-16,5
+1000,10,greedy + keep-alive,p95_latency_ms,592.62,0,5
+1000,10,greedy + keep-alive,p99_latency_ms,1050.58,0,5
+1000,10,prediction without warm-state awareness,total_turnaround_time,453326,0,5
+1000,10,prediction without warm-state awareness,cold_count,5000,0,5
+1000,10,prediction without warm-state awareness,total_energy_j,649626,0,5
+1000,10,prediction without warm-state awareness,warm_rate,0.983108,0,5
+1000,10,prediction without warm-state awareness,p95_latency_ms,535.404,0,5
+1000,10,prediction without warm-state awareness,p99_latency_ms,538.51,0,5
+1000,10,predictive,total_turnaround_time,453326,0,5
+1000,10,predictive,cold_count,5000,0,5
+1000,10,predictive,total_energy_j,649626,0,5
+1000,10,predictive,warm_rate,0.983108,0,5
+1000,10,predictive,p95_latency_ms,535.404,0,5
+1000,10,predictive,p99_latency_ms,538.51,0,5
+5000,10,greedy,total_turnaround_time,2.20722e+06,0,5
+5000,10,greedy,cold_count,30500,0,5
+5000,10,greedy,total_energy_j,3.23804e+06,0,5
+5000,10,greedy,warm_rate,0.979392,0,5
+5000,10,greedy,p95_latency_ms,444.278,0,5
+5000,10,greedy,p99_latency_ms,522.359,0,5
+5000,10,greedy + keep-alive,total_turnaround_time,2.21374e+06,0,5
+5000,10,greedy + keep-alive,cold_count,33267,0,5
+5000,10,greedy + keep-alive,total_energy_j,3.2555e+06,0,5
+5000,10,greedy + keep-alive,warm_rate,0.977522,1.54099e-16,5
+5000,10,greedy + keep-alive,p95_latency_ms,443.283,7.88987e-14,5
+5000,10,greedy + keep-alive,p99_latency_ms,640.967,0,5
+5000,10,prediction without warm-state awareness,total_turnaround_time,2.1982e+06,0,5
+5000,10,prediction without warm-state awareness,cold_count,25000,0,5
+5000,10,prediction without warm-state awareness,total_energy_j,3.20332e+06,0,5
+5000,10,prediction without warm-state awareness,warm_rate,0.983108,0,5
+5000,10,prediction without warm-state awareness,p95_latency_ms,448.41,7.88987e-14,5
+5000,10,prediction without warm-state awareness,p99_latency_ms,534.754,0,5
+5000,10,predictive,total_turnaround_time,2.1982e+06,0,5
+5000,10,predictive,cold_count,25000,0,5
+5000,10,predictive,total_energy_j,3.20332e+06,0,5
+5000,10,predictive,warm_rate,0.983108,0,5
+5000,10,predictive,p95_latency_ms,448.41,7.88987e-14,5
+5000,10,predictive,p99_latency_ms,534.754,0,5
