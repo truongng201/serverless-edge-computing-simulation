@@ -1,0 +1,73 @@
+num_users,num_edges,algorithm,metric,mean,ci95,n_seeds
+100,10,greedy,total_turnaround_time,126460,4173.49,5
+100,10,greedy,cold_count,23799.2,1177.58,5
+100,10,greedy,total_energy_j,222110,7432.91,5
+100,10,greedy,warm_rate,0.195973,0.0397831,5
+100,10,greedy,p95_latency_ms,1471.16,0.468501,5
+100,10,greedy,p99_latency_ms,1479.73,2.85024,5
+100,10,greedy + keep-alive,total_turnaround_time,59576.7,9580.37,5
+100,10,greedy + keep-alive,cold_count,4944.4,2699.58,5
+100,10,greedy + keep-alive,total_energy_j,103098,17039.8,5
+100,10,greedy + keep-alive,warm_rate,0.832959,0.0912019,5
+100,10,greedy + keep-alive,p95_latency_ms,1270.76,367.846,5
+100,10,greedy + keep-alive,p99_latency_ms,1334.74,302.874,5
+100,10,prediction without warm-state awareness,total_turnaround_time,59466.1,9553.05,5
+100,10,prediction without warm-state awareness,cold_count,4894.4,2691.69,5
+100,10,prediction without warm-state awareness,total_energy_j,102782,16990,5
+100,10,prediction without warm-state awareness,warm_rate,0.834649,0.0909356,5
+100,10,prediction without warm-state awareness,p95_latency_ms,1250.16,372.615,5
+100,10,prediction without warm-state awareness,p99_latency_ms,1310.42,299.014,5
+100,10,predictive,total_turnaround_time,59220.8,9239.81,5
+100,10,predictive,cold_count,4740,2594.39,5
+100,10,predictive,total_energy_j,101807,16375.9,5
+100,10,predictive,warm_rate,0.839865,0.0876483,5
+100,10,predictive,p95_latency_ms,1267.32,344.495,5
+100,10,predictive,p99_latency_ms,1335.08,304.082,5
+500,10,greedy,total_turnaround_time,522291,14674.7,5
+500,10,greedy,cold_count,87804.2,4134.06,5
+500,10,greedy,total_energy_j,868857,26094.3,5
+500,10,greedy,warm_rate,0.406728,0.0279329,5
+500,10,greedy,p95_latency_ms,1472.9,0.564465,5
+500,10,greedy,p99_latency_ms,1488.58,3.39563,5
+500,10,greedy + keep-alive,total_turnaround_time,464927,14814.7,5
+500,10,greedy + keep-alive,cold_count,71633,4169.38,5
+500,10,greedy + keep-alive,total_energy_j,766784,26317.2,5
+500,10,greedy + keep-alive,warm_rate,0.515993,0.0281715,5
+500,10,greedy + keep-alive,p95_latency_ms,1472.85,0.546109,5
+500,10,greedy + keep-alive,p99_latency_ms,1485.63,3.72118,5
+500,10,prediction without warm-state awareness,total_turnaround_time,463372,14500.6,5
+500,10,prediction without warm-state awareness,cold_count,71102.2,4083.74,5
+500,10,prediction without warm-state awareness,total_energy_j,763433,25776.7,5
+500,10,prediction without warm-state awareness,warm_rate,0.51958,0.0275928,5
+500,10,prediction without warm-state awareness,p95_latency_ms,1473.55,0.524828,5
+500,10,prediction without warm-state awareness,p99_latency_ms,1487.05,3.73102,5
+500,10,predictive,total_turnaround_time,461169,20294.1,5
+500,10,predictive,cold_count,69274.6,5666.77,5
+500,10,predictive,total_energy_j,751897,35768.8,5
+500,10,predictive,warm_rate,0.531928,0.038289,5
+500,10,predictive,p95_latency_ms,1497.58,6.51254,5
+500,10,predictive,p99_latency_ms,1566.55,2.20401,5
+1000,10,greedy,total_turnaround_time,842915,16137.9,5
+1000,10,greedy,cold_count,119861,4540.44,5
+1000,10,greedy,total_energy_j,1.37463e+06,28659.4,5
+1000,10,greedy,warm_rate,0.595063,0.0153393,5
+1000,10,greedy,p95_latency_ms,1476.18,0.386762,5
+1000,10,greedy,p99_latency_ms,1484.16,1.08889,5
+1000,10,greedy + keep-alive,total_turnaround_time,757375,15126.8,5
+1000,10,greedy + keep-alive,cold_count,94417,4255.79,5
+1000,10,greedy + keep-alive,total_energy_j,1.21403e+06,26862.7,5
+1000,10,greedy + keep-alive,warm_rate,0.681024,0.0143777,5
+1000,10,greedy + keep-alive,p95_latency_ms,1475.77,0.511127,5
+1000,10,greedy + keep-alive,p99_latency_ms,1482.75,1.18558,5
+1000,10,prediction without warm-state awareness,total_turnaround_time,755079,15889.4,5
+1000,10,prediction without warm-state awareness,cold_count,93639.8,4474.96,5
+1000,10,prediction without warm-state awareness,total_energy_j,1.20912e+06,28246.1,5
+1000,10,prediction without warm-state awareness,warm_rate,0.683649,0.0151181,5
+1000,10,prediction without warm-state awareness,p95_latency_ms,1476.41,0.645482,5
+1000,10,prediction without warm-state awareness,p99_latency_ms,1484.22,0.96935,5
+1000,10,predictive,total_turnaround_time,803460,290355,2
+1000,10,predictive,cold_count,103362,81464.5,2
+1000,10,predictive,total_energy_j,1.27049e+06,514206,2
+1000,10,predictive,warm_rate,0.650802,0.275218,2
+1000,10,predictive,p95_latency_ms,1566.6,2.33091,2
+1000,10,predictive,p99_latency_ms,1569.4,0.742575,2
