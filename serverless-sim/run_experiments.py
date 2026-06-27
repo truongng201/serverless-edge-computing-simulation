@@ -763,7 +763,7 @@ def main():
     #       --num-trips all --include-features
     # =====================================================================
     USER_RANGES = [100, 500, 1000, 5000]                      # number of mobile users
-    EDGE_RANGES = [100]                                        # default topology = 10 cloudlets
+    EDGE_RANGES = [50]                                        # default topology = 10 cloudlets
     ALGORITHMS  = [                                           # the 4 ablation variants
         "greedy",
         "greedy + keep-alive",
