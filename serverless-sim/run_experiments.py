@@ -753,24 +753,28 @@ def main():
     # EXPERIMENT MATRIX — edit these to change what gets run.
     # Each combination (num_users x num_edges x algorithm x seed) = 1 experiment.
     #
-    # Ablation grid for Table IV: 4 variants x 4 user scales x 5 seeds @ 10
-    # cloudlets = 80 runs, reported as mean +/- 95% CI over seeds.
+    # !!! To capture per-request logs (handoffs / CDF / jitter), the CENTRAL
+    #     server must be started with PER_REQUEST_LOG_DIR set, e.g.:
+    #       PER_REQUEST_LOG_DIR=request_logs python central_main.py --port 8000
+    #     (it is a server-process env var, NOT a runner one). Without it, only
+    #     the aggregate experiment_results_*.csv is produced (no request_logs/).
     #
     # PREREQUISITE for a TRUE 5000-user run: the taxiD_Replay pool must hold
-    # >= 5000 trajectories. The current pool (taxid_replay_last1k.pkl) has only
-    # 1000, so 5000 (and 1000) collapse to the full pool. Regenerate first:
-    #   python serverless-sim/scripts/export_taxid_replay_last1k.py \
-    #       --num-trips all --include-features
+    # >= 5000 trajectories (mock_data/taxid_replay_5000_features.pkl).
     # =====================================================================
-    USER_RANGES = [100, 500, 1000, 5000]                      # number of mobile users
-    EDGE_RANGES = [100]                                        # default topology = 10 cloudlets
-    ALGORITHMS  = [                                           # the 4 ablation variants
+    # --- ACTIVE: full 4-variant ablation swept across edge density 10..200.
+    #     4 users x 4 edges x 4 variants x 5 seeds = 320 runs.
+    #     Captures request logs for EVERY variant at every density (handoff + CDF).
+    #     To trim: drop 5000 from USER_RANGES, or use SEEDS=[11] for a quick pass. ---
+    USER_RANGES = [100, 500, 1000, 5000]                     # mobile users
+    EDGE_RANGES = [10, 20, 100, 200]                         # cloudlet density sweep
+    ALGORITHMS  = [                                          # all 4 ablation variants
         "greedy",
         "greedy + keep-alive",
         "prediction without warm-state awareness",
         "predictive",
     ]
-    SEEDS       = [11, 23, 42, 71, 97]                        # 5 seeds for mean +/- CI
+    SEEDS       = [11, 23, 42, 71, 97]                        # 5 seeds for mean +/- CI ([11] = quick)
     DURATION_S  = 300                                         # steps per experiment
     # =====================================================================
 
