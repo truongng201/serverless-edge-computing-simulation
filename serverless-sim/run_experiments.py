@@ -766,8 +766,8 @@ def main():
     #     4 users x 4 edges x 4 variants x 5 seeds = 320 runs.
     #     Captures request logs for EVERY variant at every density (handoff + CDF).
     #     To trim: drop 5000 from USER_RANGES, or use SEEDS=[11] for a quick pass. ---
-    USER_RANGES = [100, 500, 1000, 5000]                     # mobile users
-    EDGE_RANGES = [10, 20, 100, 200]                         # cloudlet density sweep
+    USER_RANGES = [50, 3000]                     # mobile users
+    EDGE_RANGES = [10, 50, 100]                         # cloudlet density sweep
     ALGORITHMS  = [                                          # all 4 ablation variants
         "greedy",
         "greedy + keep-alive",
