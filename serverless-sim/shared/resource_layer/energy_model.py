@@ -171,6 +171,27 @@ class SystemPowerProfile:
         
         return profile
     
+    @classmethod
+    def from_config(cls, is_edge: bool = True) -> "SystemPowerProfile":
+        """Fixed, documented power profile from Config (reproducible across hosts)."""
+        from config import Config as _Cfg
+        prefix = "EDGE" if is_edge else "CENTRAL"
+        profile = cls()
+        profile.idle_power_w = float(getattr(_Cfg, f"{prefix}_CPU_IDLE_W"))
+        profile.max_power_w = float(getattr(_Cfg, f"{prefix}_CPU_MAX_W"))
+        profile.cpu_tdp_w = profile.max_power_w
+        profile.memory_power_w = float(getattr(_Cfg, f"{prefix}_MEMORY_W"))
+        profile.storage_power_w = float(getattr(_Cfg, f"{prefix}_STORAGE_W"))
+        profile.base_system_power_w = float(getattr(_Cfg, f"{prefix}_BASE_W"))
+        return profile
+
+    @classmethod
+    def for_simulation(cls, is_edge: bool = True) -> "SystemPowerProfile":
+        from config import Config as _Cfg
+        if str(getattr(_Cfg, "POWER_PROFILE_SOURCE", "config")).lower() == "host":
+            return cls.from_system(is_edge=is_edge)
+        return cls.from_config(is_edge=is_edge)
+
     @staticmethod
     def _detect_container() -> bool:
         """Detect if running inside a Docker container."""
@@ -374,9 +395,9 @@ class EnergyModel:
         """
         self.logger = logging.getLogger(__name__)
         
-        # Power profiles - detect from system if not provided
-        self.edge_power_profile = edge_power_profile or SystemPowerProfile.from_system(is_edge=True)
-        self.central_power_profile = central_power_profile or SystemPowerProfile.from_system(is_edge=False)
+        # Power profiles - fixed from Config unless POWER_PROFILE_SOURCE=host
+        self.edge_power_profile = edge_power_profile or SystemPowerProfile.for_simulation(is_edge=True)
+        self.central_power_profile = central_power_profile or SystemPowerProfile.for_simulation(is_edge=False)
         
         # Network configuration
         self.network_type = network_type
@@ -769,172 +790,157 @@ class EnergyModel:
         avg_edge_cpu_util: float,
         avg_data_size_bytes: float,
         avg_bandwidth_bytes_per_s: float,
-        cold_start_count: int,
-        warm_count: int,
-        timestep_duration_s: float = 1.0
+        edge_warm: int = 0,
+        edge_cold: int = 0,
+        central_warm: int = 0,
+        central_cold: int = 0,
+        live_containers: int = 0,
+        prewarm_launches: int = 0,
+        handoffs: int = 0,
+        timestep_duration_s: float = 60.0,
+        cold_start_count: Optional[int] = None,
+        warm_count: Optional[int] = None,
     ) -> Dict[str, float]:
         """
         Estimate energy consumption for a single simulation timestep.
-        
-        Uses real system power profiles and defaults to WIRED network.
-        Provides detailed breakdown of each energy component.
-        
-        Args:
-            num_edge_nodes: Number of active edge nodes
-            num_users: Number of active users
-            avg_edge_cpu_util: Average CPU utilization across edge nodes (0-100%)
-            avg_data_size_bytes: Average data size per user request
-            avg_bandwidth_bytes_per_s: Average network bandwidth
-            cold_start_count: Number of cold starts in this timestep
-            warm_count: Number of warm executions in this timestep
-            timestep_duration_s: Duration of the timestep
-            
-        Returns:
-            Dictionary with detailed energy breakdown:
-                - static_energy_j: Idle/baseline energy (all nodes)
-                - dynamic_energy_j: Workload-dependent energy (CPU utilization)
-                - network_energy_j: Data transfer energy (wired by default)
-                - cold_start_energy_j: Container cold start overhead
-                - total_energy_j: Sum of all components
-                - average_power_w: Average power consumption
+
+        E_step = E_static + E_dynamic + E_network + E_cold_start + E_prewarm
+
+          E_static     = (N_edge * P_idle,edge + P_idle,central) * f_static * dt
+          E_dynamic    = E_exec + E_keepalive (+ utilization-driven base load)
+            E_exec       = every executed request (warm or cold) pays its
+                           execution energy
+            E_keepalive  = live containers (warm or launching) * P_container * dt
+                           -> retained and prewarmed containers are NOT free
+          E_network    = per-request transfer + DT state migration per handoff
+          E_cold_start = per request-triggered cold start (init overhead)
+          E_prewarm    = per prewarm launch (same init overhead, paid by no request)
+
+        Per-request compute energy uses the edge power profile for both edge and
+        central requests (the same function does the same work); the node type
+        only selects the cold-start penalty duration.
+
+        `cold_start_count` / `warm_count` are accepted for backward
+        compatibility and are treated as edge requests.
+
+        Returns a dict of components in Joules; `variable_energy_j` is the
+        policy-dependent part (total minus static).
         """
+        from config import Config as _Cfg
+
+        if cold_start_count is not None or warm_count is not None:
+            if not any((edge_warm, edge_cold, central_warm, central_cold)):
+                edge_cold = int(cold_start_count or 0)
+                edge_warm = int(warm_count or 0)
+        dt = float(timestep_duration_s)
+
         # ===== STATIC ENERGY =====
         # Idle power that the marginal serverless edge stack consumes on top of the
         # underlying host. STATIC_OVERHEAD_FRACTION (default 0.1) attributes only the
         # share of idle power belonging to the serverless runtime (containerd, agent,
         # health checks), not the full server. Set to 1.0 to bill full idle power.
-        from config import Config as _Cfg
         static_scale = float(getattr(_Cfg, "STATIC_OVERHEAD_FRACTION", 0.1))
-        edge_static = num_edge_nodes * self.calculate_static_energy(NodeType.EDGE, timestep_duration_s) * static_scale
-        central_static = self.calculate_static_energy(NodeType.CENTRAL, timestep_duration_s) * static_scale
+        edge_static = num_edge_nodes * self.calculate_static_energy(NodeType.EDGE, dt) * static_scale
+        central_static = self.calculate_static_energy(NodeType.CENTRAL, dt) * static_scale
         static_energy = edge_static + central_static
-        
+
         # ===== DYNAMIC ENERGY =====
-        # Dynamic energy = energy from actual function executions (warm only)
-        # Cold start energy is separate - it captures the initialization overhead
-        
-        # Base dynamic from CPU utilization (infrastructure overhead)
-        base_dynamic_energy = 0.0
-        for _ in range(num_edge_nodes):
-            edge_dynamic = self.calculate_dynamic_energy(
-                NodeType.EDGE, avg_edge_cpu_util, timestep_duration_s
-            )
-            base_dynamic_energy += edge_dynamic
-        
-        # Execution energy: ONLY warm executions count as dynamic
-        # Cold execution overhead goes to cold_start_energy (not double counted)
-        # Pulled from Config.SIM_EXEC_WARM_MS_EDGE so latency and energy stay aligned.
-        warm_exec_duration_s = float(getattr(_Cfg, "SIM_EXEC_WARM_MS_EDGE", 300.0)) / 1000.0
-        warm_exec_cpu_percent = 30.0  # CPU spike during warm execution
-        
-        # Energy per warm execution
-        warm_exec_energy = self.calculate_dynamic_energy(
-            NodeType.EDGE, warm_exec_cpu_percent, warm_exec_duration_s
+        # Utilization-driven base load reported by the nodes (0 for virtual edges).
+        base_dynamic_energy = num_edge_nodes * self.calculate_dynamic_energy(
+            NodeType.EDGE, avg_edge_cpu_util, dt
         )
-        
-        execution_dynamic_energy = warm_count * warm_exec_energy
-        
-        # Warm container maintenance: keeping containers warm consumes idle resources
-        # Each warm container uses ~2-5% CPU for health checks, garbage collection, etc.
-        warm_container_idle_cpu = 3.0  # ~3% CPU per warm container
-        warm_container_idle_duration = timestep_duration_s
-        warm_maintenance_energy = warm_count * self.calculate_dynamic_energy(
-            NodeType.EDGE, warm_container_idle_cpu, warm_container_idle_duration
+
+        # Execution: every request runs the function once, warm or cold. The cold
+        # start overhead is billed on top in E_cold_start.
+        warm_exec_cpu_percent = 30.0  # CPU spike during execution
+        exec_edge_j = self.calculate_dynamic_energy(
+            NodeType.EDGE, warm_exec_cpu_percent, float(getattr(_Cfg, "SIM_EXEC_WARM_MS_EDGE", 300.0)) / 1000.0
         )
-        
-        dynamic_energy = base_dynamic_energy + execution_dynamic_energy + warm_maintenance_energy
-        
+        exec_central_j = self.calculate_dynamic_energy(
+            NodeType.EDGE, warm_exec_cpu_percent, float(getattr(_Cfg, "SIM_EXEC_WARM_MS_CENTRAL", 300.0)) / 1000.0
+        )
+        execution_energy = (edge_warm + edge_cold) * exec_edge_j + (central_warm + central_cold) * exec_central_j
+
+        # Keep-alive: each live container pins memory for the whole step, whether
+        # it serves requests or not.
+        keepalive_energy = float(live_containers) * float(getattr(_Cfg, "CONTAINER_IDLE_POWER_W", 0.0)) * dt
+
+        dynamic_energy = base_dynamic_energy + execution_energy + keepalive_energy
+
         # ===== NETWORK ENERGY =====
-        # Network energy has two components:
-        # 1. Regular data transfer for function execution (all executions)
-        # 2. Migration overhead when switching nodes (cold starts = node switches)
-        total_executions = cold_start_count + warm_count
+        total_requests = edge_warm + edge_cold + central_warm + central_cold
         network_energy = 0.0
         network_tx_energy = 0.0
         network_rx_energy = 0.0
-        
-        if total_executions > 0 and avg_data_size_bytes > 0:
-            # Each execution involves uplink (request) + downlink (response)
-            for _ in range(total_executions):
-                net_total, net_tx, net_rx = self.calculate_network_energy(
-                    avg_data_size_bytes,
-                    avg_bandwidth_bytes_per_s,
-                    network_type=None  # Uses model default (WIRED)
-                )
-                network_energy += net_total
-                network_tx_energy += net_tx
-                network_rx_energy += net_rx
-        
-        # Migration overhead: cold starts often mean node switching
-        # Switching nodes requires state transfer, connection setup, etc.
-        # Migration cost = ~2x the normal request data transfer
-        migration_overhead_factor = 2.0
-        for _ in range(cold_start_count):
-            migration_net, migration_tx, migration_rx = self.calculate_network_energy(
-                avg_data_size_bytes * migration_overhead_factor,
-                avg_bandwidth_bytes_per_s,
-                network_type=None
+        if total_requests > 0 and avg_data_size_bytes > 0:
+            # Each request involves uplink (request) + downlink (response).
+            net_total, net_tx, net_rx = self.calculate_network_energy(
+                avg_data_size_bytes, avg_bandwidth_bytes_per_s, network_type=None
             )
-            network_energy += migration_net
-            network_tx_energy += migration_tx
-            network_rx_energy += migration_rx
-        
-        # ===== COLD START ENERGY =====
-        # Cold start energy is the MARGINAL cost over warm execution:
-        # - Extra time: cold adds ~100ms extra latency (not 250ms - that was too high)
-        # - Extra CPU: brief spike during container init
-        # This should be a small marginal cost, not dominate the total
-        cold_start_energy = 0.0
-        
-        # Realistic cold start parameters
-        # Pulled from Config.SIM_EXEC_COLD_PENALTY_MS_EDGE so the cold-start energy
-        # penalty matches the cold-start latency penalty applied in the latency model.
-        extra_latency_s = float(getattr(_Cfg, "SIM_EXEC_COLD_PENALTY_MS_EDGE", 1050.0)) / 1000.0
-        cold_init_cpu = 40.0        # Moderate CPU spike (not 60%)
-        
-        # Energy for the extra latency at init CPU (the penalty)
-        cold_penalty_energy = self.calculate_dynamic_energy(
-            NodeType.EDGE, cold_init_cpu, extra_latency_s
-        )
-        
-        # Small container init overhead (image layer check, memory allocation)
-        # Should be very small - just the marginal cost
-        container_init_overhead_j = 0.1  # ~0.1J for container init
-        
-        for _ in range(cold_start_count):
-            cold_start_energy += cold_penalty_energy + container_init_overhead_j
-        
+            network_energy += total_requests * net_total
+            network_tx_energy += total_requests * net_tx
+            network_rx_energy += total_requests * net_rx
+
+        # Handoff: DT state moves between nodes over the wired backhaul.
+        backhaul_bytes_per_s = float(getattr(_Cfg, "BACKHAUL_BANDWIDTH_BYTES_PER_MS", 0.0)) * 1000.0
+        if handoffs > 0 and avg_data_size_bytes > 0 and backhaul_bytes_per_s > 0:
+            mig_total, mig_tx, mig_rx = self.calculate_network_energy(
+                avg_data_size_bytes, backhaul_bytes_per_s, network_type=None
+            )
+            network_energy += handoffs * mig_total
+            network_tx_energy += handoffs * mig_tx
+            network_rx_energy += handoffs * mig_rx
+
+        # ===== COLD START / PREWARM ENERGY =====
+        # Marginal cost of starting a container: the init time at elevated CPU
+        # plus a small fixed overhead (image layer check, memory allocation). A
+        # prewarm launch starts a container exactly like a cold start does.
+        cold_init_cpu = 40.0
+        container_init_overhead_j = 0.1
+
+        def _init_energy(penalty_ms: float) -> float:
+            return self.calculate_dynamic_energy(NodeType.EDGE, cold_init_cpu, penalty_ms / 1000.0) + container_init_overhead_j
+
+        init_edge_j = _init_energy(float(getattr(_Cfg, "SIM_EXEC_COLD_PENALTY_MS_EDGE", 1050.0)))
+        init_central_j = _init_energy(float(getattr(_Cfg, "SIM_EXEC_COLD_PENALTY_MS_CENTRAL", 900.0)))
+        cold_start_energy = edge_cold * init_edge_j + central_cold * init_central_j
+        # Prewarm targets are always edge cloudlets.
+        prewarm_energy = prewarm_launches * init_edge_j
+
         # ===== TOTAL ENERGY =====
-        total_energy = static_energy + dynamic_energy + network_energy + cold_start_energy
-        
-        # Calculate average power
-        average_power = total_energy / timestep_duration_s if timestep_duration_s > 0 else 0.0
-        
+        total_energy = static_energy + dynamic_energy + network_energy + cold_start_energy + prewarm_energy
+        average_power = total_energy / dt if dt > 0 else 0.0
+
         return {
             # Energy breakdown (all in Joules)
             "static_energy_j": round(static_energy, 4),
             "dynamic_energy_j": round(dynamic_energy, 4),
+            "execution_energy_j": round(execution_energy, 4),
+            "keepalive_energy_j": round(keepalive_energy, 4),
             "network_energy_j": round(network_energy, 4),
             "network_tx_energy_j": round(network_tx_energy, 4),
             "network_rx_energy_j": round(network_rx_energy, 4),
             "cold_start_energy_j": round(cold_start_energy, 4),
-            
+            "prewarm_energy_j": round(prewarm_energy, 4),
+
             # Total energy
             "total_energy_j": round(total_energy, 4),
+            "variable_energy_j": round(total_energy - static_energy, 4),
             "total_energy_wh": round(total_energy / 3600, 6),
-            
+
             # Counts
-            "cold_start_count": cold_start_count,
-            "warm_count": warm_count,
-            
+            "cold_start_count": edge_cold + central_cold,
+            "warm_count": edge_warm + central_warm,
+
             # Power metrics
             "average_power_w": round(average_power, 4),
-            
+            "timestep_duration_s": dt,
+
             # System info
             "num_edge_nodes": num_edge_nodes,
             "num_users": num_users,
             "avg_cpu_utilization": round(avg_edge_cpu_util, 2),
-            
+
             # Power profile info
             "edge_idle_power_w": round(self.edge_power_profile.get_total_idle_power(), 2),
             "edge_max_power_w": round(self.edge_power_profile.max_power_w, 2),

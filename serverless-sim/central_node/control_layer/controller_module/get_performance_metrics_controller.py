@@ -18,7 +18,9 @@ class GetPerformanceMetricsController:
         # `cold_start_count`; those must NOT clobber the authoritative
         # request-status counts from the turnaround breakdown (otherwise
         # warm_count would include unknowns and disagree with warm_rate).
-        energy_metrics = self.scheduler.calculate_energy_consumption(timestep_duration_s=1.0)
+        # Integrate power over the trajectory time one step covers
+        # (Config.SIM_STEP_DURATION_S), not over 1 s.
+        energy_metrics = self.scheduler.calculate_energy_consumption()
         for k in ("warm_count", "cold_count", "unknown_count", "cold_start_count"):
             energy_metrics.pop(k, None)
         self.response.update(energy_metrics)

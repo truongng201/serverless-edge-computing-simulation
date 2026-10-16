@@ -37,18 +37,42 @@ VARIANT_ORDER = [
     "greedy",
     "greedy + keep-alive",
     "prediction without warm-state awareness",
+    "prewarm (persistence)",
+    "prewarm (constant velocity)",
     "predictive",
+    "prewarm (oracle)",
 ]
 
 METRICS = {
     # column -> (aggregation over timesteps, pretty name)
-    "total_turnaround_time": ("mean", "Turnaround (ms, step mean)"),
+    # "ratio:<num>/<den>" = sum(num) / sum(den) over the run, i.e. weighted by
+    # requests. Needed because the number of active users changes over a run
+    # (taxis leave when their trip ends), so per-step means are biased.
+    "latency_per_request_ms": ("ratio:total_turnaround_time/requests", "Latency per request (ms)"),
     "cold_count": ("sum", "Cold starts (total)"),
+    "warm_rate": ("ratio:warm_count/requests", "Warm rate (request-weighted)"),
     "total_energy_j": ("sum", "Energy (J, total)"),
-    "warm_rate": ("mean", "Warm rate"),
-    "p95_latency_ms": ("mean", "p95 latency (ms)"),
-    "p99_latency_ms": ("mean", "p99 latency (ms)"),
+    "variable_energy_j": ("sum", "Policy-dependent energy (J, total - static)"),
+    "keepalive_energy_j": ("sum", "Keep-alive energy (J)"),
+    "prewarm_launches": ("sum", "Prewarm launches"),
+    "prewarm_hits": ("sum", "Prewarm hits"),
+    "prewarm_wasted": ("sum", "Prewarm wasted"),
+    "handoffs": ("sum", "Handoffs"),
+    "requests": ("sum", "Requests"),
+    "p95_latency_ms": ("mean", "p95 latency (ms, step mean)"),
+    "p99_latency_ms": ("mean", "p99 latency (ms, step mean)"),
 }
+
+
+def _source_columns():
+    cols = set()
+    for col, (agg, _) in METRICS.items():
+        if agg.startswith("ratio:"):
+            num, den = agg[len("ratio:"):].split("/")
+            cols.update((num, den))
+        else:
+            cols.add(col)
+    return cols
 
 
 def fnum(x):
@@ -70,8 +94,11 @@ def mean_ci(values):
     return (m, t * math.sqrt(var / n), n)
 
 
-def load_runs(path):
-    """runs[(users, edges, algorithm, seed)][metric] = per-run scalar"""
+def load_runs(path, warmup_steps=0):
+    """runs[(users, edges, algorithm, seed)][metric] = per-run scalar
+
+    Rows with timestep <= warmup_steps are dropped (cold-system transient).
+    """
     per_step = defaultdict(lambda: defaultdict(list))
     skipped_warmup = 0
     with open(path, newline="") as fh:
@@ -85,6 +112,10 @@ def load_runs(path):
             seed = (row.get("seed") or "").strip() or "NA"
             if not algo or row.get("timestep", "") == "":
                 continue
+            ts = fnum(row.get("timestep"))
+            if ts is not None and ts <= warmup_steps:
+                skipped_warmup += 1
+                continue
             # Skip warm-up steps before the first execution (execution runs only
             # every 5 sim steps; earlier steps have container_status="unknown"
             # and don't represent a measured request outcome).
@@ -93,7 +124,11 @@ def load_runs(path):
                 skipped_warmup += 1
                 continue
             key = (users, edges, algo, seed)
-            for col in METRICS:
+            if fnum(row.get("requests")) is None:
+                # CSVs from before the `requests` column: every counted
+                # user-step was treated as a request.
+                row["requests"] = (fnum(row.get("warm_count")) or 0.0) + (fnum(row.get("cold_count")) or 0.0)
+            for col in _source_columns():
                 v = fnum(row.get(col))
                 if v is not None:
                     per_step[key][col].append(v)
@@ -102,12 +137,18 @@ def load_runs(path):
     for key, cols in per_step.items():
         runs[key] = {}
         for col, (agg, _) in METRICS.items():
+            if agg.startswith("ratio:"):
+                num, den = agg[len("ratio:"):].split("/")
+                den_total = sum(cols.get(den, []))
+                if den_total > 0:
+                    runs[key][col] = sum(cols.get(num, [])) / den_total
+                continue
             vals = cols.get(col, [])
             if not vals:
                 continue
             runs[key][col] = sum(vals) if agg == "sum" else sum(vals) / len(vals)
     if skipped_warmup:
-        print(f"(skipped {skipped_warmup} warm-up rows with unknown_count>0)")
+        print(f"(skipped {skipped_warmup} warm-up rows)")
     return runs
 
 
@@ -148,11 +189,11 @@ def print_table(table, latex=False):
                 print(f"{algo:<46}" + "".join(cells))
 
         if latex:
-            print("\n--- LaTeX rows (turnaround / cold / energy) ---")
+            print("\n--- LaTeX rows (latency per request / cold / energy) ---")
             for algo in algos:
                 parts = [algo.replace("&", r"\&")]
                 for u in users_scales:
-                    for col in ("total_turnaround_time", "cold_count", "total_energy_j"):
+                    for col in ("latency_per_request_ms", "cold_count", "total_energy_j"):
                         entry = table.get((u, edges, algo), {}).get(col)
                         if entry:
                             m, ci, _ = entry
@@ -237,6 +278,8 @@ def main():
     ap.add_argument("results_csv", nargs="?", help="experiment_results_*.csv from run_experiments.py")
     ap.add_argument("--out", default="table_iv.csv", help="aggregate CSV output path")
     ap.add_argument("--latex", action="store_true", help="also print LaTeX table rows")
+    ap.add_argument("--warmup-steps", type=int, default=0,
+                    help="drop timesteps <= N from every run (cold-system transient)")
     ap.add_argument("--requests", metavar="DIR", help="per-request log dir (request_logs)")
     ap.add_argument("--cdf-out", metavar="CSV", help="write pooled CDF quantiles for plotting")
     args = ap.parse_args()
@@ -245,7 +288,7 @@ def main():
         ap.error("give a results CSV and/or --requests DIR")
 
     if args.results_csv:
-        runs = load_runs(args.results_csv)
+        runs = load_runs(args.results_csv, warmup_steps=args.warmup_steps)
         if not runs:
             sys.exit(f"no usable rows in {args.results_csv}")
         seeds_per_cfg = defaultdict(set)

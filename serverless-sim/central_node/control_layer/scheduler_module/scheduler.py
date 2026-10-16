@@ -59,6 +59,34 @@ class AssignmentAlgorithm(Enum):
     PREDICTIVE = "predictive"
     GREEDY_KEEPALIVE = "greedy + keep-alive"
     PREDICTIVE_NO_WARM = "prediction without warm-state awareness"
+    # Prewarm baselines: identical to PREDICTIVE except for the forecast that
+    # picks the prewarm target, so any difference isolates the forecast.
+    PREWARM_PERSISTENCE = "prewarm (persistence)"
+    PREWARM_CONSTANT_VELOCITY = "prewarm (constant velocity)"
+    PREWARM_ORACLE = "prewarm (oracle)"
+
+
+# Variants that serve at the nearest cloudlet and prewarm at a forecast cloudlet.
+PREWARM_ALGORITHMS = (
+    AssignmentAlgorithm.PREDICTIVE,
+    AssignmentAlgorithm.PREWARM_PERSISTENCE,
+    AssignmentAlgorithm.PREWARM_CONSTANT_VELOCITY,
+    AssignmentAlgorithm.PREWARM_ORACLE,
+)
+# Variants whose forecast comes from the learned mobility predictor.
+PREDICTOR_ALGORITHMS = (
+    AssignmentAlgorithm.PREDICTIVE,
+    AssignmentAlgorithm.PREDICTIVE_NO_WARM,
+)
+
+
+class PredictorUnavailableError(RuntimeError):
+    """A predictor-based variant was requested but the predictor is not loaded.
+
+    Raised instead of silently falling back to greedy, which would record a
+    greedy run under a predictive label.
+    """
+
 
 class Scheduler:
     def __init__(self, assignment_algorithm: AssignmentAlgorithm = AssignmentAlgorithm.GREEDY):
@@ -89,6 +117,7 @@ class Scheduler:
         # Per-timestep counters surfaced to metrics.
         self.timestep_rejections = 0
         self.timestep_evictions = 0
+        self.timestep_handoffs = 0
         # Align the warm-pool keep-alive TTL with the initial algorithm so the
         # pool behaves correctly even before set_assignment_algorithm is called.
         self._apply_keep_alive_policy()
@@ -115,6 +144,28 @@ class Scheduler:
         elif self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
             self.logger.warning("Predictive scheduling requested but predictor is unavailable")
 
+
+    @property
+    def predictor_ready(self) -> bool:
+        return self.predictor_adapter is not None and get_mobility_prediction is not None
+
+    def _require_predictor(self) -> bool:
+        """Return True if the predictor can be used.
+
+        In strict mode (default) a missing predictor raises, so a predictive run
+        can never be recorded with greedy behaviour. With STRICT_PREDICTIVE off
+        it logs and returns False so the caller can degrade explicitly.
+        """
+        if self.predictor_ready:
+            return True
+        msg = (
+            f"Algorithm '{self.assignment_algorithm.value}' needs the mobility predictor, "
+            f"but it is not loaded (TDRIVE_ARTIFACT_DIR={getattr(Config, 'TDRIVE_ARTIFACT_DIR', None)})"
+        )
+        if getattr(Config, "STRICT_PREDICTIVE", True):
+            raise PredictorUnavailableError(msg)
+        self.logger.warning(msg + "; STRICT_PREDICTIVE is off, degrading to greedy")
+        return False
 
     def start_simulation(self):
         self.simulation = True
@@ -159,7 +210,7 @@ class Scheduler:
         if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
             self.warm_pool.set_ttl(0)
         else:
-            self.warm_pool.set_ttl(getattr(Config, "WARM_TTL_STEPS", 30))
+            self.warm_pool.set_ttl(getattr(Config, "WARM_TTL_STEPS", 10))
     
     # ------------------------------------------------------------------
     # Per-request latency log
@@ -325,10 +376,23 @@ class Scheduler:
             # Use pre-computed features directly
             self._append_history_point_with_features(user, point_data)
         else:
-            # Fall back to computing features
-            self._append_history_point(user, user.location)
+            # Fall back to computing features, timed by the trajectory's own
+            # timestamps (one point per minute), not by the wall clock of the poll.
+            self._append_history_point(user, user.location, ts=self._point_timestamp(point_data))
         
         return True
+
+    @staticmethod
+    def _point_timestamp(point_data: Dict[str, Any]) -> Optional[float]:
+        ts = point_data.get("ts")
+        if ts is None:
+            return None
+        if isinstance(ts, (int, float)):
+            return float(ts)
+        try:
+            return datetime.fromisoformat(str(ts)).timestamp()
+        except ValueError:
+            return None
     
     def _append_history_point_with_features(self, user_node: UserNodeInfo, point_data: Dict[str, float]) -> None:
         """Append a history point using pre-computed features from trajectory data.
@@ -371,13 +435,14 @@ class Scheduler:
         self.user_nodes[user_node.user_id] = user_node
         self._append_history_point(user_node, user_node.location)
 
-    def _append_history_point(self, user_node: UserNodeInfo, location: Dict[str, float]) -> None:
+    def _append_history_point(self, user_node: UserNodeInfo, location: Dict[str, float], ts: Optional[float] = None) -> None:
         """Append a history point with features computed in meters (consistent with model training).
         
         IMPORTANT: x,y are stored in METERS (converted from pixels) for consistency with 
         the prediction model which was trained on projected GPS coordinates in meters.
         """
-        ts = time.time()
+        if ts is None:
+            ts = time.time()
         # Convert pixel coordinates to meters for consistent coordinate system
         x_meters = float(location.get("x", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
         y_meters = float(location.get("y", 0.0)) * Config.DEFAULT_PIXEL_TO_METERS
@@ -508,6 +573,7 @@ class Scheduler:
             "unhealthy_node_list": list(classified_nodes["unhealthy"]),
             "warning_node_count": len(classified_nodes["warning"]),
             "warning_node_list": list(classified_nodes["warning"]),
+            "predictor_ready": self.predictor_ready,
         }
     
     
@@ -551,22 +617,54 @@ class Scheduler:
             Propagation delay in milliseconds
         """
         return self._calculate_propagation_delay_deterministic(distance_meters)
-    
+
+    def _node_location(self, node_id: str) -> Dict[str, float]:
+        if node_id == "central_node":
+            return self.central_node["location"]
+        return self.edge_nodes[node_id].location
+
+    def _node_propagation_delay(self, user_location: Dict[str, float], node_id: str) -> Tuple[float, float]:
+        """(distance_m, one-way propagation ms) from a user to a node.
+
+        Requests served by the central cloud also traverse the metro backbone /
+        WAN, which an on-site cloudlet avoids (CENTRAL_WAN_EXTRA_MS).
+        """
+        distance = self._calculate_distance(user_location, self._node_location(node_id))
+        delay = self._calculate_propagation_delay(distance)
+        if node_id == "central_node":
+            delay += float(getattr(Config, "CENTRAL_WAN_EXTRA_MS", 0.0))
+        return distance, delay
+
     def node_assignment(self) -> dict:
         # Per-timestep capacity counters must be reset before reassignment so that
         # the per-edge concurrency budget is enforced from a clean slate.
         self._reset_timestep_counters()
-        if self.assignment_algorithm == AssignmentAlgorithm.GREEDY:
+        current_step = self.get_current_step_id() or 0
+        if self.warm_pool is not None:
+            self.warm_pool.begin_step(current_step)
+        algo = self.assignment_algorithm
+        if algo == AssignmentAlgorithm.GREEDY:
             return self._assign_users_greedy()
-        elif self.assignment_algorithm == AssignmentAlgorithm.GREEDY_KEEPALIVE:
+        elif algo == AssignmentAlgorithm.GREEDY_KEEPALIVE:
             # Same placement as plain greedy; the only difference is keep-alive,
             # which is applied in the warm/cold decision (TTL>0 vs 0). This makes
             # (greedy) vs (greedy + keep-alive) a clean single-factor ablation.
             return self._assign_users_greedy()
-        elif self.assignment_algorithm in (
-            AssignmentAlgorithm.PREDICTIVE,
-            AssignmentAlgorithm.PREDICTIVE_NO_WARM,
-        ):
+        elif algo in PREWARM_ALGORITHMS:
+            # Serve every request where the network would route it (nearest
+            # feasible cloudlet to the ACTUAL position), and use the forecast only
+            # to launch containers ahead of demand. A prewarm therefore pays off
+            # only if the forecast names the cloudlet the user really reaches.
+            use_forecast = True
+            if algo in PREDICTOR_ALGORITHMS:
+                use_forecast = self._require_predictor()
+            matrix = self._assign_users_greedy()
+            if use_forecast:
+                self._plan_prewarm(current_step)
+            return matrix
+        elif algo == AssignmentAlgorithm.PREDICTIVE_NO_WARM:
+            if not self._require_predictor():
+                return self._assign_users_greedy()
             return self._predictive_assignment()
         elif self.assignment_algorithm == AssignmentAlgorithm.RANDOM:
             return self._assign_users_random()
@@ -724,224 +822,9 @@ class Scheduler:
         
         return best_node, min_distance
 
-    def _predictive_assignment(self) -> dict:
-        # Prewarm (plan-ahead + proactive warm-pool admission) is the distinguishing
-        # mechanism of the full PREDICTIVE variant. "prediction without warm-state
-        # awareness" (PREDICTIVE_NO_WARM) uses the same predictive PLACEMENT but
-        # gets NO prewarm — it falls through to the immediate-placement path below
-        # and only benefits from passive container reuse (keep-alive), like greedy.
-        if self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
-            return self._predictive_prewarm_only_assignment()
-
-        if not self.predictor_adapter or not get_mobility_prediction:
-            self.logger.warning("Predictor not available, falling back to greedy assignment")
-            return self._assign_users_greedy()
-        if not self.edge_nodes:
-            self.logger.warning("No edge nodes registered; using greedy assignment")
-            return self._assign_users_greedy()
-        
-        # Separate users into those with sufficient history (for prediction) 
-        # and those without (for greedy fallback)
-        user_states = []
-        users_insufficient_history = []
-        
-        for user in self.user_nodes.values():
-            if self._has_sufficient_history(user.history):
-                # User has enough history for reliable prediction
-                history = self._get_history_for_prediction(user.history)
-                user_states.append({"user_id": user.user_id, "history": history})
-            else:
-                # User doesn't have enough history - will use greedy
-                users_insufficient_history.append(user.user_id)
-        
-        # Log summary of user history status
-        total_users = len(self.user_nodes)
-        predictable_users = len(user_states)
-        if users_insufficient_history:
-            self.logger.info(
-                f"Predictive assignment: {predictable_users}/{total_users} users have sufficient history, "
-                f"{len(users_insufficient_history)} will use greedy fallback"
-            )
-        
-        # If no users have sufficient history, use greedy for all
-        if not user_states:
-            self.logger.info("No users with sufficient history, using greedy assignment for all")
-            return self._assign_users_greedy()
-        
-        # Convert cloudlet positions from pixels to meters (consistent with user history)
-        cloudlet_records = [
-            {
-                "id": node_id, 
-                "x": info.location["x"] * Config.DEFAULT_PIXEL_TO_METERS, 
-                "y": info.location["y"] * Config.DEFAULT_PIXEL_TO_METERS
-            }
-            for node_id, info in self.edge_nodes.items()
-        ]
-        try:
-            prob_map = get_mobility_prediction(user_states, cloudlet_records, self.predictor_adapter)
-        except Exception as exc:
-            self.logger.warning("Predictive inference failed: %s", exc)
-            return self._assign_users_greedy()
-        
-        # Log prediction results summary
-        predicted_count = len(prob_map)
-        total_with_history = len(user_states)
-        if predicted_count < total_with_history:
-            self.logger.info(
-                f"Prediction results: {predicted_count}/{total_with_history} users predicted successfully"
-            )
-        
-        self.assignment_matrix = {}
-        predictive_assignments = 0
-        greedy_fallback_assignments = 0
-        
-        for user_id, user_node in self.user_nodes.items():
-            probs = prob_map.get(user_id)
-            if probs is None:
-                candidate, _ = self._greedy_assignment(user_node.location)
-                greedy_fallback_assignments += 1
-            else:
-                predictive_assignments += 1
-                horizon_idx = -1
-                if probs.ndim == 2 and probs.shape[1] > 0:
-                    # Inference currently returns probabilities for horizons (1,3,5,10).
-                    # Default to using horizon=5 (aligns better with the replay step and
-                    # execution cadence), but clamp if the shape is unexpected.
-                    desired_h = getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5)
-                    horizons = (1, 3, 5, 10)
-                    if probs.shape[1] == len(horizons) and desired_h in horizons:
-                        horizon_idx = horizons.index(desired_h)
-                    else:
-                        horizon_idx = min(max(int(desired_h) - 1, 0), probs.shape[1] - 1)
-                order = np.argsort(probs[:, horizon_idx])[::-1]
-                candidate = None
-                for idx in order:
-                    node_id = cloudlet_records[idx]["id"]
-                    if self._check_resource_constraints(user_node, node_id):
-                        candidate = node_id
-                        break
-                if candidate is None:
-                    candidate = "central_node"
-            assigned_node_id, assigned_node_distance = self._apply_assignment_latency(user_node, candidate)
-            self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
-        
-        # Log final assignment summary
-        if predictive_assignments > 0 or greedy_fallback_assignments > 0:
-            self.logger.info(
-                f"Assignment complete: {predictive_assignments} predictive, "
-                f"{greedy_fallback_assignments} greedy fallback"
-            )
-        
-        return self.assignment_matrix
-
-    def _apply_assignment_latency(self, user_node: UserNodeInfo, assigned_node_id: str) -> Tuple[str, float]:
-        # Detect handoff BEFORE overwriting assigned_node_id
-        prev_assigned = user_node.assigned_node_id
-        handoff = prev_assigned is not None and prev_assigned != assigned_node_id
-        self._account_assignment(assigned_node_id)
-
-        if assigned_node_id == "central_node":
-            location = self.central_node["location"]
-        else:
-            location = self.edge_nodes[assigned_node_id].location
-        assigned_node_distance = self._calculate_distance(user_node.location, location)
-
-        user_node.previous_node_id = prev_assigned
-        user_node.assigned_node_id = assigned_node_id
-        user_node.latency.distance = assigned_node_distance
-        user_node.latency.propagation_delay = self._calculate_propagation_delay(assigned_node_distance)
-
-        # Context switch cost: when a user is handed off to a different edge, its
-        # session/DT state must be transferred. Modeled as state_size / bandwidth
-        # (one-time, on the handoff step only). For serverless DT services this is
-        # non-trivial and should be counted on top of any cold-start penalty.
-        if handoff and user_node.bandwidth_demand and user_node.bandwidth_demand > 0:
-            user_node.migration_cost = float(user_node.data_size_demand) / float(user_node.bandwidth_demand)
-        else:
-            user_node.migration_cost = 0.0
-
-        user_node.latency.total_turnaround_time = (
-            user_node.latency.propagation_delay
-            + user_node.latency.transmission_delay
-            + user_node.latency.computation_delay
-            + user_node.migration_cost
-        )
-        return assigned_node_id, assigned_node_distance
-
-    def _predictive_prewarm_only_assignment(self) -> dict:
-        """Predictive mode that plans ahead but does not reassign immediately.
-
-        - Keeps current assignment for serving requests "now".
-        - On planning ticks, stores (planned_node_id, planned_step_id) per user based on horizon.
-        - Switches assignment only when planned_step_id is reached.
-
-        This mode is designed for experiments where wall-clock steps are slow (many users),
-        so Docker warm TTL is not meaningful; the execution layer can model prewarm analytically.
-        """
-        if not self.predictor_adapter or not get_mobility_prediction:
-            self.logger.warning("Predictor not available, falling back to greedy assignment")
-            return self._assign_users_greedy()
-        if not self.edge_nodes:
-            self.logger.warning("No edge nodes registered; using greedy assignment")
-            return self._assign_users_greedy()
-
-        current_step = self.get_current_step_id() or 0
-        lead_steps = int(getattr(Config, "PREDICTIVE_PREWARM_LEAD_STEPS", 5))
-        exec_interval = int(getattr(Config, "PREDICTIVE_EXECUTE_INTERVAL_STEPS", 5))
-
-        # Apply due switches first
-        for user_node in self.user_nodes.values():
-            if not user_node.planned_node_id or user_node.planned_step_id is None:
-                continue
-            if current_step < int(user_node.planned_step_id):
-                continue
-            # If we already passed the planned step, the prewarm signal is no longer needed.
-            # Clear it to avoid repeatedly "re-applying" the same switch on later steps.
-            if current_step > int(user_node.planned_step_id):
-                user_node.planned_node_id = None
-                user_node.planned_step_id = None
-                continue
-            candidate = user_node.planned_node_id
-            if candidate != "central_node" and candidate not in self.edge_nodes:
-                candidate = "central_node"
-            if candidate != "central_node" and not self._check_resource_constraints(user_node, candidate):
-                # Cannot switch to planned node; drop the plan and keep current assignment.
-                user_node.planned_node_id = None
-                user_node.planned_step_id = None
-                continue
-            # Apply the switch, but KEEP planned_node_id/step_id for this step so that
-            # the execution layer can treat it as "prewarmed" on the switch step.
-            # (get_all_users_controller.py checks planned_node_id/step_id when simulating cold/warm.)
-            self._apply_assignment_latency(user_node, candidate)
-
-        # Ensure an initial assignment exists (greedy) for any unassigned user
-        for user_node in self.user_nodes.values():
-            if user_node.assigned_node_id:
-                continue
-            assigned_node_id, _ = self._greedy_assignment(user_node.location)
-            self._apply_assignment_latency(user_node, assigned_node_id)
-
-        # Current assignment matrix reflects what serves requests "now"
-        self.assignment_matrix = {
-            user_id: (user.assigned_node_id, user.latency.distance)
-            for user_id, user in self.user_nodes.items()
-        }
-
-        # Only plan on interval ticks (avoid expensive prediction every step)
-        if exec_interval <= 0 or (current_step % exec_interval != 0):
-            return self.assignment_matrix
-
-        # Build prediction inputs for users with sufficient history
-        user_states = []
-        for user in self.user_nodes.values():
-            if self._has_sufficient_history(user.history):
-                history = self._get_history_for_prediction(user.history)
-                user_states.append({"user_id": user.user_id, "history": history})
-
-        if not user_states:
-            return self.assignment_matrix
-
-        cloudlet_records = [
+    def _cloudlet_records_m(self) -> List[Dict[str, Any]]:
+        """Edge positions in meters (same frame as user history)."""
+        return [
             {
                 "id": node_id,
                 "x": info.location["x"] * Config.DEFAULT_PIXEL_TO_METERS,
@@ -950,64 +833,191 @@ class Scheduler:
             for node_id, info in self.edge_nodes.items()
         ]
 
-        try:
-            prob_map = get_mobility_prediction(user_states, cloudlet_records, self.predictor_adapter)
-        except Exception as exc:
-            self.logger.warning("Predictive inference failed: %s", exc)
-            return self.assignment_matrix
-
-        desired_h = getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5)
+    @staticmethod
+    def _horizon_index(probs: np.ndarray, desired_h: int) -> int:
+        # Inference returns probabilities for horizons (1,3,5,10); clamp if the
+        # shape is unexpected.
         horizons = (1, 3, 5, 10)
+        if probs.shape[1] == len(horizons) and desired_h in horizons:
+            return horizons.index(desired_h)
+        return min(max(int(desired_h) - 1, 0), probs.shape[1] - 1)
+
+    def _run_predictor(self, users: List[UserNodeInfo], cloudlet_records: List[Dict[str, Any]]) -> Optional[dict]:
+        user_states = [
+            {"user_id": u.user_id, "history": self._get_history_for_prediction(u.history)}
+            for u in users
+        ]
+        try:
+            return get_mobility_prediction(user_states, cloudlet_records, self.predictor_adapter)
+        except Exception as exc:
+            if getattr(Config, "STRICT_PREDICTIVE", True):
+                raise
+            self.logger.warning("Predictive inference failed: %s", exc)
+            return None
+
+    def _predictive_assignment(self) -> dict:
+        """Forecast-based PLACEMENT without prewarm.
+
+        Ablation variant "prediction without warm-state awareness": each request
+        is served at the cloudlet with the highest probability at the target
+        horizon (where the user is expected to be, not where it is now). Users
+        without enough history are placed greedily. Warmth comes only from
+        passive keep-alive.
+        """
+        if not self.edge_nodes:
+            self.logger.warning("No edge nodes registered; using greedy assignment")
+            return self._assign_users_greedy()
+
+        predictable = [u for u in self.user_nodes.values() if self._has_sufficient_history(u.history)]
+        cloudlet_records = self._cloudlet_records_m()
+        prob_map = self._run_predictor(predictable, cloudlet_records) if predictable else {}
+        if prob_map is None:
+            return self._assign_users_greedy()
+
+        desired_h = int(getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5))
+        self.assignment_matrix = {}
         for user_id, user_node in self.user_nodes.items():
-            # If this user is switching *now* (planned_step_id == current_step),
-            # keep the current plan fields intact for this step so the execution
-            # layer can mark it as warm (prewarmed). We'll plan the next switch
-            # on a later planning tick.
-            if user_node.planned_step_id is not None and int(user_node.planned_step_id) == int(current_step):
-                continue
             probs = prob_map.get(user_id)
-            if probs is None or probs.ndim != 2 or probs.shape[1] <= 0:
-                continue
-            if probs.shape[1] == len(horizons) and desired_h in horizons:
-                horizon_idx = horizons.index(desired_h)
+            if probs is None or probs.ndim != 2 or probs.shape[1] == 0:
+                candidate, _ = self._greedy_assignment(user_node.location)
             else:
-                horizon_idx = min(max(int(desired_h) - 1, 0), probs.shape[1] - 1)
-
-            order = np.argsort(probs[:, horizon_idx])[::-1]
-            planned = None
-            for idx in order:
-                node_id = cloudlet_records[idx]["id"]
-                if self._check_resource_constraints(user_node, node_id):
-                    planned = node_id
-                    break
-            if planned is None:
-                planned = "central_node"
-
-            user_node.planned_node_id = planned
-            user_node.planned_step_id = int(current_step) + int(lead_steps)
-
-            # ACTUAL prewarm: consume a warm-pool slot at the planned node now.
-            # If admission fails (no capacity), the prewarm is dropped and the
-            # user will incur a real cold start at switch time — predictive does
-            # not get a free pass.
-            if self.warm_pool is not None and planned != "central_node":
-                fn_id = self._function_id_for(user_node)
-                # Admit on the step clock: the container is warm from now until
-                # now+TTL, so the planned switch (at current_step + lead_steps)
-                # lands warm as long as lead_steps <= WARM_TTL_STEPS.
-                admitted = self.warm_pool.admit_cold(planned, fn_id, now=current_step)
-                if not admitted:
-                    self.timestep_rejections += 1
-                    user_node.planned_node_id = None
-                    user_node.planned_step_id = None
-
-        self.logger.info(
-            "Predictive(prewarm-only): planned at step=%s -> switch at step+%s",
-            current_step,
-            lead_steps,
-        )
-
+                horizon_idx = self._horizon_index(probs, desired_h)
+                order = np.argsort(probs[:, horizon_idx])[::-1]
+                candidate = "central_node"
+                for idx in order:
+                    node_id = cloudlet_records[idx]["id"]
+                    if self._check_resource_constraints(user_node, node_id):
+                        candidate = node_id
+                        break
+            assigned_node_id, assigned_node_distance = self._apply_assignment_latency(user_node, candidate)
+            self.assignment_matrix[user_id] = (assigned_node_id, assigned_node_distance)
         return self.assignment_matrix
+
+    def _apply_assignment_latency(self, user_node: UserNodeInfo, assigned_node_id: str) -> Tuple[str, float]:
+        # Detect handoff BEFORE overwriting assigned_node_id
+        prev_assigned = user_node.assigned_node_id
+        handoff = prev_assigned is not None and prev_assigned != assigned_node_id
+        self._account_assignment(assigned_node_id)
+
+        assigned_node_distance, propagation_delay = self._node_propagation_delay(user_node.location, assigned_node_id)
+
+        user_node.previous_node_id = prev_assigned
+        user_node.assigned_node_id = assigned_node_id
+        user_node.latency.distance = assigned_node_distance
+        user_node.latency.propagation_delay = propagation_delay
+
+        # Context switch cost: when a user is handed off to a different node, its
+        # DT session state moves from the old node to the new one over the wired
+        # backhaul (state_size / backhaul bandwidth). It is charged to the user's
+        # next request, so a handoff between two requests is not lost.
+        if handoff:
+            self.timestep_handoffs += 1
+            backhaul = float(getattr(Config, "BACKHAUL_BANDWIDTH_BYTES_PER_MS", 0.0) or 0.0)
+            if backhaul > 0 and user_node.data_size_demand and user_node.data_size_demand > 0:
+                user_node.pending_migration_ms += float(user_node.data_size_demand) / backhaul
+
+        user_node.latency.total_turnaround_time = (
+            user_node.latency.propagation_delay
+            + user_node.latency.transmission_delay
+            + user_node.latency.computation_delay
+            + float(user_node.migration_cost or 0.0)
+        )
+        return assigned_node_id, assigned_node_distance
+
+    # ------------------------------------------------------------------
+    # Prewarm planning (PREWARM_ALGORITHMS)
+    # ------------------------------------------------------------------
+    def _plan_prewarm(self, current_step: int) -> None:
+        """Launch containers at each user's forecast cloudlet ahead of demand.
+
+        Runs every PREDICTIVE_EXECUTE_INTERVAL_STEPS. For each user with a
+        forecast target different from the cloudlet serving it now, launch the
+        user's function there (no-op if already live). The container becomes
+        usable PREWARM_READY_DELAY_STEPS later, is billed as a launch, and
+        occupies a pool slot (may evict an LRU entry). It is useful only if the
+        user is later routed to that cloudlet while it is still alive.
+        """
+        if self.warm_pool is None or not self.edge_nodes:
+            return
+        interval = int(getattr(Config, "PREDICTIVE_EXECUTE_INTERVAL_STEPS", 5))
+        if interval <= 0 or current_step % interval != 0:
+            return
+        horizon = int(getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5))
+        for user_id, target in self._forecast_prewarm_targets(horizon).items():
+            user_node = self.user_nodes.get(user_id)
+            if user_node is None or target is None or target == user_node.assigned_node_id:
+                continue
+            self.warm_pool.prewarm(target, self._function_id_for(user_node), now=current_step)
+
+    def _forecast_prewarm_targets(self, horizon: int) -> Dict[str, Optional[str]]:
+        """Forecast cloudlet per user at `horizon` steps ahead.
+
+        All prewarm variants use the same eligibility rule (at least
+        TDRIVE_HISTORY_LENGTH observed points), so the baselines do not get an
+        earlier start than the learned predictor; they differ only in the
+        forecast itself.
+        """
+        eligible = [u for u in self.user_nodes.values() if self._has_sufficient_history(u.history)]
+        if not eligible:
+            return {}
+        cloudlet_records = self._cloudlet_records_m()
+        targets: Dict[str, Optional[str]] = {}
+
+        if self.assignment_algorithm == AssignmentAlgorithm.PREDICTIVE:
+            prob_map = self._run_predictor(eligible, cloudlet_records)
+            if not prob_map:
+                return {}
+            for user_id, probs in prob_map.items():
+                if probs is None or probs.ndim != 2 or probs.shape[1] == 0:
+                    continue
+                idx = self._horizon_index(probs, horizon)
+                targets[user_id] = cloudlet_records[int(np.argmax(probs[:, idx]))]["id"]
+            return targets
+
+        for user_node in eligible:
+            pos = self._baseline_forecast_m(user_node, horizon)
+            if pos is not None:
+                targets[user_node.user_id] = self._nearest_cloudlet_m(pos, cloudlet_records)
+        return targets
+
+    def _baseline_forecast_m(self, user_node: UserNodeInfo, horizon: int) -> Optional[Tuple[float, float]]:
+        """Forecast position (meters) for the non-learned prewarm baselines."""
+        algo = self.assignment_algorithm
+        history = user_node.history
+        last = history[-1]
+        if algo == AssignmentAlgorithm.PREWARM_PERSISTENCE:
+            return float(last["x"]), float(last["y"])
+        if algo == AssignmentAlgorithm.PREWARM_CONSTANT_VELOCITY:
+            # Mean per-step velocity over the last k steps, extrapolated linearly.
+            k = min(3, len(history) - 1)
+            if k <= 0:
+                return float(last["x"]), float(last["y"])
+            first = history[-1 - k]
+            vx = (float(last["x"]) - float(first["x"])) / k
+            vy = (float(last["y"]) - float(first["y"])) / k
+            return float(last["x"]) + horizon * vx, float(last["y"]) + horizon * vy
+        if algo == AssignmentAlgorithm.PREWARM_ORACLE:
+            # True future position from the replayed trajectory. If the trip ends
+            # before the horizon the user departs, so there is nothing to prewarm.
+            seq = (self.dataset_metadata.get("trajectories_px") or {}).get(user_node.user_id)
+            idx = user_node.traj_index
+            if not seq or idx is None or idx + horizon >= len(seq):
+                return None
+            pt = seq[idx + horizon]
+            return (
+                float(pt["x"]) * Config.DEFAULT_PIXEL_TO_METERS,
+                float(pt["y"]) * Config.DEFAULT_PIXEL_TO_METERS,
+            )
+        return None
+
+    @staticmethod
+    def _nearest_cloudlet_m(pos: Tuple[float, float], cloudlet_records: List[Dict[str, Any]]) -> Optional[str]:
+        best, best_d = None, float("inf")
+        for rec in cloudlet_records:
+            d = (rec["x"] - pos[0]) ** 2 + (rec["y"] - pos[1]) ** 2
+            if d < best_d:
+                best, best_d = rec["id"], d
+        return best
 
     def _function_id_for(self, user_node: UserNodeInfo) -> str:
         if self.warm_pool is not None:
@@ -1051,6 +1061,7 @@ class Scheduler:
         self._assigned_concurrency = {}
         self.timestep_rejections = 0
         self.timestep_evictions = 0
+        self.timestep_handoffs = 0
 
     def _account_assignment(self, cloudlet_id: str) -> None:
         self._assigned_concurrency[cloudlet_id] = self._assigned_concurrency.get(cloudlet_id, 0) + 1
@@ -1098,8 +1109,12 @@ class Scheduler:
     def calculate_turnaround_time_breakdown(self) -> Dict[str, float]:
         """Return total turnaround time split by container status (warm/cold/unknown).
 
-        Adds per-user latency percentiles, average latency, warm-pool utilization,
-        and rejected request count to support IEEE-quality metrics reporting.
+        Only requests issued in the CURRENT step are counted. A user's latency
+        fields persist between its requests, so counting every user every step
+        would re-count one request on each step until the next one.
+
+        Adds per-request latency percentiles, average latency, warm-pool
+        utilization, prewarm accounting and handoffs.
         """
         total = 0.0
         warm_total = 0.0
@@ -1108,6 +1123,8 @@ class Scheduler:
         warm_count = 0
         cold_count = 0
         unknown_count = 0
+        # (warm, cold) request counts per node type, for the energy model.
+        by_type = {"edge": [0, 0], "central": [0, 0]}
         per_user_latencies: List[float] = []
 
         # Per-request logging: emit one row per user for this step, but only
@@ -1120,16 +1137,13 @@ class Scheduler:
             self._req_log_last_step = step_id
 
         for user_id, user_node in self.user_nodes.items():
+            if step_id is not None and user_node.last_executed_step_id != step_id:
+                continue  # no request from this user in this step
             cloudlet_id = user_node.assigned_node_id
-            if cloudlet_id == "central_node":
-                distance = self._calculate_distance(user_node.location, self.central_node["location"])
-            else:
-                if not cloudlet_id or cloudlet_id not in self.edge_nodes:
-                    continue
-                cloudlet = self.edge_nodes[cloudlet_id]
-                distance = self._calculate_distance(user_node.location, cloudlet.location)
+            if not cloudlet_id or (cloudlet_id != "central_node" and cloudlet_id not in self.edge_nodes):
+                continue
 
-            propagation_delay = self._calculate_propagation_delay(distance)
+            _, propagation_delay = self._node_propagation_delay(user_node.location, cloudlet_id)
             transmission_delay = user_node.data_size_demand / user_node.bandwidth_demand
             computation_delay = getattr(getattr(user_node, "latency", None), "computation_delay", 0.0) or 0.0
             migration_cost = float(getattr(user_node, "migration_cost", 0.0) or 0.0)
@@ -1137,13 +1151,16 @@ class Scheduler:
             total += turnaround_time
             per_user_latencies.append(turnaround_time)
 
+            node_type = "central" if cloudlet_id == "central_node" else "edge"
             status = str(getattr(getattr(user_node, "latency", None), "container_status", "unknown") or "unknown")
             if status == "warm":
                 warm_total += turnaround_time
                 warm_count += 1
+                by_type[node_type][0] += 1
             elif status == "cold":
                 cold_total += turnaround_time
                 cold_count += 1
+                by_type[node_type][1] += 1
             else:
                 unknown_total += turnaround_time
                 unknown_count += 1
@@ -1181,13 +1198,28 @@ class Scheduler:
         warm_rate = (warm_count / total_invocations) if total_invocations > 0 else 0.0
 
         # Warm-pool utilization snapshot per node.
+        pool = getattr(self, "warm_pool", None)
         pool_util = {}
-        if getattr(self, "warm_pool", None) is not None:
+        if pool is not None:
             for node_id in self.edge_nodes.keys():
-                pool_util[node_id] = self.warm_pool.utilization(node_id)
-            pool_util["central_node"] = self.warm_pool.utilization("central_node")
+                pool_util[node_id] = pool.utilization(node_id)
+            pool_util["central_node"] = pool.utilization("central_node")
 
         return {
+            "requests": float(n),
+            "edge_warm_count": float(by_type["edge"][0]),
+            "edge_cold_count": float(by_type["edge"][1]),
+            "central_warm_count": float(by_type["central"][0]),
+            "central_cold_count": float(by_type["central"][1]),
+            "handoffs": float(getattr(self, "timestep_handoffs", 0)),
+            # Prewarm accounting (per step). A launch is a container start that
+            # no request paid for; hits/wasted resolve each launch exactly once.
+            "prewarm_launches": float(pool.step_prewarm_launches) if pool is not None else 0.0,
+            "prewarm_hits": float(pool.step_prewarm_hits) if pool is not None else 0.0,
+            "prewarm_wasted": float(pool.step_prewarm_wasted) if pool is not None else 0.0,
+            # Containers kept alive past this step (warm + launching); keep-alive
+            # energy is billed on this.
+            "live_containers": float(pool.total_retained()) if pool is not None else 0.0,
             "total_turnaround_time": total,
             "total_turnaround_time_warm": warm_total,
             "total_turnaround_time_cold": cold_total,
@@ -1210,7 +1242,7 @@ class Scheduler:
     def calculate_total_turnaround_time(self) -> float:
         return float(self.calculate_turnaround_time_breakdown()["total_turnaround_time"])
 
-    def calculate_energy_consumption(self, timestep_duration_s: float = 1.0, use_rapl: Optional[bool] = None) -> Dict[str, float]:
+    def calculate_energy_consumption(self, timestep_duration_s: Optional[float] = None, use_rapl: Optional[bool] = None) -> Dict[str, float]:
         """
         Calculate energy consumption for the current simulation state.
         
@@ -1237,12 +1269,13 @@ class Scheduler:
         # Use config setting if not explicitly specified
         if use_rapl is None:
             use_rapl = getattr(Config, 'USE_RAPL', True)
+        # One step covers SIM_STEP_DURATION_S of trajectory time (60 s for the
+        # per-minute T-Drive replay); power must be integrated over that span.
+        if timestep_duration_s is None:
+            timestep_duration_s = float(getattr(Config, "SIM_STEP_DURATION_S", 60.0))
         
-        # Get turnaround breakdown for cold/warm counts
+        # Requests issued in this step, split by outcome and node type.
         breakdown = self.calculate_turnaround_time_breakdown()
-        cold_count = int(breakdown.get("cold_count", 0))
-        warm_count = int(breakdown.get("warm_count", 0))
-        unknown_count = int(breakdown.get("unknown_count", 0))
         
         # Get node and user counts
         num_edge_nodes = len(self.edge_nodes) if self.edge_nodes else 1
@@ -1318,9 +1351,14 @@ class Scheduler:
             avg_edge_cpu_util=avg_cpu_util,
             avg_data_size_bytes=avg_data_size,
             avg_bandwidth_bytes_per_s=avg_bandwidth,
-            cold_start_count=cold_count,
-            warm_count=warm_count + unknown_count,  # Treat unknown as warm
-            timestep_duration_s=timestep_duration_s
+            edge_warm=int(breakdown.get("edge_warm_count", 0)),
+            edge_cold=int(breakdown.get("edge_cold_count", 0)),
+            central_warm=int(breakdown.get("central_warm_count", 0)),
+            central_cold=int(breakdown.get("central_cold_count", 0)),
+            live_containers=int(breakdown.get("live_containers", 0)),
+            prewarm_launches=int(breakdown.get("prewarm_launches", 0)),
+            handoffs=int(breakdown.get("handoffs", 0)),
+            timestep_duration_s=timestep_duration_s,
         )
         
         # Mark source based on whether RAPL was used for calibration

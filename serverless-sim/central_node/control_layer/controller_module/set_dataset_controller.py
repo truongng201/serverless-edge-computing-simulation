@@ -212,6 +212,13 @@ class SetDatasetController:
                 sample_data["items"] = self._sample_points_on_edges(polylines_m, spawn_count)
             elif self.dataset_name == "taxiD_Replay":
                 trajectories = self._load_replay_trajectories()
+                min_steps = int(getattr(Config, "REPLAY_MIN_TRIP_STEPS", 0) or 0)
+                if min_steps > 0:
+                    before = len(trajectories)
+                    trajectories = [t for t in trajectories if len(t.get("points", [])) >= min_steps]
+                    self.logger.info(
+                        f"TaxiD replay: kept {len(trajectories)}/{before} trips with >= {min_steps} points"
+                    )
                 pool_size = len(trajectories)
                 # Cohort selection:
                 #  - seed set  -> reproducible RANDOM subset (distinct per seed => CI variance)
@@ -311,6 +318,11 @@ class SetDatasetController:
                 latency=latency
             )
             self.scheduler.create_user_node(user_node)
+            if self.dataset_name == "taxiD_Replay":
+                # The replay loop appends trajectory point 0 (with its exported
+                # features) on the first step; drop the synthetic creation point
+                # so the first observation is not duplicated in the history.
+                user_node.history = []
         self.scheduler.node_assignment()
                 
     def execute(self):

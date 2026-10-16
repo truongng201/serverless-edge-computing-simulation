@@ -54,7 +54,26 @@ class ExperimentRunner:
             "total_energy_j",
             "total_energy_wh",
             "average_power_w",
+            # Added with the realism fixes (request counting, prewarm billing,
+            # keep-alive energy). See ABLATION_RUN_GUIDE.md.
+            "requests",
+            "handoffs",
+            "prewarm_launches",
+            "prewarm_hits",
+            "prewarm_wasted",
+            "live_containers",
+            "execution_energy_j",
+            "keepalive_energy_j",
+            "prewarm_energy_j",
+            "variable_energy_j",
         ]
+
+    # Columns copied verbatim from the /performance_metrics payload per timestep.
+    @classmethod
+    def _metric_fieldnames(cls):
+        run_cols = {"num_users", "num_edges", "algorithm", "seed",
+                    "experiment_duration", "total_experiment_time", "timestep"}
+        return [f for f in cls._csv_fieldnames() if f not in run_cols]
 
     def _ensure_results_csv_schema(self, filename: str, fieldnames):
         """Rewrite an existing CSV if it was created with an older header."""
@@ -130,28 +149,8 @@ class ExperimentRunner:
                     row = dict(base_row)
                     row["timestep"] = timestep
                     if isinstance(v, dict):
-                        row["total_turnaround_time"] = v.get("total_turnaround_time", "")
-                        row["total_turnaround_time_warm"] = v.get("total_turnaround_time_warm", "")
-                        row["total_turnaround_time_cold"] = v.get("total_turnaround_time_cold", "")
-                        row["total_turnaround_time_unknown"] = v.get("total_turnaround_time_unknown", "")
-                        row["warm_count"] = v.get("warm_count", "")
-                        row["cold_count"] = v.get("cold_count", "")
-                        row["unknown_count"] = v.get("unknown_count", "")
-                        row["avg_latency_ms"] = v.get("avg_latency_ms", "")
-                        row["p50_latency_ms"] = v.get("p50_latency_ms", "")
-                        row["p95_latency_ms"] = v.get("p95_latency_ms", "")
-                        row["p99_latency_ms"] = v.get("p99_latency_ms", "")
-                        row["warm_rate"] = v.get("warm_rate", "")
-                        row["rejected_count"] = v.get("rejected_count", "")
-                        row["pool_evictions"] = v.get("pool_evictions", "")
-                        row["pool_utilization_avg"] = v.get("pool_utilization_avg", "")
-                        row["static_energy_j"] = v.get("static_energy_j", "")
-                        row["dynamic_energy_j"] = v.get("dynamic_energy_j", "")
-                        row["network_energy_j"] = v.get("network_energy_j", "")
-                        row["cold_start_energy_j"] = v.get("cold_start_energy_j", "")
-                        row["total_energy_j"] = v.get("total_energy_j", "")
-                        row["total_energy_wh"] = v.get("total_energy_wh", "")
-                        row["average_power_w"] = v.get("average_power_w", "")
+                        for col in self._metric_fieldnames():
+                            row[col] = v.get(col, "")
                     else:
                         row["total_turnaround_time"] = v
                     writer.writerow(row)
@@ -390,30 +389,7 @@ class ExperimentRunner:
                 # Keep total turnaround time for plotting, but also store warm/cold totals for analysis.
                 # Also include energy consumption metrics
                 metrics[timestep + 1] = {
-                    "total_turnaround_time": float(m.get("total_turnaround_time", 0.0) or 0.0),
-                    "total_turnaround_time_warm": float(m.get("total_turnaround_time_warm", 0.0) or 0.0),
-                    "total_turnaround_time_cold": float(m.get("total_turnaround_time_cold", 0.0) or 0.0),
-                    "total_turnaround_time_unknown": float(m.get("total_turnaround_time_unknown", 0.0) or 0.0),
-                    "warm_count": int(float(m.get("warm_count", 0) or 0)),
-                    "cold_count": int(float(m.get("cold_count", 0) or 0)),
-                    "unknown_count": int(float(m.get("unknown_count", 0) or 0)),
-                    # QoS metrics
-                    "avg_latency_ms": float(m.get("avg_latency_ms", 0.0) or 0.0),
-                    "p50_latency_ms": float(m.get("p50_latency_ms", 0.0) or 0.0),
-                    "p95_latency_ms": float(m.get("p95_latency_ms", 0.0) or 0.0),
-                    "p99_latency_ms": float(m.get("p99_latency_ms", 0.0) or 0.0),
-                    "warm_rate": float(m.get("warm_rate", 0.0) or 0.0),
-                    "rejected_count": int(float(m.get("rejected_count", 0) or 0)),
-                    "pool_evictions": int(float(m.get("pool_evictions", 0) or 0)),
-                    "pool_utilization_avg": float(m.get("pool_utilization_avg", 0.0) or 0.0),
-                    # Energy consumption metrics
-                    "static_energy_j": float(m.get("static_energy_j", 0.0) or 0.0),
-                    "dynamic_energy_j": float(m.get("dynamic_energy_j", 0.0) or 0.0),
-                    "network_energy_j": float(m.get("network_energy_j", 0.0) or 0.0),
-                    "cold_start_energy_j": float(m.get("cold_start_energy_j", 0.0) or 0.0),
-                    "total_energy_j": float(m.get("total_energy_j", 0.0) or 0.0),
-                    "total_energy_wh": float(m.get("total_energy_wh", 0.0) or 0.0),
-                    "average_power_w": float(m.get("average_power_w", 0.0) or 0.0),
+                    col: float(m.get(col, 0.0) or 0.0) for col in self._metric_fieldnames()
                 }
                 print(
                     f"Timestep {timestep + 1}: "
@@ -768,11 +744,16 @@ def main():
     #     To trim: drop 5000 from USER_RANGES, or use SEEDS=[11] for a quick pass. ---
     USER_RANGES = [50, 3000]                     # mobile users
     EDGE_RANGES = [10, 50, 100]                         # cloudlet density sweep
-    ALGORITHMS  = [                                          # all 4 ablation variants
+    ALGORITHMS  = [
         "greedy",
         "greedy + keep-alive",
         "prediction without warm-state awareness",
         "predictive",
+        # Same prewarm mechanism, different forecast: isolates the value of the
+        # learned predictor ("prewarm (persistence)" never forecasts a move, so
+        # it reduces to keep-alive; add it if a reviewer asks for it).
+        "prewarm (constant velocity)",
+        "prewarm (oracle)",
     ]
     SEEDS       = [11, 23, 42, 71, 97]                        # 5 seeds for mean +/- CI ([11] = quick)
     DURATION_S  = 300                                         # steps per experiment

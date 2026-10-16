@@ -38,14 +38,72 @@ class Config:
     # Max concurrent users that can be assigned to a single edge node per timestep.
     MAX_CONCURRENT_PER_EDGE = int(os.getenv("MAX_CONCURRENT_PER_EDGE", "64"))
 
-    # Keep-alive window for the warm pool, expressed in SIMULATION STEPS (the
-    # execution clock used by get_all_users_controller / the scheduler). A
+    # Wall-clock duration of one simulation step. The T-Drive replay is resampled
+    # to one point per minute, so one step = 60 s of trajectory time. Used for
+    # energy integration (static power, container keep-alive) so that power x
+    # time matches the time the trajectory actually covers.
+    SIM_STEP_DURATION_S = float(os.getenv("SIM_STEP_DURATION_S", "60"))
+
+    # Every active user issues one request every REQUEST_INTERVAL_STEPS steps.
+    # Metrics count only the requests issued in the current step (a user that did
+    # not issue a request this step contributes nothing).
+    REQUEST_INTERVAL_STEPS = int(os.getenv("REQUEST_INTERVAL_STEPS", "1"))
+
+    # Keep-alive window for the warm pool, expressed in SIMULATION STEPS. A
     # (node, function) container stays warm for this many steps after its last
     # use. The plain "greedy" variant runs with keep-alive OFF (TTL forced to 0)
-    # as the no-reuse baseline; all other variants use this window. Chosen as a
-    # multiple of PREDICTIVE_PREWARM_LEAD_STEPS so a prewarmed container is still
-    # alive when the planned switch lands.
-    WARM_TTL_STEPS = int(os.getenv("WARM_TTL_STEPS", "30"))
+    # as the no-reuse baseline; all other variants use this window. 10 steps =
+    # 10 min, the OpenWhisk default keep-alive; it must be >= the prewarm horizon
+    # (PREDICTIVE_TARGET_HORIZON_MIN) so a prewarmed container survives until use.
+    WARM_TTL_STEPS = int(os.getenv("WARM_TTL_STEPS", "10"))
+
+    # A prewarmed container launched at step t becomes usable at t + this delay.
+    # Requests at step t arrive concurrently with the planning decision, so they
+    # cannot rely on a container whose launch is decided in the same step.
+    PREWARM_READY_DELAY_STEPS = int(os.getenv("PREWARM_READY_DELAY_STEPS", "1"))
+
+    # Idle power of one live (warm or prewarmed) container. Dominated by the
+    # memory it pins: 256 MB x ~0.3 W/GB (same W/GB as the node power profile).
+    # Billed per container per step, so keep-alive and unused prewarms have a cost.
+    CONTAINER_IDLE_POWER_W = float(os.getenv("CONTAINER_IDLE_POWER_W", "0.075"))
+
+    # Edge-to-edge DT state migration on handoff goes over the wired backhaul,
+    # not over the user's 4G link. 125,000 B/ms = 1 Gbps.
+    BACKHAUL_BANDWIDTH_BYTES_PER_MS = float(os.getenv("BACKHAUL_BANDWIDTH_BYTES_PER_MS", "125000"))
+
+    # Extra one-way latency for requests served by the central cloud (metro
+    # backbone / WAN traversal that an on-site cloudlet avoids).
+    CENTRAL_WAN_EXTRA_MS = float(os.getenv("CENTRAL_WAN_EXTRA_MS", "20"))
+
+    # What happens when a replayed taxi trip ends:
+    #  - "depart": the user leaves the system (no more requests)  [realistic]
+    #  - "hold":   legacy behaviour, user is frozen at its last point and keeps
+    #              issuing requests (inflates warm rate and prediction accuracy)
+    REPLAY_END_BEHAVIOR = os.getenv("REPLAY_END_BEHAVIOR", "depart").lower()
+    # Only sample trips with at least this many points into the cohort (0 = all).
+    REPLAY_MIN_TRIP_STEPS = int(os.getenv("REPLAY_MIN_TRIP_STEPS", "0"))
+
+    # A "predictive" run must never silently degrade into greedy when the
+    # predictor cannot be loaded; it raises PredictorUnavailableError instead.
+    # Set STRICT_PREDICTIVE=0 only for UI demos.
+    STRICT_PREDICTIVE = os.getenv("STRICT_PREDICTIVE", "1").lower() in ("1", "true", "yes")
+
+    # Fixed node power profiles (W). Previously these were detected with psutil
+    # on whatever machine ran the simulator, which made energy results depend on
+    # the host. The defaults reproduce what that detection produced on the
+    # 16-core / 30 GB reference machine, so magnitudes stay comparable.
+    EDGE_CPU_IDLE_W = float(os.getenv("EDGE_CPU_IDLE_W", "12.25"))
+    EDGE_CPU_MAX_W = float(os.getenv("EDGE_CPU_MAX_W", "35.0"))
+    EDGE_MEMORY_W = float(os.getenv("EDGE_MEMORY_W", "9.09"))
+    EDGE_STORAGE_W = float(os.getenv("EDGE_STORAGE_W", "2.0"))
+    EDGE_BASE_W = float(os.getenv("EDGE_BASE_W", "3.0"))
+    CENTRAL_CPU_IDLE_W = float(os.getenv("CENTRAL_CPU_IDLE_W", "84.0"))
+    CENTRAL_CPU_MAX_W = float(os.getenv("CENTRAL_CPU_MAX_W", "240.0"))
+    CENTRAL_MEMORY_W = float(os.getenv("CENTRAL_MEMORY_W", "9.09"))
+    CENTRAL_STORAGE_W = float(os.getenv("CENTRAL_STORAGE_W", "2.0"))
+    CENTRAL_BASE_W = float(os.getenv("CENTRAL_BASE_W", "20.0"))
+    # "config" (default, reproducible) or "host" (legacy psutil detection).
+    POWER_PROFILE_SOURCE = os.getenv("POWER_PROFILE_SOURCE", "config").lower()
 
     # Global RNG seed for reproducible runs. Supplied per-run via the
     # /set_dataset payload ("seed") or this env var. When set, the trajectory
@@ -172,13 +230,11 @@ class Config:
     # predictor output. For curv_step we currently expose horizons (1,3,5,10).
     # PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
 
-    # Prewarm (plan-ahead + proactive warm-pool admission) is bound to the
-    # "predictive" algorithm variant itself (see Scheduler._predictive_assignment),
-    # not to a config flag. "prediction without warm-state awareness" uses the
-    # same predictive placement with no prewarm.
-    # How many simulation steps ahead to schedule the switch (lead time).
-    PREDICTIVE_PREWARM_LEAD_STEPS = int(os.getenv("PREDICTIVE_PREWARM_LEAD_STEPS", "5"))
-    # How often to run planning (in simulation steps). Lower = more compute.
+    # Prewarm variants ("predictive" and the "prewarm (...)" baselines) serve every
+    # request at the nearest feasible cloudlet to the user's ACTUAL position, and
+    # use their forecast only to decide where to launch a container ahead of time
+    # (see Scheduler._plan_prewarm). They differ only in the forecast.
+    # How often to run prewarm planning (in simulation steps).
     PREDICTIVE_EXECUTE_INTERVAL_STEPS = int(os.getenv("PREDICTIVE_EXECUTE_INTERVAL_STEPS", "5"))
     # Dataset playback speed (Scenario 2 / vehicles)
     # Multiply timestep advancement per poll to make movements appear faster on canvas
@@ -191,7 +247,8 @@ class Config:
     # `simulated`: do not call /execute; instead assign computation_delay analytically
     # EXECUTION_MODE = os.getenv("EXECUTION_MODE", "real").lower()
     EXECUTION_MODE = "simulated"
-    PREDICTIVE_TARGET_HORIZON_MIN = 5
+    # Forecast horizon (in steps = minutes) used to pick the prewarm target.
+    PREDICTIVE_TARGET_HORIZON_MIN = int(os.getenv("PREDICTIVE_TARGET_HORIZON_MIN", "5"))
     # Defaults derived from local benchmarking (median warm + median cold-warm delta).
     SIM_EXEC_WARM_MS_CENTRAL = float(os.getenv("SIM_EXEC_WARM_MS_CENTRAL", "300"))
     SIM_EXEC_COLD_PENALTY_MS_CENTRAL = float(os.getenv("SIM_EXEC_COLD_PENALTY_MS_CENTRAL", "900"))

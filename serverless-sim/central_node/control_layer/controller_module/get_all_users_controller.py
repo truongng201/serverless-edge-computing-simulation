@@ -177,12 +177,19 @@ class GetAllUsersController:
             print("No trajectories found for TaxiD replay.")
             return False
         
+        depart = str(getattr(Config, "REPLAY_END_BEHAVIOR", "depart")).lower() == "depart"
         max_len = 0
         for user_id, seq in trajectories_px.items():
             if not seq:
                 print(f"No seq for {user_id}")
                 continue
             max_len = max(max_len, len(seq))
+            if depart and step >= len(seq):
+                # Trip over: the taxi leaves the system instead of parking at its
+                # last point and issuing requests forever.
+                if user_id in self.scheduler.user_nodes:
+                    self.scheduler.delete_user_by_id(user_id)
+                continue
             idx = min(step, len(seq) - 1)
             pt = seq[idx]
             
@@ -192,6 +199,7 @@ class GetAllUsersController:
                 self.scheduler.update_user_node_with_features(user_id, pt)
                 
                 user_node = self.scheduler.user_nodes[user_id]
+                user_node.traj_index = idx
                 dist_m = getattr(user_node.latency, "distance", 0.0)
                 user_node.latency.propagation_delay = self.scheduler._calculate_propagation_delay(dist_m)
                 user_node.latency.total_turnaround_time = (
@@ -203,7 +211,10 @@ class GetAllUsersController:
         
         if max_len == 0:
             return False
-        self.current_step_id = min(step + 1, max_len - 1) 
+        if depart:
+            self.current_step_id = step + 1
+        else:
+            self.current_step_id = min(step + 1, max_len - 1)
         return True
 
     def _get_all_users(self):
@@ -225,8 +236,9 @@ class GetAllUsersController:
             self.scheduler.set_current_step_id(self.current_step_id)
             self.scheduler.node_assignment()
         
-        # Execute functions at this timestep if simulation is active and users_agent is available
-        if self.simulation and self.scheduler.user_nodes and self.current_step_id % 5 == 0:
+        # Every active user issues one request every REQUEST_INTERVAL_STEPS steps.
+        interval = max(1, int(getattr(Config, "REQUEST_INTERVAL_STEPS", 1)))
+        if self.simulation and self.scheduler.user_nodes and (self.current_step_id or 0) % interval == 0:
             self._execute_function()
         
         for user_id, user_node in self.scheduler.user_nodes.items():
@@ -264,7 +276,7 @@ class GetAllUsersController:
             # Advance the pool's step clock so all TTL decisions this step use the
             # current simulation step as the reference time.
             if pool is not None:
-                pool.set_now(step_id)
+                pool.begin_step(step_id)
             for _, user_node in self.scheduler.user_nodes.items():
                 assigned_node = user_node.assigned_node_id
                 if not assigned_node:
@@ -277,13 +289,14 @@ class GetAllUsersController:
                 )
 
                 # Warm/cold is decided by the warm pool, keyed by (node, function).
-                # A hit = a live container exists within the keep-alive TTL window
-                # (set per-variant: TTL=0 for plain greedy => no cross-step reuse;
-                # WARM_TTL_STEPS otherwise). A miss = cold start, which admits a
-                # fresh container. The full PREDICTIVE variant pre-admits at the
-                # planned node ahead of the switch, so the switch lands warm via
-                # this same lookup. Many users share a small function catalogue
-                # (FUNCTION_NAME_BUCKETS), so reuse across users is possible.
+                # A hit = a live, ready container exists within the keep-alive TTL
+                # window (set per-variant: TTL=0 for plain greedy => no cross-step
+                # reuse; WARM_TTL_STEPS otherwise). A miss = cold start, which
+                # admits a fresh container. Prewarm variants may have launched a
+                # container here in an earlier step; one launched in this same
+                # step is not ready yet. Many users share a small function
+                # catalogue (FUNCTION_NAME_BUCKETS), so reuse across users is
+                # possible.
                 if pool is not None:
                     fn_id = self.scheduler._function_id_for(user_node)
                     warm = pool.lookup(assigned_node, fn_id, now=step_id)
@@ -295,6 +308,9 @@ class GetAllUsersController:
 
                 user_node.latency.computation_delay = warm_ms if warm else (warm_ms + cold_penalty_ms)
                 user_node.latency.container_status = "warm" if warm else "cold"
+                # Charge any handoff migration that happened since the last request.
+                user_node.migration_cost = float(user_node.pending_migration_ms or 0.0)
+                user_node.pending_migration_ms = 0.0
                 user_node.last_executed = time.time()
                 user_node.last_executed_node_id = assigned_node
                 user_node.last_executed_step_id = step_id

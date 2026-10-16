@@ -1,31 +1,72 @@
 # Ablation Grid — Run Guide
 
-Run the 80-run ablation grid (Table IV) + per-request latency (p95/p99/jitter/CDF)
+Run the ablation grid (Table IV) + per-request latency (p95/p99/jitter/CDF)
 on the server (where the predictor artifacts live). Noise sensitivity (§V.E) is a
 separate follow-up batch.
 
-## What changed (Phase 0 + 1 + 2)
+## Simulation semantics (realism fixes, 2026-10)
 
-The 4 variants are now **correctly distinct** (previously 2 pairs were byte-identical):
+**Results produced before these fixes are not comparable with new runs.** Re-run
+every variant, including the baselines.
 
-| Variant (algorithm string)                     | Placement   | Keep-alive | Prewarm |
-|------------------------------------------------|-------------|------------|---------|
-| `greedy`                                       | greedy      | OFF (TTL=0)| no      |
-| `greedy + keep-alive`                          | greedy      | ON         | no      |
-| `prediction without warm-state awareness`      | predictive  | ON         | no      |
-| `predictive`                                   | predictive  | ON         | YES     |
+| Variant (algorithm string)                | Serves request at                  | Keep-alive  | Prewarm target (forecast)        |
+|-------------------------------------------|------------------------------------|-------------|----------------------------------|
+| `greedy`                                  | nearest feasible cloudlet          | OFF (TTL=0) | —                                |
+| `greedy + keep-alive`                     | nearest feasible cloudlet          | ON          | —                                |
+| `prediction without warm-state awareness` | cloudlet of forecast position      | ON          | —                                |
+| `prewarm (persistence)`                   | nearest feasible cloudlet          | ON          | current position (≡ keep-alive)  |
+| `prewarm (constant velocity)`             | nearest feasible cloudlet          | ON          | linear extrapolation, h=5 min    |
+| `predictive`                              | nearest feasible cloudlet          | ON          | GRU predictor, h=5 min           |
+| `prewarm (oracle)`                        | nearest feasible cloudlet          | ON          | true position at t+5 (upper bound) |
 
-- Warm/cold is now decided by the **warm pool** (`lookup`/`admit_cold`), keyed by
-  `(node, function)`, on the **simulation-step clock**. TTL = `WARM_TTL_STEPS` (30)
-  for every variant except plain `greedy` (TTL=0 = no cross-step reuse baseline).
-- Prewarm is bound to the `predictive` variant (no longer a hardcoded global).
-- `seed` is plumbed through `/set_dataset`; it drives a **reproducible random
-  cohort** of taxis (so 5 seeds give genuine variance for CI).
-- Per-request latency logged to `PER_REQUEST_LOG_DIR` (one gzip CSV per run).
+The prewarm variants share one mechanism and differ **only** in the forecast, so
+`predictive` vs `prewarm (constant velocity)` / `prewarm (oracle)` measures the
+value of the learned predictor. All of them start prewarming only once a user has
+`TDRIVE_HISTORY_LENGTH` (20) observed points.
 
-Verified locally (greedy-family, no predictor): keep-alive raises warm reuse,
-same seed reproduces exactly, different seeds differ. **Predictive variants must be
-verified on the server** (predictor artifacts not present locally).
+What a run now models (all in `config.py`, env-overridable):
+
+- **One step = 60 s** of trajectory time (`SIM_STEP_DURATION_S`). Each active user
+  issues one request every `REQUEST_INTERVAL_STEPS` (1) steps. Metrics count only
+  the requests issued in that step (previously one execution every 5 steps was
+  re-counted on each step until the next one).
+- **Prewarm is real and billed.** A container launched at step *t* occupies a
+  pool slot at once (may evict LRU) but serves requests only from
+  *t* + `PREWARM_READY_DELAY_STEPS` (1). Every launch pays cold-start energy.
+  Each launch ends up as exactly one `prewarm_hits` (served ≥ 1 request) or
+  `prewarm_wasted` (expired/evicted unused, or a request arrived while it was
+  still launching). The user is **not** forced onto the forecast cloudlet, so a
+  wrong forecast wastes the launch and the request goes cold.
+- **Keep-alive:** `WARM_TTL_STEPS` = 10 (10 min, OpenWhisk default). Retained
+  containers cost `CONTAINER_IDLE_POWER_W` (0.075 W = 256 MB × 0.3 W/GB) for each
+  step they are kept after their last use (`keepalive_energy_j`).
+- **Energy** is integrated over 60 s per step, with fixed power profiles
+  (`EDGE_*_W`, `CENTRAL_*_W`) instead of psutil detection on the host. Every
+  request pays execution energy; a cold request also pays the init energy. DT
+  migration energy is billed per real handoff, not per cold start.
+  `variable_energy_j` = total − static is the policy-dependent part: report it
+  alongside the total, since static power dominates the total.
+- **Taxis leave when their trip ends** (`REPLAY_END_BEHAVIOR=depart`). Before,
+  they parked at their last point and kept requesting; in the local pools that
+  was 63–75% of all user-steps. The active population therefore shrinks over a
+  run. Use the request-weighted metrics (`latency_per_request_ms`, `warm_rate`)
+  and report `requests`. `REPLAY_MIN_TRIP_STEPS` filters short trips from the cohort.
+- **Capacity:** every variant books every assigned user against
+  `MAX_CONCURRENT_PER_EDGE` (the old predictive path skipped users that did not
+  switch). Overflow goes to the central cloud, which pays `CENTRAL_WAN_EXTRA_MS`
+  (20 ms) extra one-way latency.
+- **Handoff migration** moves DT state over the wired backhaul
+  (`BACKHAUL_BANDWIDTH_BYTES_PER_MS` = 1 Gbps, ≈4 ms for 512 KB), charged to the
+  user's next request. Previously it used the user's 4G link (≈175 ms).
+- **No silent fallback:** `predictive` and `prediction without warm-state
+  awareness` raise `PredictorUnavailableError` if the predictor is not loaded
+  (`STRICT_PREDICTIVE=1`). Before, they quietly ran greedy under a predictive label.
+
+New CSV columns: `requests, handoffs, prewarm_launches, prewarm_hits,
+prewarm_wasted, live_containers, execution_energy_j, keepalive_energy_j,
+prewarm_energy_j, variable_energy_j`.
+
+Tests: `python -m pytest tests -q` (no server, no predictor needed).
 
 ## Prerequisite — replay pool ≥ 5000 trajectories
 
@@ -51,8 +92,8 @@ column (or point `--phaseb-dir` at a larger artifact set).
 cd serverless-sim
 PER_REQUEST_LOG_DIR=request_logs python central_main.py --port 8000 --log-level WARNING &
 
-# 2. Run the 80-run grid (matrix is set in run_experiments.py main():
-#    4 variants x {100,500,1000,5000} users x 5 seeds [11,23,42,71,97] @ 10 edges, 300 steps)
+# 2. Run the grid (matrix is set in run_experiments.py main():
+#    6 variants x USER_RANGES x EDGE_RANGES x 5 seeds [11,23,42,71,97], 300 steps)
 python run_experiments.py
 #    -> streams experiment_results_<ts>.csv  (one row per timestep, includes `seed`)
 #    -> request_logs/req_<algo>_u<users>_e<edges>_s<seed>_<ts>.csv.gz per run
@@ -78,9 +119,10 @@ python analyze_ablation.py experiment_results_<ts>.csv \
     --requests request_logs --cdf-out cdf_data.csv
 ```
 
-The analyzer skips warm-up rows (steps before the first execution, where
-`unknown_count > 0`) and reports the minimum number of seeds per config so you can
-confirm all 5 landed.
+The analyzer reports the minimum number of seeds per config so you can confirm
+all 5 landed. `--warmup-steps N` drops the first N steps of every run (the
+cold-system transient that is identical for all variants). It also still skips
+rows with `unknown_count > 0` from old CSVs.
 
 ## Re-verify on the server (recommended)
 
@@ -93,8 +135,8 @@ python smoke_test_ablation.py
 
 ## Notes / caveats for the paper
 
-- `WARM_TTL_STEPS=30` makes keep-alive very generous (≈0 cold after warm-up). Tune
-  via env `WARM_TTL_STEPS` if you want a tighter keep-alive window.
+- `WARM_TTL_STEPS=10` (10 min). Sweep it (e.g. 5/10/30) for a sensitivity
+  table: longer TTL trades keep-alive energy for fewer cold starts.
 - `FUNCTION_NAME_BUCKETS=32`, `MAX_WARM_PER_NODE=16`: many users share a small
   function catalogue so reuse is meaningful; per-node pool caps at 16 (LRU evict).
 - The 4.46% figure in the old draft is **not reproducible** from prior data;

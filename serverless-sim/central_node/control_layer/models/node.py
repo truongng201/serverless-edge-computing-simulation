@@ -66,3 +66,8 @@ class UserNodeInfo:
     last_executed_step_id: Optional[int] = None
     planned_node_id: Optional[str] = None
     planned_step_id: Optional[int] = None
+    # Index of the current point in the replayed trajectory (oracle forecasts).
+    traj_index: Optional[int] = None
+    # Handoff migration delay not yet charged to a request (ms). Charged to the
+    # user's next request, so handoffs between requests are not lost.
+    pending_migration_ms: float = 0.0
