@@ -107,6 +107,14 @@ def test_oracle_prewarm_makes_the_handoff_warm(scheduler):
     assert scheduler.warm_pool.prewarm_hits == 1
 
 
+def test_forecast_counters_record_moves_to_another_cloudlet(scheduler):
+    steps = _replay(scheduler, AssignmentAlgorithm.PREWARM_ORACLE, {"user_a": _jump_trajectory()}, 30)
+
+    # Planning ticks at step ids 20, 25, 30; only the tick at 30 sees the jump.
+    assert sum(s["forecasts"] for s in steps) == 3
+    assert sum(s["forecast_moves"] for s in steps) == 1
+
+
 def test_persistence_forecast_cannot_anticipate_the_handoff(scheduler):
     steps = _replay(scheduler, AssignmentAlgorithm.PREWARM_PERSISTENCE, {"user_a": _jump_trajectory()}, 32)
 

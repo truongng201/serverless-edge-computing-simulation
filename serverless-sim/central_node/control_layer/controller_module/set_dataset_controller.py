@@ -315,7 +315,12 @@ class SetDatasetController:
                 last_executed=0,
                 size=item.get("size", 10),  # Default size if not provided
                 speed=item.get("speed", 5),  # Default speed if not provided
-                latency=latency
+                latency=latency,
+                # Without these the dataclass defaults (1024 B, 10 B/ms) were
+                # used for transmission delay, migration size and network energy.
+                bandwidth_demand=bandwidth,
+                memory_demand=Config.DEFAULT_USER_MEMORY_DEMAND,
+                data_size_demand=data_size,
             )
             self.scheduler.create_user_node(user_node)
             if self.dataset_name == "taxiD_Replay":

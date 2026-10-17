@@ -57,7 +57,13 @@ class ExperimentRunner:
             # Added with the realism fixes (request counting, prewarm billing,
             # keep-alive energy). See ABLATION_RUN_GUIDE.md.
             "requests",
+            "edge_warm_count",
+            "edge_cold_count",
+            "central_warm_count",
+            "central_cold_count",
             "handoffs",
+            "forecasts",
+            "forecast_moves",
             "prewarm_launches",
             "prewarm_hits",
             "prewarm_wasted",

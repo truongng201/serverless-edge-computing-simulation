@@ -118,6 +118,8 @@ class Scheduler:
         self.timestep_rejections = 0
         self.timestep_evictions = 0
         self.timestep_handoffs = 0
+        self.timestep_forecasts = 0
+        self.timestep_forecast_moves = 0
         # Align the warm-pool keep-alive TTL with the initial algorithm so the
         # pool behaves correctly even before set_assignment_algorithm is called.
         self._apply_keep_alive_policy()
@@ -945,8 +947,13 @@ class Scheduler:
         horizon = int(getattr(Config, "PREDICTIVE_TARGET_HORIZON_MIN", 5))
         for user_id, target in self._forecast_prewarm_targets(horizon).items():
             user_node = self.user_nodes.get(user_id)
-            if user_node is None or target is None or target == user_node.assigned_node_id:
+            if user_node is None or target is None:
                 continue
+            self.timestep_forecasts += 1
+            if target == user_node.assigned_node_id:
+                continue
+            # The forecast names a different cloudlet than the one serving now.
+            self.timestep_forecast_moves += 1
             self.warm_pool.prewarm(target, self._function_id_for(user_node), now=current_step)
 
     def _forecast_prewarm_targets(self, horizon: int) -> Dict[str, Optional[str]]:
@@ -1062,6 +1069,8 @@ class Scheduler:
         self.timestep_rejections = 0
         self.timestep_evictions = 0
         self.timestep_handoffs = 0
+        self.timestep_forecasts = 0
+        self.timestep_forecast_moves = 0
 
     def _account_assignment(self, cloudlet_id: str) -> None:
         self._assigned_concurrency[cloudlet_id] = self._assigned_concurrency.get(cloudlet_id, 0) + 1
@@ -1212,6 +1221,10 @@ class Scheduler:
             "central_warm_count": float(by_type["central"][0]),
             "central_cold_count": float(by_type["central"][1]),
             "handoffs": float(getattr(self, "timestep_handoffs", 0)),
+            # Prewarm planning: users with a forecast this step, and how many of
+            # those forecasts name a cloudlet other than the serving one.
+            "forecasts": float(getattr(self, "timestep_forecasts", 0)),
+            "forecast_moves": float(getattr(self, "timestep_forecast_moves", 0)),
             # Prewarm accounting (per step). A launch is a container start that
             # no request paid for; hits/wasted resolve each launch exactly once.
             "prewarm_launches": float(pool.step_prewarm_launches) if pool is not None else 0.0,
