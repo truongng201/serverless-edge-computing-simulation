@@ -206,6 +206,39 @@ def print_table(table, latex=False):
                 print(" & ".join(parts) + r" \\")
 
 
+def paired_differences(runs, pairs, metrics=("cold_count", "latency_per_request_ms", "variable_energy_j")):
+    """Seed-paired differences A - B per (users, edges).
+
+    All policies in one seed replay the same cohort, so the per-seed
+    difference removes cohort-to-cohort variation. Returns
+    {(users, edges, A, B, metric): (mean, ci95, n_pairs)}.
+    """
+    out = {}
+    configs = sorted({(u, e) for (u, e, _, _) in runs})
+    for (u, e) in configs:
+        for a, b in pairs:
+            seeds_a = {s for (uu, ee, al, s) in runs if (uu, ee, al) == (u, e, a)}
+            seeds_b = {s for (uu, ee, al, s) in runs if (uu, ee, al) == (u, e, b)}
+            for m in metrics:
+                diffs = []
+                for sd in sorted(seeds_a & seeds_b):
+                    va = runs[(u, e, a, sd)].get(m)
+                    vb = runs[(u, e, b, sd)].get(m)
+                    if va is not None and vb is not None:
+                        diffs.append(va - vb)
+                if diffs:
+                    out[(u, e, a, b, m)] = mean_ci(diffs)
+    return out
+
+
+def print_paired(paired):
+    print(f"\n{'=' * 100}\nSEED-PAIRED DIFFERENCES (A - B, mean ± 95% CI, Student-t)\n{'=' * 100}")
+    for (u, e, a, b, m), (mean, ci, n) in sorted(paired.items()):
+        flag = "" if ci != ci else ("  *" if abs(mean) > ci else "")
+        print(f"u={u:<5} e={e:<4} {m:<24} {a} - {b}: {mean:>10.4g} ± {ci:<8.3g} (n={n}){flag}")
+    print("(* = 95% CI excludes zero)")
+
+
 def write_csv(table, out_path):
     with open(out_path, "w", newline="") as fh:
         w = csv.writer(fh)
@@ -283,6 +316,8 @@ def main():
     ap.add_argument("--latex", action="store_true", help="also print LaTeX table rows")
     ap.add_argument("--warmup-steps", type=int, default=0,
                     help="drop timesteps <= N from every run (cold-system transient)")
+    ap.add_argument("--paired", action="append", default=[], metavar="A::B",
+                    help="seed-paired difference A - B, e.g. 'predictive::prewarm (constant velocity)'; repeatable")
     ap.add_argument("--requests", metavar="DIR", help="per-request log dir (request_logs)")
     ap.add_argument("--cdf-out", metavar="CSV", help="write pooled CDF quantiles for plotting")
     args = ap.parse_args()
@@ -303,6 +338,14 @@ def main():
         table = aggregate(runs)
         print_table(table, latex=args.latex)
         write_csv(table, args.out)
+        if args.paired:
+            pairs = []
+            for spec in args.paired:
+                if "::" not in spec:
+                    ap.error(f"--paired expects 'A::B', got {spec!r}")
+                a, b = (x.strip() for x in spec.split("::", 1))
+                pairs.append((a, b))
+            print_paired(paired_differences(runs, pairs))
 
     if args.requests:
         analyze_requests(args.requests, cdf_out=args.cdf_out)

@@ -169,10 +169,30 @@ class SetDatasetController:
             first_point = trajectories[0]["points"][0]
             has_features = "v" in first_point
             self.logger.info(f"TaxiD replay: features included = {has_features}")
+            if has_features:
+                self._reject_standardized_features(trajectories, path)
         
         return trajectories
     
         
+    @staticmethod
+    def _reject_standardized_features(trajectories: List[Dict[str, Any]], path: Path) -> None:
+        """Refuse replay files whose features are already standardized.
+
+        The predictor applies its training scaler at inference time. Older
+        exports copied the standardized columns of test.pkl, so the model saw
+        doubly standardized inputs. Raw stop_flag / rush_hour are 0/1 flags.
+        """
+        for traj in trajectories[:50]:
+            for pt in traj.get("points", [])[:50]:
+                for flag in ("stop_flag", "rush_hour"):
+                    v = pt.get(flag)
+                    if v is not None and min(abs(v), abs(v - 1.0)) > 1e-6:
+                        raise ValueError(
+                            f"TaxiD replay '{path}' has standardized features ({flag}={v:.3f}); "
+                            "re-export it with scripts/export_taxid_replay_last1k.py --include-features"
+                        )
+
     def start_sample_data(self):
         self._apply_seed()
         sample_data = {}

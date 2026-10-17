@@ -171,6 +171,19 @@ def export_replay(
     if include_features:
         print(f"[ReplayExport] Available features: {available_features}")
 
+    # test.pkl stores features already standardized with the training scaler.
+    # The simulator's inference path applies that scaler itself, so export RAW
+    # values; otherwise the model receives doubly standardized inputs.
+    scaler = None
+    if include_features:
+        scaler_path = phaseb_dir / "scaler.pkl"
+        if not scaler_path.exists():
+            raise FileNotFoundError(
+                f"scaler.pkl not found at {scaler_path}; needed to export raw features"
+            )
+        scaler = pd.read_pickle(scaler_path)
+        print(f"[ReplayExport] Un-standardizing features with {scaler_path}")
+
     # Export trajectories
     trajectories: List[Dict[str, Any]] = []
     
@@ -197,7 +210,11 @@ def export_replay(
             # Add features if requested
             if include_features:
                 for feat in available_features:
-                    point[feat] = float(row[feat])
+                    value = float(row[feat])
+                    if feat in scaler:
+                        mu, sigma = scaler[feat]
+                        value = value * (sigma if sigma else 1.0) + mu
+                    point[feat] = value
             
             points.append(point)
         
