@@ -6,7 +6,7 @@ import subprocess
 import signal
 import sys
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from collections import OrderedDict, defaultdict
 import matplotlib.pyplot as plt
 import math
@@ -373,8 +373,13 @@ class ExperimentRunner:
             print(f"Failed to set dataset: {e}")
             return False
     
-    def run_simulation_workload(self, duration: int = 50, delay_time: int = 1) -> Dict[str, Any]:
-        print(f"Running simulation workload for {duration} seconds...")
+    def run_simulation_workload(self, duration: int = 50, delay_time: Optional[float] = None) -> Dict[str, Any]:
+        # `duration` is the number of simulation steps. `delay_time` is only a
+        # wall-clock pause between steps (useful for watching the UI); simulated
+        # execution does not depend on it, so STEP_DELAY_S=0 runs at full speed.
+        if delay_time is None:
+            delay_time = float(os.getenv("STEP_DELAY_S", "1"))
+        print(f"Running simulation workload for {duration} steps (pause {delay_time}s per step)...")
         
         # Start simulation
         start_response = requests.post(f"{self.api_base}/start_simulation")
@@ -384,7 +389,7 @@ class ExperimentRunner:
         else:
             print("Simulation started successfully")
         metrics = {}
-        for timestep in range(duration // delay_time):
+        for timestep in range(duration):
             res = requests.get(f"{self.api_base}/get_all_users")
             if res.status_code != 200:
                 print(f"Failed to update users at timestep {timestep + 1}")
@@ -409,7 +414,8 @@ class ExperimentRunner:
                 )
             else:
                 print(f"Failed to get metrics at timestep {timestep + 1}: {metrics_response.text}")
-            time.sleep(delay_time)
+            if delay_time > 0:
+                time.sleep(delay_time)
 
         # Stop simulation
         stop_response = requests.post(f"{self.api_base}/stop_simulation")
@@ -744,21 +750,21 @@ def main():
     # PREREQUISITE for a TRUE 5000-user run: the taxiD_Replay pool must hold
     # >= 5000 trajectories (mock_data/taxid_replay_5000_features.pkl).
     # =====================================================================
-    # --- ACTIVE: full 4-variant ablation swept across edge density 10..200.
-    #     4 users x 4 edges x 4 variants x 5 seeds = 320 runs.
-    #     Captures request logs for EVERY variant at every density (handoff + CDF).
-    #     To trim: drop 5000 from USER_RANGES, or use SEEDS=[11] for a quick pass. ---
-    USER_RANGES = [50, 3000]                     # mobile users
-    EDGE_RANGES = [10, 50, 100]                         # cloudlet density sweep
+    # --- ACTIVE: the paper's grid (Section 5.1): 5 user scales x 3 densities x
+    #     7 policies x 5 seeds = 525 runs. Run with STEP_DELAY_S=0; the default
+    #     1 s pause per step alone adds ~44 h. To trim, use SEEDS=[11] first. ---
+    USER_RANGES = [50, 100, 500, 1000, 3000]     # mobile users
+    EDGE_RANGES = [10, 50, 100]                  # cloudlet density sweep
     ALGORITHMS  = [
         "greedy",
         "greedy + keep-alive",
         "prediction without warm-state awareness",
-        "predictive",
         # Same prewarm mechanism, different forecast: isolates the value of the
-        # learned predictor ("prewarm (persistence)" never forecasts a move, so
-        # it reduces to keep-alive; add it if a reviewer asks for it).
+        # learned predictor. Persistence forecasts no movement, so it differs
+        # from keep-alive only when admission control moves a user.
+        "prewarm (persistence)",
         "prewarm (constant velocity)",
+        "predictive",
         "prewarm (oracle)",
     ]
     SEEDS       = [11, 23, 42, 71, 97]                        # 5 seeds for mean +/- CI ([11] = quick)
