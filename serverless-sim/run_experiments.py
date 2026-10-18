@@ -769,6 +769,19 @@ def main():
     ]
     SEEDS       = [11, 23, 42, 71, 97]                        # 5 seeds for mean +/- CI ([11] = quick)
     DURATION_S  = 300                                         # steps per experiment
+    # Optional overrides without editing this file, e.g. for a smoke test:
+    #   GRID_USERS="50" GRID_EDGES="10" GRID_SEEDS="11" GRID_STEPS=60 \
+    #   GRID_ALGOS="greedy + keep-alive;predictive" python run_experiments.py
+    # Lists are comma-separated, except GRID_ALGOS (names contain spaces): ';'.
+    def _ints(name, default):
+        raw = os.getenv(name, "").strip()
+        return [int(x) for x in raw.split(",") if x.strip()] if raw else default
+    USER_RANGES = _ints("GRID_USERS", USER_RANGES)
+    EDGE_RANGES = _ints("GRID_EDGES", EDGE_RANGES)
+    SEEDS = _ints("GRID_SEEDS", SEEDS)
+    DURATION_S = int(os.getenv("GRID_STEPS", DURATION_S))
+    if os.getenv("GRID_ALGOS", "").strip():
+        ALGORITHMS = [a.strip() for a in os.environ["GRID_ALGOS"].split(";") if a.strip()]
     # =====================================================================
 
     runner.run_comprehensive_experiments(
